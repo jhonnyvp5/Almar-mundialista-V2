@@ -169,6 +169,7 @@ export default function App() {
   const [showPointsManual, setShowPointsManual] = useState<boolean>(true);
   const [activeRuleAccordion, setActiveRuleAccordion] = useState<number | null>(0);
   const [profileSearchTerm, setProfileSearchTerm] = useState('');
+  const [profileSearchWeek, setProfileSearchWeek] = useState<string>('all');
   const [profileOnlyWithPoints, setProfileOnlyWithPoints] = useState(false);
 
   // General States
@@ -207,6 +208,7 @@ export default function App() {
   
   // Admin Score Entry Form
   const [selectedAdminMatchStage, setSelectedAdminMatchStage] = useState<StageType | 'all'>('all');
+  const [selectedAdminMatchWeek, setSelectedAdminMatchWeek] = useState<string>('all');
   const [adminScores, setAdminScores] = useState<Record<string, { home: string; away: string; winner?: string }>>({});
 
   // Loading indicator for server syncs
@@ -234,6 +236,7 @@ export default function App() {
         setSystemConfig(data);
         if (typeof data.unlockedWeek === 'number') {
           setUnlockedWeek(data.unlockedWeek);
+          setSelectedAdminMatchWeek(data.unlockedWeek.toString());
         }
       }
     } catch (e) {
@@ -801,7 +804,8 @@ export default function App() {
 
     const isTimeLocked = isMatchLockedForTime(m);
     const isWeeklyLocked = isMatchWeeklyLocked(m.date);
-    const isLocked = m.completed || isTimeLocked || isWeeklyLocked;
+    const hasOfficialResult = m.homeScore !== undefined;
+    const isLocked = m.completed || isTimeLocked || isWeeklyLocked || hasOfficialResult;
 
     const isDisabled = isLocked || isHomePlaceholder || isAwayPlaceholder;
     const isTie = hScore !== '' && aScore !== '' && parseInt(hScore, 10) === parseInt(aScore, 10);
@@ -1320,6 +1324,7 @@ export default function App() {
       }
 
       setUnlockedWeek(week);
+      setSelectedAdminMatchWeek(week.toString());
       showToast(`🔓 Semana ${week} de partidos habilitada exitosamente.`);
     } catch (e) {
       showToast('❌ Error de conexión al actualizar la configuración.');
@@ -2655,7 +2660,8 @@ export default function App() {
                             // Match locked criteria (kickoff rules, weekly lock or completed)
                             const isTimeLocked = isMatchLockedForTime(m);
                             const isWeeklyLocked = isMatchWeeklyLocked(m.date);
-                            const isLocked = m.completed || isTimeLocked || isWeeklyLocked;
+                            const hasOfficialResult = m.homeScore !== undefined;
+                            const isLocked = m.completed || isTimeLocked || isWeeklyLocked || hasOfficialResult;
 
                             return (
                               <div 
@@ -4093,7 +4099,7 @@ export default function App() {
 
                   {/* detailed user predictions list where we compute score per prediction live */}
                   <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-white/5 pb-4">
                       <div>
                         <h3 className="text-lg font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
                           <ClipboardList className="h-5 w-5 text-amber-500" />
@@ -4102,7 +4108,22 @@ export default function App() {
                         <p className="text-xs text-slate-400">Verifica los puntos que vas acumulando con cada partido y pronóstico.</p>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                      <div className="flex flex-row flex-wrap items-center gap-3 w-full lg:w-auto">
+                        {/* Week filter */}
+                        <select
+                          value={profileSearchWeek}
+                          onChange={(e) => setProfileSearchWeek(e.target.value)}
+                          className="bg-slate-950 text-slate-300 rounded-xl px-3 py-1.5 text-xs border border-slate-900 focus:outline-none focus:border-amber-500/50"
+                        >
+                          <option value="all">Todas las semanas</option>
+                          <option value="1">Semana 1</option>
+                          <option value="2">Semana 2</option>
+                          <option value="3">Semana 3</option>
+                          <option value="4">Semana 4</option>
+                          <option value="5">Semana 5</option>
+                          <option value="6">Semana 6</option>
+                        </select>
+
                         {/* Search field */}
                         <div className="relative">
                           <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
@@ -4119,7 +4140,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setProfileOnlyWithPoints(!profileOnlyWithPoints)}
-                          className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                          className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                             profileOnlyWithPoints
                               ? 'bg-amber-500/10 border-amber-500/25 text-amber-400'
                               : 'bg-slate-950 border-slate-900 text-slate-400 hover:text-white'
@@ -4139,6 +4160,12 @@ export default function App() {
                         const awayRes = resolveTeamWithManualOverrides(m.awayTeamId);
                         const homeName = 'name' in homeRes ? homeRes.name : homeRes.text;
                         const awayName = 'name' in awayRes ? awayRes.name : awayRes.text;
+
+                        if (profileSearchWeek !== 'all') {
+                          if (getMatchWeek(m.date).toString() !== profileSearchWeek) {
+                            return false;
+                          }
+                        }
 
                         const matchesSearch = 
                           homeName.toLowerCase().includes(profileSearchTerm.toLowerCase()) ||
@@ -4514,24 +4541,40 @@ export default function App() {
                     Cargar Resultados Oficiales
                   </h3>
 
-                  <select
-                    value={selectedAdminMatchStage}
-                    onChange={(e) => setSelectedAdminMatchStage(e.target.value as StageType | 'all')}
-                    className="bg-slate-950 text-slate-300 rounded px-2.5 py-1 text-xs border border-slate-850"
-                  >
-                    <option value="all">Fase torneo completo</option>
-                    <option value="group">Fase de Grupos</option>
-                    <option value="1/16">1/16 Final</option>
-                    <option value="1/8">1/8 Final</option>
-                    <option value="1/4">1/4 Final</option>
-                    <option value="1/2">Semifinales</option>
-                    <option value="final">Final</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedAdminMatchStage}
+                      onChange={(e) => setSelectedAdminMatchStage(e.target.value as StageType | 'all')}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1 text-xs border border-slate-850"
+                    >
+                      <option value="all">Fase torneo completo</option>
+                      <option value="group">Fase de Grupos</option>
+                      <option value="1/16">1/16 Final</option>
+                      <option value="1/8">1/8 Final</option>
+                      <option value="1/4">1/4 Final</option>
+                      <option value="1/2">Semifinales</option>
+                      <option value="final">Final</option>
+                    </select>
+                    <select
+                      value={selectedAdminMatchWeek}
+                      onChange={(e) => setSelectedAdminMatchWeek(e.target.value)}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1 text-xs border border-slate-850"
+                    >
+                      <option value="all">Todas las semanas</option>
+                      <option value="1">Semana 1</option>
+                      <option value="2">Semana 2</option>
+                      <option value="3">Semana 3</option>
+                      <option value="4">Semana 4</option>
+                      <option value="5">Semana 5</option>
+                      <option value="6">Semana 6</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="overflow-y-auto max-h-[380px] space-y-3 pr-1">
                   {combinedMatches
                     .filter(m => selectedAdminMatchStage === 'all' || m.stage === selectedAdminMatchStage)
+                    .filter(m => selectedAdminMatchWeek === 'all' || getMatchWeek(m.date).toString() === selectedAdminMatchWeek)
                     .map((m) => {
                       const homeRes = resolveTeamWithManualOverrides(m.homeTeamId);
                       const awayRes = resolveTeamWithManualOverrides(m.awayTeamId);
@@ -4621,6 +4664,7 @@ export default function App() {
                                 className="bg-slate-900 border border-slate-800 rounded text-[10px] p-0.5 text-amber-400 focus:outline-none"
                               >
                                 <option value="">-- Elige --</option>
+                                <option value="no_aplica">No aplica</option>
                                 <option value={'id' in homeRes ? homeRes.id : ''}>{'name' in homeRes ? homeRes.name : 'Local'}</option>
                                 <option value={'id' in awayRes ? awayRes.id : ''}>{'name' in awayRes ? awayRes.name : 'Visitante'}</option>
                               </select>
