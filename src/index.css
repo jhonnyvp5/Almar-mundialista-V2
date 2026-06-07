@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Redefining slate colors derived from the requested Azul oscuro #0A2540 */
+  --color-slate-50: #FCFDFE;
+  --color-slate-100: #F5F7FA;  /* Gris claro */
+  --color-slate-200: #E2E8F0;
+  --color-slate-300: #BAD0E0;
+  --color-slate-400: #89A8C5;
+  --color-slate-500: #5D84A8;
+  --color-slate-600: #3E6388;
+  --color-slate-700: #264465;
+  --color-slate-800: #142E4A;
+  --color-slate-850: #0E243A;
+  --color-slate-900: #0A2540;  /* Azul oscuro */
+  --color-slate-950: #041221;  /* Ultra dark background variant matching Azul oscuro foundation */
+
+  /* Redefining amber colors to the requested Dorado #F4B400 */
+  --color-amber-50: #FFFDF0;
+  --color-amber-100: #FFF9C4;
+  --color-amber-200: #FFF176;
+  --color-amber-300: #FFE082;
+  --color-amber-400: #F4B400;  /* Dorado */
+  --color-amber-500: #E09E00;
+  --color-amber-600: #C28200;
+  --color-amber-700: #A36500;
+  --color-amber-800: #854E00;
+  --color-amber-900: #663800;
+
+  /* Redefining emerald and green colors to the requested Verde acento #00C853 */
+  --color-emerald-50: #E8FAF0;
+  --color-emerald-150: #C7F7DC;
+  --color-emerald-200: #A6F4C7;
+  --color-emerald-300: #64EC9F;
+  --color-emerald-400: #22E17A;
+  --color-emerald-500: #00C853;  /* Verde acento */
+  --color-emerald-600: #00B147;
+  --color-emerald-700: #00993B;
+  --color-emerald-800: #00812F;
+  --color-emerald-900: #006922;
+
+  --color-green-50: #E8FAF0;
+  --color-green-100: #C7F7DC;
+  --color-green-200: #A6F4C7;
+  --color-green-300: #64EC9F;
+  --color-green-400: #22E17A;
+  --color-green-500: #00C853;  /* Verde acento */
+  --color-green-600: #00B147;
+  --color-green-700: #00993B;
+  --color-green-800: #00812F;
+  --color-green-900: #006922;
+}
+
+/* Custom scrollbar styling for slick lists with new colors */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #041221;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #142E4A;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #264465;
+}

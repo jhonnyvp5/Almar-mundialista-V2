@@ -1,0 +1,20 @@
+{
+  "users": [
+    {
+      "id": "usr_admin",
+      "nombreCompleto": "Jhonny Vargas",
+      "cedula": "admin12345",
+      "correo": "jhonnyvp5@gmail.com",
+      "empresa": "PRODUMAR SA",
+      "localidad": "San Pablo",
+      "fechaHoraRegistro": "2026-06-06T04:39:00.000Z",
+      "role": "admin",
+      "blocked": false
+    }
+  ],
+  "predictions": {},
+  "matches": [],
+  "config": {
+    "unlockedWeek": 1
+  }
+}
