@@ -143,7 +143,6 @@ export default function App() {
   const [regCorreo, setRegCorreo] = useState('');
   const [regEmpresa, setRegEmpresa] = useState('PRODUMAR SA');
   const [regLocalidad, setRegLocalidad] = useState('San Pablo');
-  const [regIsAdminTest, setRegIsAdminTest] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [regError, setRegError] = useState('');
   const [loginCedula, setLoginCedula] = useState('');
@@ -987,10 +986,6 @@ export default function App() {
     const cleanCorreo = regCorreo.trim().toLowerCase();
     let cleanCedula = regCedula.trim().replace(/\s+/g, '');
 
-    if (regIsAdminTest) {
-      cleanCedula = 'admin12345';
-    }
-
     if (!cleanNombre || !cleanCedula || !cleanCorreo) {
       setRegError('Completa todos los campos obligatorios.');
       return;
@@ -1002,7 +997,7 @@ export default function App() {
     }
 
     // Client-side Cédula check
-    if (cleanCedula !== 'admin12345' && !isEcuadorianCedulaValid(cleanCedula)) {
+    if (!isEcuadorianCedulaValid(cleanCedula)) {
       setRegError('El formato de la cédula ecuatoriana ingresada es inválido.');
       return;
     }
@@ -1017,8 +1012,7 @@ export default function App() {
           cedula: cleanCedula,
           correo: cleanCorreo,
           empresa: regEmpresa,
-          localidad: regLocalidad,
-          isAdminTest: regIsAdminTest
+          localidad: regLocalidad
         })
       });
       const data = await res.json();
@@ -1652,7 +1646,7 @@ export default function App() {
                  authMode === 'login' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
                }`}
             >
-              Ingresar o Iniciar Sesión
+              Iniciar Sesión
             </button>
           </div>
 
@@ -1750,29 +1744,6 @@ export default function App() {
                     <option value="Durán">Durán</option>
                   </select>
                 </div>
-              </div>
-
-              {/* Test checkbox helper */}
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  id="checkbox-admintest"
-                  type="checkbox"
-                  checked={regIsAdminTest}
-                  onChange={(e) => {
-                    setRegIsAdminTest(e.target.checked);
-                    if (e.target.checked) {
-                      setRegCedula('admin12345');
-                      setRegCorreo('admin@polla.com');
-                    } else {
-                      setRegCedula('');
-                      setRegCorreo('');
-                    }
-                  }}
-                  className="rounded text-amber-500 focus:ring-amber-500 bg-slate-950 border-slate-800"
-                />
-                <label htmlFor="checkbox-admintest" className="text-xs text-amber-400 font-semibold cursor-pointer">
-                  Registrar como modo de prueba ADMINISTRADOR
-                </label>
               </div>
 
               <button
@@ -4611,10 +4582,19 @@ export default function App() {
 
               {/* Right Column: User Management list (5/12) */}
               <div className="lg:col-span-5 bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
-                <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5 border-b border-slate-850 pb-2.5">
-                  <User className="h-4 w-4" />
-                  Manejo de Participantes
-                </h3>
+                <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
+                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <User className="h-4 w-4" />
+                    Manejo de Participantes
+                  </h3>
+                  <button 
+                    onClick={fetchAdminData}
+                    className="flex items-center gap-1 text-[10px] uppercase font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 p-1.5 rounded-lg transition-colors cursor-pointer"
+                    title="Actualizar lista de usuarios"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </button>
+                </div>
 
                 {/* Filtros de Empresa, Localidad y Buscador de Nombre/Cédula */}
                 <div className="space-y-3 bg-slate-950/50 p-3.5 rounded-xl border border-slate-850">

@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import * as xlsx from 'xlsx';
 import { createServer as createViteServer } from 'vite';
 import { TEAMS, GROUPS, generateGroupStageMatches, generateKnockoutMatches } from './src/data';
 import { computeAllStandings, getRankedThirdPlacedTeams, getKnockoutWinnerId, resolveAllThirds } from './src/utils';
@@ -35,7 +36,7 @@ export function validarCedulaEcuatoriana(cedula: string): boolean {
   return calculado === digitoVerificador;
 }
 
-const DB_FILE = path.join(process.cwd(), 'data_db.json');
+const DB_FILE = process.env.VERCEL ? '/tmp/data_db.json' : path.join(process.cwd(), 'data_db.json');
 
 // Interface definition matching database structure
 interface UserRecord {
@@ -139,7 +140,7 @@ async function startServer() {
 
   // API - Auth Register
   app.post('/api/auth/register', (req, res) => {
-    const { nombreCompleto, cedula, correo, empresa, localidad, isAdminTest } = req.body;
+    const { nombreCompleto, cedula, correo, empresa, localidad } = req.body;
 
     if (!nombreCompleto || !cedula || !empresa || !localidad || !correo) {
       return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
@@ -185,7 +186,7 @@ async function startServer() {
       empresa,
       localidad,
       fechaHoraRegistro: new Date().toISOString(),
-      role: isAdminTest ? 'admin' : (cleanCedula === 'admin12345' ? 'admin' : 'user'),
+      role: (cleanCedula === 'admin12345' ? 'admin' : 'user'),
       blocked: false
     };
 
@@ -309,17 +310,144 @@ async function startServer() {
 
     // Build Ranking general stats first to export rich info
     const scores = calculateRankingStats(db);
+    
+    const getMatchWeek = (matchDate: string): number => {
+      if (!matchDate) return 1;
+      if (matchDate <= '2026-06-14') return 1;
+      if (matchDate <= '2026-06-21') return 2;
+      return 3;
+    };
 
-    let csvContent = '\uFEFF'; // Excel UTF-8 BOM
-    csvContent += 'Posición,Nombre Completo,Cédula,Correo,Empresa,Localidad,Fecha Registro,Puntos,Aciertos Exactos,Aciertos Ganador,Aciertos Goles Equipo,Aciertos Diferencia Gol,Aciertos 1er Grupo,Aciertos 2do Grupo,Aciertos 3er Grupo,Puntos Campeón,Puntos Balón de Oro,Puntos Guante de Oro,Puntos Bota de Oro,Puntos Joven Torneo,Rol,Estado\n';
+    const getTeamName = (teamId: string) => {
+      const t = TEAMS.find(x => x.id === teamId);
+      return t ? t.name : (teamId || 'N/A');
+    };
 
-    scores.forEach((u, index) => {
-      csvContent += `${index + 1},"${u.nombre}","${u.cedula}","${u.correo || 'N/D'}","${u.empresa}","${u.localidad}","${u.fechaRegistro}",${u.puntos},${u.aciertosExactos},${u.aciertosGanador},${u.aciertosGolesEquipo},${u.aciertosDiferenciaGol},${u.aciertosPrimeros},${u.aciertosSegundos},${u.aciertosTerceros},${u.puntosCampeon},${u.puntosBalonOro},${u.puntosGuanteOro},${u.puntosBotaOro},${u.puntosJovenTorneo},"${u.role}","${u.blocked ? 'Bloqueado' : 'Activo'}"\n`;
+    const unlockedWeek = db.config?.unlockedWeek || 1;
+    const allMatches = [...generateGroupStageMatches(), ...generateKnockoutMatches()];
+    const weekMatches = allMatches.filter(m => getMatchWeek(m.date) === unlockedWeek);
+    const knockoutMatches = generateKnockoutMatches();
+
+    // Sheet 1: Pronósticos Semana Activada
+    const sheet1Data = scores.map((u, i) => {
+      const baseObj: any = {
+        'Posición': i + 1,
+        'Nombre': u.nombre,
+        'Cédula': u.cedula,
+        'Empresa': u.empresa,
+        'Localidad': u.localidad,
+        'Puntos Totales': u.puntos
+      };
+
+      const userPreds = db.predictions[u.id] || {};
+
+      weekMatches.forEach(m => {
+        const p = userPreds[m.id];
+        let pTxt = 'Sin pronóstico';
+        if (p) {
+            if (m.type === 'knockout') {
+                pTxt = `${p.predictedHome || 0} - ${p.predictedAway || 0} (Avanza: ${getTeamName(p.predictedWinnerId || 'Empate')})`;
+            } else {
+                pTxt = `${p.predictedHome || 0} - ${p.predictedAway || 0}`;
+            }
+        }
+        const colName = `${m.id} (${getTeamName(m.homeTeamId)} vs ${getTeamName(m.awayTeamId)})`;
+        baseObj[colName] = pTxt;
+      });
+
+      return baseObj;
     });
 
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename=participantes_mundial2026.csv');
-    res.send(csvContent);
+    // Sheet 2: Posiciones Grupos (1st, 2nd, 3rd)
+    const sheet2Data = scores.map((u, i) => {
+      const baseObj: any = {
+        'Posición': i + 1,
+        'Nombre': u.nombre,
+        'Cédula': u.cedula,
+      };
+      
+      const userPreds = db.predictions[u.id] || {};
+      
+      GROUPS.forEach(g => {
+        const first = getTeamName(userPreds[`group_override_first_${g}`]?.predictedWinnerId || '');
+        const second = getTeamName(userPreds[`group_override_second_${g}`]?.predictedWinnerId || '');
+        const thirdId = userPreds[`group_override_third_${g}`]?.predictedWinnerId || '';
+        const third = thirdId === 'no_aplica' ? 'No aplica' : getTeamName(thirdId);
+        
+        baseObj[`Grupo ${g} - 1ero`] = first !== 'N/A' ? first : 'No seleccionado';
+        baseObj[`Grupo ${g} - 2do`] = second !== 'N/A' ? second : 'No seleccionado';
+        baseObj[`Grupo ${g} - 3ero`] = third !== 'N/A' ? third : 'No seleccionado';
+      });
+
+      return baseObj;
+    });
+
+    // Sheet 3: Llave Eliminatoria (Knockouts)
+    const sheet3Data = scores.map((u, i) => {
+      const baseObj: any = {
+        'Posición': i + 1,
+        'Nombre': u.nombre,
+        'Cédula': u.cedula,
+      };
+
+      const userPreds = db.predictions[u.id] || {};
+
+      knockoutMatches.forEach(m => {
+        const p = userPreds[m.id];
+        let pTxt = 'Sin pronóstico';
+        if (p) {
+             pTxt = `${p.predictedHome || 0} - ${p.predictedAway || 0} (Avanza: ${getTeamName(p.predictedWinnerId || 'Empate')})`;
+        }
+        const colName = `${m.id} - ${m.stage}`;
+        baseObj[colName] = pTxt;
+      });
+
+      return baseObj;
+    });
+
+    // Sheet 4: Premios FIFA
+    const awardsMap: Record<string, string> = {
+      'award_balon_oro': 'Balón de Oro',
+      'award_guante_oro': 'Guante de Oro',
+      'award_bota_oro': 'Bota de Oro',
+      'award_joven_torneo': 'Jugador Joven'
+    };
+
+    const sheet4Data = scores.map((u, i) => {
+      const baseObj: any = {
+        'Posición': i + 1,
+        'Nombre': u.nombre,
+        'Cédula': u.cedula,
+      };
+
+      const userPreds = db.predictions[u.id] || {};
+
+      Object.keys(awardsMap).forEach(key => {
+         const p = userPreds[key]?.predictedWinnerId;
+         baseObj[awardsMap[key]] = p ? getTeamName(p) : 'Sin pronóstico';
+      });
+
+      return baseObj;
+    });
+
+    const wb = xlsx.utils.book_new();
+    
+    // Convert JSONs to Sheets
+    const ws1 = xlsx.utils.json_to_sheet(sheet1Data);
+    const ws2 = xlsx.utils.json_to_sheet(sheet2Data);
+    const ws3 = xlsx.utils.json_to_sheet(sheet3Data);
+    const ws4 = xlsx.utils.json_to_sheet(sheet4Data);
+
+    xlsx.utils.book_append_sheet(wb, ws1, `Semana ${unlockedWeek}`);
+    xlsx.utils.book_append_sheet(wb, ws2, "Fase Grupos");
+    xlsx.utils.book_append_sheet(wb, ws3, "Llave Eliminatoria");
+    xlsx.utils.book_append_sheet(wb, ws4, "Premios FIFA");
+
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=pronosticos_mundial2026.xlsx');
+    res.send(buffer);
   });
 
   // Helper matching dates/times
@@ -1003,9 +1131,18 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server started on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    const port = process.env.PORT || PORT;
+    app.listen(port, () => {
+      console.log(`Server started on http://localhost:${port}`);
+    });
+  }
+
+  return app;
 }
 
-startServer();
+const appPromise = startServer();
+export default async function handler(req: any, res: any) {
+  const app = await appPromise;
+  app(req, res);
+}
