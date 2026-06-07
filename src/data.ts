@@ -212,153 +212,49 @@ export function generateGroupStageMatches(): Match[] {
 // The actual teams are resolved dynamically from the group standings,
 // but we define the empty fixture list here.
 export function generateKnockoutMatches(): Match[] {
-  const matches: Match[] = [];
+  return [
+    // 1/16 Final (Round of 32)
+    { id: 'K73', type: 'knockout', stage: '1/16', date: '2026-06-28', time: '14:00', venue: VENUES[0], homeTeamId: '2A', awayTeamId: '2B' },
+    { id: 'K74', type: 'knockout', stage: '1/16', date: '2026-06-29', time: '12:00', venue: VENUES[1], homeTeamId: '1C', awayTeamId: '2F' },
+    { id: 'K75', type: 'knockout', stage: '1/16', date: '2026-06-29', time: '15:30', venue: VENUES[2], homeTeamId: '1E', awayTeamId: '3_ABCDF' },
+    { id: 'K76', type: 'knockout', stage: '1/16', date: '2026-06-29', time: '20:00', venue: VENUES[3], homeTeamId: '1F', awayTeamId: '2C' },
+    { id: 'K77', type: 'knockout', stage: '1/16', date: '2026-06-30', time: '12:00', venue: VENUES[4], homeTeamId: '2E', awayTeamId: '2I' },
+    { id: 'K78', type: 'knockout', stage: '1/16', date: '2026-06-30', time: '16:00', venue: VENUES[5], homeTeamId: '1I', awayTeamId: '3_CDFGH' },
+    { id: 'K79', type: 'knockout', stage: '1/16', date: '2026-06-30', time: '20:00', venue: VENUES[6], homeTeamId: '1A', awayTeamId: '3_CEFHI' },
+    { id: 'K80', type: 'knockout', stage: '1/16', date: '2026-07-01', time: '11:00', venue: VENUES[7], homeTeamId: '1L', awayTeamId: '3_EHIJK' },
+    { id: 'K81', type: 'knockout', stage: '1/16', date: '2026-07-01', time: '15:00', venue: VENUES[8], homeTeamId: '1G', awayTeamId: '3_AEHIJ' },
+    { id: 'K82', type: 'knockout', stage: '1/16', date: '2026-07-01', time: '19:00', venue: VENUES[9], homeTeamId: '1D', awayTeamId: '3_BEFIJ' },
+    { id: 'K83', type: 'knockout', stage: '1/16', date: '2026-07-02', time: '14:00', venue: VENUES[10], homeTeamId: '1H', awayTeamId: '2J' },
+    { id: 'K84', type: 'knockout', stage: '1/16', date: '2026-07-02', time: '18:00', venue: VENUES[11], homeTeamId: '2K', awayTeamId: '2L' },
+    { id: 'K85', type: 'knockout', stage: '1/16', date: '2026-07-02', time: '22:00', venue: VENUES[12], homeTeamId: '1B', awayTeamId: '3_EFGIJ' },
+    { id: 'K86', type: 'knockout', stage: '1/16', date: '2026-07-03', time: '13:00', venue: VENUES[13], homeTeamId: '2D', awayTeamId: '2G' },
+    { id: 'K87', type: 'knockout', stage: '1/16', date: '2026-07-03', time: '17:00', venue: VENUES[14], homeTeamId: '1J', awayTeamId: '2H' },
+    { id: 'K88', type: 'knockout', stage: '1/16', date: '2026-07-03', time: '20:30', venue: VENUES[15], homeTeamId: '1K', awayTeamId: '3_DEIJL' },
 
-  // 1/16 Final (Round of 32)
-  // June 28 to July 3, 2026
-  const r32Dates = [
-    '2026-06-28', '2026-06-28', '2026-06-29', '2026-06-29',
-    '2026-06-30', '2026-06-30', '2026-07-01', '2026-07-01',
-    '2026-07-02', '2026-07-02', '2026-07-03', '2026-07-03',
-    '2026-06-28', '2026-06-29', '2026-07-01', '2026-07-02'
+    // 1/8 Final (Round of 16)
+    { id: 'K89', type: 'knockout', stage: '1/8', date: '2026-07-04', time: '12:00', venue: VENUES[0], homeTeamId: 'WK73', awayTeamId: 'WK75' },
+    { id: 'K90', type: 'knockout', stage: '1/8', date: '2026-07-04', time: '16:00', venue: VENUES[1], homeTeamId: 'WK74', awayTeamId: 'WK77' },
+    { id: 'K91', type: 'knockout', stage: '1/8', date: '2026-07-05', time: '15:00', venue: VENUES[2], homeTeamId: 'WK76', awayTeamId: 'WK78' },
+    { id: 'K92', type: 'knockout', stage: '1/8', date: '2026-07-05', time: '19:00', venue: VENUES[3], homeTeamId: 'WK79', awayTeamId: 'WK80' },
+    { id: 'K93', type: 'knockout', stage: '1/8', date: '2026-07-06', time: '14:00', venue: VENUES[4], homeTeamId: 'WK83', awayTeamId: 'WK84' },
+    { id: 'K94', type: 'knockout', stage: '1/8', date: '2026-07-06', time: '19:00', venue: VENUES[5], homeTeamId: 'WK81', awayTeamId: 'WK82' },
+    { id: 'K95', type: 'knockout', stage: '1/8', date: '2026-07-07', time: '11:00', venue: VENUES[6], homeTeamId: 'WK86', awayTeamId: 'WK88' },
+    { id: 'K96', type: 'knockout', stage: '1/8', date: '2026-07-07', time: '15:00', venue: VENUES[7], homeTeamId: 'WK85', awayTeamId: 'WK87' },
+
+    // Quarter Finals
+    { id: 'K97', type: 'knockout', stage: '1/4', date: '2026-07-09', time: '15:00', venue: VENUES[8], homeTeamId: 'WK89', awayTeamId: 'WK90' },
+    { id: 'K98', type: 'knockout', stage: '1/4', date: '2026-07-10', time: '14:00', venue: VENUES[9], homeTeamId: 'WK93', awayTeamId: 'WK94' },
+    { id: 'K99', type: 'knockout', stage: '1/4', date: '2026-07-11', time: '16:00', venue: VENUES[10], homeTeamId: 'WK91', awayTeamId: 'WK92' },
+    { id: 'K100', type: 'knockout', stage: '1/4', date: '2026-07-11', time: '20:00', venue: VENUES[11], homeTeamId: 'WK95', awayTeamId: 'WK96' },
+
+    // Semi Finals
+    { id: 'K101', type: 'knockout', stage: '1/2', date: '2026-07-14', time: '14:00', venue: VENUES[12], homeTeamId: 'WK97', awayTeamId: 'WK98' },
+    { id: 'K102', type: 'knockout', stage: '1/2', date: '2026-07-15', time: '14:00', venue: VENUES[13], homeTeamId: 'WK99', awayTeamId: 'WK100' },
+
+    // Third Place
+    { id: 'K103', type: 'knockout', stage: 'third_place', date: '2026-07-18', time: '16:00', venue: VENUES[14], homeTeamId: 'LK101', awayTeamId: 'LK102' },
+
+    // Final
+    { id: 'K104', type: 'knockout', stage: 'final', date: '2026-07-19', time: '14:00', venue: VENUES[15], homeTeamId: 'WK101', awayTeamId: 'WK102' },
   ];
-
-  // We have 16 matches in Round of 32
-  // Let's map homeTeamId and awayTeamId to placeholders
-  const r32Pairings = [
-    { home: '1E', away: '3_ABCDF' },  // K73
-    { home: '1I', away: '3_CDFGH' },  // K74
-    { home: '2A', away: '2B' },       // K75
-    { home: '1F', away: '2C' },       // K76
-    { home: '2K', away: '2L' },       // K77
-    { home: '1H', away: '2J' },       // K78
-    { home: '1D', away: '3_BEFIJ' },  // K79
-    { home: '1G', away: '3_AEHIJ' },  // K80
-    { home: '1C', away: '2F' },       // K81
-    { home: '2E', away: '2I' },       // K82
-    { home: '1A', away: '3_CEFHI' },  // K83
-    { home: '1L', away: '3_EHIJK' },  // K84
-    { home: '1J', away: '2H' },       // K85
-    { home: '2D', away: '2G' },       // K86
-    { home: '1B', away: '3_EFGIJ' },  // K87
-    { home: '1K', away: '3_DEIJL' },  // K88
-  ];
-
-  for (let i = 0; i < 16; i++) {
-    matches.push({
-      id: `K${73 + i}`,
-      type: 'knockout',
-      stage: '1/16',
-      date: r32Dates[i],
-      time: i % 2 === 0 ? '14:00' : '19:00',
-      venue: VENUES[i % VENUES.length],
-      homeTeamId: r32Pairings[i].home,
-      awayTeamId: r32Pairings[i].away,
-    });
-  }
-
-  // 1/8 Final (Round of 16)
-  // July 4 to July 7
-  const r16Pairings = [
-    { home: 'WK73', away: 'WK74' }, // K89
-    { home: 'WK75', away: 'WK76' }, // K90
-    { home: 'WK77', away: 'WK78' }, // K91
-    { home: 'WK79', away: 'WK80' }, // K92
-    { home: 'WK81', away: 'WK82' }, // K93
-    { home: 'WK83', away: 'WK84' }, // K94
-    { home: 'WK85', away: 'WK86' }, // K95
-    { home: 'WK87', away: 'WK88' }, // K96
-  ];
-  const r16Dates = ['2026-07-04', '2026-07-04', '2026-07-05', '2026-07-05', '2026-07-06', '2026-07-06', '2026-07-07', '2026-07-07'];
-
-  for (let i = 0; i < 8; i++) {
-    matches.push({
-      id: `K${89 + i}`,
-      type: 'knockout',
-      stage: '1/8',
-      date: r16Dates[i],
-      time: i % 2 === 0 ? '14:00' : '19:00',
-      venue: VENUES[(16 + i) % VENUES.length],
-      homeTeamId: r16Pairings[i].home,
-      awayTeamId: r16Pairings[i].away,
-    });
-  }
-
-  // 1/4 Final
-  // July 9 to July 11
-  const qfPairings = [
-    { home: 'WK89', away: 'WK90' }, // K97
-    { home: 'WK91', away: 'WK92' }, // K98
-    { home: 'WK93', away: 'WK94' }, // K99
-    { home: 'WK95', away: 'WK96' }, // K100
-  ];
-  const qfDates = ['2026-07-09', '2026-07-10', '2026-07-10', '2026-07-11'];
-
-  for (let i = 0; i < 4; i++) {
-    matches.push({
-      id: `K${97 + i}`,
-      type: 'knockout',
-      stage: '1/4',
-      date: qfDates[i],
-      time: i === 0 || i === 3 ? '19:00' : '14:00',
-      venue: VENUES[(24 + i) % VENUES.length],
-      homeTeamId: qfPairings[i].home,
-      awayTeamId: qfPairings[i].away,
-    });
-  }
-
-  // Semi-finals (1/2)
-  // July 14 and July 15
-  const sfPairings = [
-    { home: 'WK97', away: 'WK98' },  // K101
-    { home: 'WK99', away: 'WK100' }, // K102
-  ];
-  matches.push({
-    id: 'K101',
-    type: 'knockout',
-    stage: '1/2',
-    date: '2026-07-14',
-    time: '19:00',
-    venue: VENUES[2], // Dallas AT&T Stadium
-    homeTeamId: sfPairings[0].home,
-    awayTeamId: sfPairings[0].away,
-  });
-  matches.push({
-    id: 'K102',
-    type: 'knockout',
-    stage: '1/2',
-    date: '2026-07-15',
-    time: '19:00',
-    venue: VENUES[4], // Atlanta Mercedes-Benz Stadium
-    homeTeamId: sfPairings[1].home,
-    awayTeamId: sfPairings[1].away,
-  });
-
-  // Third Place (Third place play-off)
-  // July 18
-  matches.push({
-    id: 'K103',
-    type: 'knockout',
-    stage: 'third_place',
-    date: '2026-07-18',
-    time: '15:00',
-    venue: VENUES[5], // Miami Hard Rock Stadium
-    homeTeamId: 'LK101',
-    awayTeamId: 'LK102',
-  });
-
-  // Final
-  // July 19
-  matches.push({
-    id: 'K104',
-    type: 'knockout',
-    stage: 'final',
-    date: '2026-07-19',
-    time: '16:00',
-    venue: VENUES[1], // MetLife Stadium, New York / New Jersey Ground Winner
-    homeTeamId: 'WK101',
-    awayTeamId: 'WK102',
-  });
-
-  return matches;
 }

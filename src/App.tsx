@@ -800,7 +800,7 @@ export default function App() {
     const pWinnerId = userPredictions[m.id]?.predictedWinnerId;
 
     const isTimeLocked = isMatchLockedForTime(m);
-    const isWeeklyLocked = m.type === 'group' ? isMatchWeeklyLocked(m.date) : false;
+    const isWeeklyLocked = isMatchWeeklyLocked(m.date);
     const isLocked = m.completed || isTimeLocked || isWeeklyLocked;
 
     const isDisabled = isLocked || isHomePlaceholder || isAwayPlaceholder;
@@ -1074,7 +1074,10 @@ export default function App() {
     if (!matchDate) return 1;
     if (matchDate <= '2026-06-14') return 1;
     if (matchDate <= '2026-06-21') return 2;
-    return 3;
+    if (matchDate <= '2026-06-28') return 3;
+    if (matchDate <= '2026-07-05') return 4;
+    if (matchDate <= '2026-07-12') return 5;
+    return 6;
   };
 
   const isMatchWeeklyLocked = (matchDate: string): boolean => {
@@ -2579,7 +2582,10 @@ export default function App() {
                     <option value="all">Ver todas las Semanas</option>
                     <option value="1">Semana 1 (11 Jun - 14 Jun)</option>
                     <option value="2">Semana 2 (15 Jun - 21 Jun)</option>
-                    <option value="3">La Semana 3 (22 Jun - 27 Jun)</option>
+                    <option value="3">Semana 3 (22 Jun - 28 Jun)</option>
+                    <option value="4">Semana 4 (29 Jun - 05 Jul)</option>
+                    <option value="5">Semana 5 (06 Jul - 12 Jul)</option>
+                    <option value="6">Semana 6 (13 Jul - 19 Jul)</option>
                   </select>
                 </div>
 
@@ -2624,171 +2630,186 @@ export default function App() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredMatches.map((m) => {
-                    const homeRes = resolveTeamWithManualOverrides(m.homeTeamId);
-                    const awayRes = resolveTeamWithManualOverrides(m.awayTeamId);
-
-                    const isHomePlaceholder = 'placeholder' in homeRes;
-                    const isAwayPlaceholder = 'placeholder' in awayRes;
-
-                    const pHome = userPredictions[m.id]?.predictedHome || '';
-                    const pAway = userPredictions[m.id]?.predictedAway || '';
-                    const pWinnerId = userPredictions[m.id]?.predictedWinnerId;
-
-                    // Match locked criteria (kickoff rules, weekly lock or completed)
-                    const isTimeLocked = isMatchLockedForTime(m);
-                    const isWeeklyLocked = m.type === 'group' ? isMatchWeeklyLocked(m.date) : false;
-                    const isLocked = m.completed || isTimeLocked || isWeeklyLocked;
-
+                  {Array.from(new Set(filteredMatches.map(m => getMatchWeek(m.date)))).sort().map(weekNumber => {
+                    const weekMatches = filteredMatches.filter(m => getMatchWeek(m.date) === weekNumber);
                     return (
-                      <div 
-                        key={m.id} 
-                        className={`bg-slate-905 border rounded-2xl p-4 flex flex-col justify-between gap-4 transition-all relative ${
-                          m.completed 
-                            ? 'bg-emerald-950/15 border-emerald-900/40 hover:border-emerald-900/60' 
-                            : (isWeeklyLocked ? 'bg-slate-950 border-slate-900 opacity-60' : (isTimeLocked ? 'bg-rose-950/15 border-rose-900/40' : 'bg-slate-900/60 border-slate-900 hover:border-slate-800'))
-                        }`}
-                      >
-                        
-                        {/* Match header info */}
-                        <div className="flex items-center justify-between text-[10px] border-b border-slate-900 pb-2">
-                          <span className="font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 uppercase tracking-widest">
-                            {m.stage === 'group' ? `Grupo ${m.group}` : (m.stage === '1/16' ? 'Round of 32' : m.stage)}
-                          </span>
-                          
-                          <div className="flex items-center gap-1 text-slate-400">
-                            <Clock className="h-3 w-3" />
-                            <span>{m.date} a las {m.time} UTC</span>
-                          </div>
+                      <div key={weekNumber} className="col-span-1 md:col-span-2 space-y-4 mb-4">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-sm font-extrabold text-white uppercase tracking-widest bg-slate-800 px-4 py-2 rounded-lg shadow-md border border-slate-700 w-full flex justify-between">
+                            <span>Semana {weekNumber}</span>
+                            <span className="text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] rounded flex items-center">{weekMatches.length} partidos</span>
+                          </h3>
                         </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {weekMatches.map((m) => {
+                            const homeRes = resolveTeamWithManualOverrides(m.homeTeamId);
+                            const awayRes = resolveTeamWithManualOverrides(m.awayTeamId);
 
-                        {m.homeScore !== undefined && m.awayScore !== undefined && (
-                          <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-[10px] text-center uppercase tracking-wider py-1 rounded-xl">
-                            Resultado Oficial: {m.homeScore} - {m.awayScore}
-                          </div>
-                        )}
+                            const isHomePlaceholder = 'placeholder' in homeRes;
+                            const isAwayPlaceholder = 'placeholder' in awayRes;
 
-                        {/* Predict Fields Grid */}
-                        <div className="grid grid-cols-7 items-center gap-2">
-                          
-                          {/* Home country info */}
-                          <div className="col-span-2 text-right space-y-1 overflow-hidden flex flex-col items-end">
-                            {isHomePlaceholder ? (
-                              <span className="text-2xl block">🏳️</span>
-                            ) : (
-                              <img src={getTeamFlagUrl(homeRes.id)} className="w-10 h-7 object-cover rounded shadow-sm border border-slate-800" alt="" referrerPolicy="no-referrer" />
-                            )}
-                            <span className={`text-xs font-bold block truncate max-w-full ${isHomePlaceholder ? 'text-slate-500 italic' : 'text-slate-100'}`}>
-                              {isHomePlaceholder ? homeRes.text : homeRes.name}
-                            </span>
-                          </div>
+                            const pHome = userPredictions[m.id]?.predictedHome || '';
+                            const pAway = userPredictions[m.id]?.predictedAway || '';
+                            const pWinnerId = userPredictions[m.id]?.predictedWinnerId;
 
-                          {/* Predict score inputs */}
-                          <div className="col-span-3 flex items-center justify-center gap-1.5 bg-slate-950 p-2.5 rounded-xl border border-slate-850">
-                            <input
-                              type="text"
-                              disabled={isLocked}
-                              value={pHome}
-                              onChange={(e) => handleLocalPredictionChange(m.id, 'home', e.target.value)}
-                              placeholder="-"
-                              className="w-10 text-center bg-slate-900 border border-slate-800 rounded-lg py-1 text-xs text-white font-bold font-mono focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-50"
-                            />
-                            <span className="text-[10px] font-bold text-slate-500 uppercase">VS</span>
-                            <input
-                              type="text"
-                              disabled={isLocked}
-                              value={pAway}
-                              onChange={(e) => handleLocalPredictionChange(m.id, 'away', e.target.value)}
-                              placeholder="-"
-                              className="w-10 text-center bg-slate-900 border border-slate-800 rounded-lg py-1 text-xs text-white font-bold font-mono focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-50"
-                            />
-                          </div>
+                            // Match locked criteria (kickoff rules, weekly lock or completed)
+                            const isTimeLocked = isMatchLockedForTime(m);
+                            const isWeeklyLocked = isMatchWeeklyLocked(m.date);
+                            const isLocked = m.completed || isTimeLocked || isWeeklyLocked;
 
-                          {/* Away country info */}
-                          <div className="col-span-2 text-left space-y-1 overflow-hidden flex flex-col items-start">
-                            {isAwayPlaceholder ? (
-                              <span className="text-2xl block">🏳️</span>
-                            ) : (
-                              <img src={getTeamFlagUrl(awayRes.id)} className="w-10 h-7 object-cover rounded shadow-sm border border-slate-800" alt="" referrerPolicy="no-referrer" />
-                            )}
-                            <span className={`text-xs font-bold block truncate max-w-full ${isAwayPlaceholder ? 'text-slate-500 italic' : 'text-slate-100'}`}>
-                              {isAwayPlaceholder ? awayRes.text : awayRes.name}
-                            </span>
-                          </div>
-
-                        </div>
-
-                        {/* Tie check for knockout games */}
-                        {m.type === 'knockout' && pHome !== '' && pAway !== '' && parseInt(pHome, 10) === parseInt(pAway, 10) && (
-                          <div className="bg-slate-950 p-2 rounded-xl text-center space-y-1.5 border border-slate-850">
-                            <div className="text-[9px] text-amber-400 font-bold uppercase tracking-wide">Empate - Selecciona el Ganador por Penales:</div>
-                            <div className="flex justify-center gap-3">
-                              <button
-                               disabled={isLocked}
-                               onClick={() => handleLocalWinnerDecider(m.id, (homeRes as any).id || '')}
-                               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                 pWinnerId === ((homeRes as any).id || '') ? 'bg-amber-500 text-slate-950' : 'bg-slate-900 text-slate-300 hover:text-white'
-                               }`}
+                            return (
+                              <div 
+                                key={m.id} 
+                                className={`bg-slate-905 border rounded-2xl p-4 flex flex-col justify-between gap-4 transition-all relative ${
+                                  m.completed 
+                                    ? 'bg-emerald-950/15 border-emerald-900/40 hover:border-emerald-900/60' 
+                                    : (isWeeklyLocked ? 'bg-slate-950 border-slate-900 opacity-60' : (isTimeLocked ? 'bg-rose-950/15 border-rose-900/40' : 'bg-slate-900/60 border-slate-900 hover:border-slate-800'))
+                                }`}
                               >
-                                {isHomePlaceholder ? (
-                                  '🏳️ Local'
-                                ) : (
-                                  <span className="flex items-center gap-1 justify-center">
-                                    <img src={getTeamFlagUrl(homeRes.id)} className="w-4 h-3 object-cover rounded" alt="" referrerPolicy="no-referrer" />
-                                    <span>{homeRes.name}</span>
+                                
+                                {/* Match header info */}
+                                <div className="flex items-center justify-between text-[10px] border-b border-slate-900 pb-2">
+                                  <span className="font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 uppercase tracking-widest">
+                                    {m.stage === 'group' ? `Grupo ${m.group}` : (m.stage === '1/16' ? 'Round of 32' : m.stage)}
                                   </span>
-                                )}
-                              </button>
-                              <button
-                               disabled={isLocked}
-                               onClick={() => handleLocalWinnerDecider(m.id, (awayRes as any).id || '')}
-                               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                 pWinnerId === ((awayRes as any).id || '') ? 'bg-amber-500 text-slate-950' : 'bg-slate-900 text-slate-300 hover:text-white'
-                               }`}
-                              >
-                                {isAwayPlaceholder ? (
-                                  '🏳️ Visitante'
-                                ) : (
-                                  <span className="flex items-center gap-1 justify-center">
-                                    <img src={getTeamFlagUrl(awayRes.id)} className="w-4 h-3 object-cover rounded" alt="" referrerPolicy="no-referrer" />
-                                    <span>{awayRes.name}</span>
-                                  </span>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                                  
+                                  <div className="flex items-center gap-1 text-slate-400">
+                                    <Clock className="h-3 w-3" />
+                                    <span>{m.date} a las {m.time} UTC</span>
+                                  </div>
+                                </div>
 
-                        {/* Match Action Saves / Lock Indicators */}
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-900/60 text-xs text-slate-100">
-                          {isWeeklyLocked ? (
-                            <div className="flex items-center gap-1 font-bold text-red-400 bg-red-950/25 px-2.5 py-1 rounded-lg border border-red-900/40">
-                              <Lock className="h-3.5 w-3.5 shrink-0" />
-                              <span>Semana bloqueada por Admin</span>
-                            </div>
-                          ) : isLocked ? (
-                            <div className={`flex items-center gap-1 font-bold ${m.completed ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              <Lock className="h-3.5 w-3.5 shrink-0" />
-                              <span>{m.completed ? 'Pronóstico Registrado (Bloqueado)' : 'Cerrado por inicio del partido'}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 font-semibold text-amber-500 bg-amber-500/5 px-2 py-1 rounded-lg border border-amber-500/10">
-                              <Unlock className="h-3.5 w-3.5 shrink-0" />
-                              <span>Editable</span>
-                            </div>
-                          )}
+                                {m.homeScore !== undefined && m.awayScore !== undefined && (
+                                  <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-[10px] text-center uppercase tracking-wider py-1 rounded-xl">
+                                    Resultado Oficial: {m.homeScore} - {m.awayScore}
+                                  </div>
+                                )}
 
-                          {!isLocked && (
-                            <button
-                              onClick={() => handleSavePrediction(m.id, m.date, m.time)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-4 rounded-lg text-xs transition-colors flex items-center gap-1 cursor-pointer"
-                            >
-                              <Check className="h-3.5 w-3.5 shrink-0" />
-                              <span>Guardar</span>
-                            </button>
-                          )}
+                                {/* Predict Fields Grid */}
+                                <div className="grid grid-cols-7 items-center gap-2">
+                                  
+                                  {/* Home country info */}
+                                  <div className="col-span-2 text-right space-y-1 overflow-hidden flex flex-col items-end">
+                                    {isHomePlaceholder ? (
+                                      <span className="text-2xl block">🏳️</span>
+                                    ) : (
+                                      <img src={getTeamFlagUrl(homeRes.id)} className="w-10 h-7 object-cover rounded shadow-sm border border-slate-800" alt="" referrerPolicy="no-referrer" />
+                                    )}
+                                    <span className={`text-xs font-bold block truncate max-w-full ${isHomePlaceholder ? 'text-slate-500 italic' : 'text-slate-100'}`}>
+                                      {isHomePlaceholder ? homeRes.text : homeRes.name}
+                                    </span>
+                                  </div>
+
+                                  {/* Predict score inputs */}
+                                  <div className="col-span-3 flex items-center justify-center gap-1.5 bg-slate-950 p-2.5 rounded-xl border border-slate-850">
+                                    <input
+                                      type="text"
+                                      disabled={isLocked}
+                                      value={pHome}
+                                      onChange={(e) => handleLocalPredictionChange(m.id, 'home', e.target.value)}
+                                      placeholder="-"
+                                      className="w-10 text-center bg-slate-900 border border-slate-800 rounded-lg py-1 text-xs text-white font-bold font-mono focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-50"
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase">VS</span>
+                                    <input
+                                      type="text"
+                                      disabled={isLocked}
+                                      value={pAway}
+                                      onChange={(e) => handleLocalPredictionChange(m.id, 'away', e.target.value)}
+                                      placeholder="-"
+                                      className="w-10 text-center bg-slate-900 border border-slate-800 rounded-lg py-1 text-xs text-white font-bold font-mono focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-50"
+                                    />
+                                  </div>
+
+                                  {/* Away country info */}
+                                  <div className="col-span-2 text-left space-y-1 overflow-hidden flex flex-col items-start">
+                                    {isAwayPlaceholder ? (
+                                      <span className="text-2xl block">🏳️</span>
+                                    ) : (
+                                      <img src={getTeamFlagUrl(awayRes.id)} className="w-10 h-7 object-cover rounded shadow-sm border border-slate-800" alt="" referrerPolicy="no-referrer" />
+                                    )}
+                                    <span className={`text-xs font-bold block truncate max-w-full ${isAwayPlaceholder ? 'text-slate-500 italic' : 'text-slate-100'}`}>
+                                      {isAwayPlaceholder ? awayRes.text : awayRes.name}
+                                    </span>
+                                  </div>
+
+                                </div>
+
+                                {/* Tie check for knockout games */}
+                                {m.type === 'knockout' && pHome !== '' && pAway !== '' && parseInt(pHome, 10) === parseInt(pAway, 10) && (
+                                  <div className="bg-slate-950 p-2 rounded-xl text-center space-y-1.5 border border-slate-850">
+                                    <div className="text-[9px] text-amber-400 font-bold uppercase tracking-wide">Empate - Selecciona el Ganador por Penales:</div>
+                                    <div className="flex justify-center gap-3">
+                                      <button
+                                       disabled={isLocked}
+                                       onClick={() => handleLocalWinnerDecider(m.id, (homeRes as any).id || '')}
+                                       className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                         pWinnerId === ((homeRes as any).id || '') ? 'bg-amber-500 text-slate-950' : 'bg-slate-900 text-slate-300 hover:text-white'
+                                       }`}
+                                      >
+                                        {isHomePlaceholder ? (
+                                          '🏳️ Local'
+                                        ) : (
+                                          <span className="flex items-center gap-1 justify-center">
+                                            <img src={getTeamFlagUrl(homeRes.id)} className="w-4 h-3 object-cover rounded" alt="" referrerPolicy="no-referrer" />
+                                            <span>{homeRes.name}</span>
+                                          </span>
+                                        )}
+                                      </button>
+                                      <button
+                                       disabled={isLocked}
+                                       onClick={() => handleLocalWinnerDecider(m.id, (awayRes as any).id || '')}
+                                       className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                         pWinnerId === ((awayRes as any).id || '') ? 'bg-amber-500 text-slate-950' : 'bg-slate-900 text-slate-300 hover:text-white'
+                                       }`}
+                                      >
+                                        {isAwayPlaceholder ? (
+                                          '🏳️ Visitante'
+                                        ) : (
+                                          <span className="flex items-center gap-1 justify-center">
+                                            <img src={getTeamFlagUrl(awayRes.id)} className="w-4 h-3 object-cover rounded" alt="" referrerPolicy="no-referrer" />
+                                            <span>{awayRes.name}</span>
+                                          </span>
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Match Action Saves / Lock Indicators */}
+                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-900/60 text-xs text-slate-100">
+                                  {isWeeklyLocked ? (
+                                    <div className="flex items-center gap-1 font-bold text-red-400 bg-red-950/25 px-2.5 py-1 rounded-lg border border-red-900/40">
+                                      <Lock className="h-3.5 w-3.5 shrink-0" />
+                                      <span>Semana bloqueada por Admin</span>
+                                    </div>
+                                  ) : isLocked ? (
+                                    <div className={`flex items-center gap-1 font-bold ${m.completed ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                      <Lock className="h-3.5 w-3.5 shrink-0" />
+                                      <span>{m.completed ? 'Pronóstico Registrado (Bloqueado)' : 'Cerrado por inicio del partido'}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1 font-semibold text-amber-500 bg-amber-500/5 px-2 py-1 rounded-lg border border-amber-500/10">
+                                      <Unlock className="h-3.5 w-3.5 shrink-0" />
+                                      <span>Editable</span>
+                                    </div>
+                                  )}
+
+                                  {!isLocked && (
+                                    <button
+                                      onClick={() => handleSavePrediction(m.id, m.date, m.time)}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-4 rounded-lg text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Check className="h-3.5 w-3.5 shrink-0" />
+                                      <span>Guardar</span>
+                                    </button>
+                                  )}
+                                </div>
+
+                              </div>
+                            );
+                          })}
                         </div>
-
                       </div>
                     );
                   })}
@@ -4331,7 +4352,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => handleUpdateUnlockedWeek(1)}
@@ -4341,8 +4362,8 @@ export default function App() {
                       : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
                   }`}
                 >
-                  <span className="text-xs font-black uppercase">Desbloquear Semana 1</span>
-                  <span className="text-[10px] text-slate-500 font-mono">Partidos: 08 Jun - 14 Jun</span>
+                  <span className="text-xs font-black uppercase">Semana 1</span>
+                  <span className="text-[9px] font-bold opacity-60 font-mono">(11 - 14 Jun)</span>
                 </button>
 
                 <button
@@ -4354,8 +4375,8 @@ export default function App() {
                       : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
                   }`}
                 >
-                  <span className="text-xs font-black uppercase">Desbloquear Semana 2</span>
-                  <span className="text-[10px] text-slate-500 font-mono">Partidos: 15 Jun - 21 Jun</span>
+                  <span className="text-xs font-black uppercase">Semana 2</span>
+                  <span className="text-[9px] font-bold opacity-60 font-mono">(15 - 21 Jun)</span>
                 </button>
 
                 <button
@@ -4367,8 +4388,47 @@ export default function App() {
                       : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
                   }`}
                 >
-                  <span className="text-xs font-black uppercase">Desbloquear Semana 3</span>
-                  <span className="text-[10px] text-slate-500 font-mono font-bold">Semana 3 (22 Jun - 27 Jun)</span>
+                  <span className="text-xs font-black uppercase">Semana 3</span>
+                  <span className="text-[9px] font-bold opacity-60 font-mono">(22 - 28 Jun)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleUpdateUnlockedWeek(4)}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                    unlockedWeek === 4
+                      ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                  }`}
+                >
+                  <span className="text-xs font-black uppercase">Semana 4</span>
+                  <span className="text-[9px] font-bold opacity-60 font-mono">(29 Jun - 05 Jul)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleUpdateUnlockedWeek(5)}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                    unlockedWeek === 5
+                      ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                  }`}
+                >
+                  <span className="text-xs font-black uppercase">Semana 5</span>
+                  <span className="text-[9px] font-bold opacity-60 font-mono">(06 - 12 Jul)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleUpdateUnlockedWeek(6)}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                    unlockedWeek === 6
+                      ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                  }`}
+                >
+                  <span className="text-xs font-black uppercase">Semana 6</span>
+                  <span className="text-[9px] font-bold opacity-60 font-mono">(13 - 19 Jul)</span>
                 </button>
               </div>
             </div>
