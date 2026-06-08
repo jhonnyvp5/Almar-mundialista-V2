@@ -1,9 +1,8 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import pool from './neonDb.ts';
+import pool from './neonDb';
 import * as xlsx from 'xlsx';
-import { createServer as createViteServer } from 'vite';
 import { TEAMS, GROUPS, generateGroupStageMatches, generateKnockoutMatches } from './src/data';
 import { Team } from './src/types';
 import { computeAllStandings, getRankedThirdPlacedTeams, getKnockoutWinnerId, resolveAllThirds } from './src/utils';
@@ -813,91 +812,101 @@ async function startServer() {
 
   // API - Auth Register
   app.post('/api/auth/register', async (req, res) => {
-    const { nombreCompleto, cedula, correo, empresa, localidad } = req.body;
+    try {
+      const { nombreCompleto, cedula, correo, empresa, localidad } = req.body;
 
-    if (!nombreCompleto || !cedula || !empresa || !localidad || !correo) {
-      return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
+      if (!nombreCompleto || !cedula || !empresa || !localidad || !correo) {
+        return res.status(400).json({ error: 'Todos los campos son obligatorios.' });
+      }
+
+      const cleanCedula = cedula.trim().replace(/\s+/g, '');
+      const cleanNombre = nombreCompleto.trim();
+      const cleanCorreo = correo.trim().toLowerCase();
+
+      if (cleanNombre === '' || cleanCedula === '' || cleanCorreo === '') {
+        return res.status(400).json({ error: 'No se permiten campos vacíos.' });
+      }
+
+      if (!cleanCorreo.includes('@') || !cleanCorreo.includes('.')) {
+        return res.status(400).json({ error: 'El formato de correo ingresado no es válido.' });
+      }
+
+      // Bypass of cedula check only if it is the special administrator test or special test cedula
+      const isSpecialTest = cleanCedula === 'admin12345';
+      if (!isSpecialTest && !validarCedulaEcuatoriana(cleanCedula)) {
+        return res.status(400).json({ error: 'La cédula ingresada no es una cédula ecuatoriana válida.' });
+      }
+
+      const db = await loadDatabase();
+
+      // Cédula duplicate check
+      const existing = db.users.find(u => u.cedula === cleanCedula);
+      if (existing) {
+        return res.status(400).json({ error: 'Ya existe un usuario registrado con esta cédula.' });
+      }
+
+      // Email duplicate check
+      const existingEmail = db.users.find(u => u.correo && u.correo.toLowerCase().trim() === cleanCorreo);
+      if (existingEmail) {
+        return res.status(400).json({ error: 'Ya existe un usuario registrado con este correo.' });
+      }
+
+      const newUser: UserRecord = {
+        id: 'usr_' + Math.random().toString(36).substring(2, 9),
+        nombreCompleto: cleanNombre,
+        cedula: cleanCedula,
+        correo: cleanCorreo,
+        empresa,
+        localidad,
+        fechaHoraRegistro: new Date().toISOString(),
+        role: (cleanCedula === 'admin12345' ? 'admin' : 'user'),
+        blocked: false
+      };
+
+      db.users.push(newUser);
+      await saveDatabase(db);
+
+      res.json({ user: newUser });
+    } catch (error: any) {
+      console.error('Register error:', error);
+      res.status(500).json({ error: 'Error interno del servidor. Por favor intenta de nuevo.' });
     }
-
-    const cleanCedula = cedula.trim().replace(/\s+/g, '');
-    const cleanNombre = nombreCompleto.trim();
-    const cleanCorreo = correo.trim().toLowerCase();
-
-    if (cleanNombre === '' || cleanCedula === '' || cleanCorreo === '') {
-      return res.status(400).json({ error: 'No se permiten campos vacíos.' });
-    }
-
-    if (!cleanCorreo.includes('@') || !cleanCorreo.includes('.')) {
-      return res.status(400).json({ error: 'El formato de correo ingresado no es válido.' });
-    }
-
-    // Bypass of cedula check only if it is the special administrator test or special test cedula
-    const isSpecialTest = cleanCedula === 'admin12345';
-    if (!isSpecialTest && !validarCedulaEcuatoriana(cleanCedula)) {
-      return res.status(400).json({ error: 'La cédula ingresada no es una cédula ecuatoriana válida.' });
-    }
-
-    const db = await loadDatabase();
-
-    // Cédula duplicate check
-    const existing = db.users.find(u => u.cedula === cleanCedula);
-    if (existing) {
-      return res.status(400).json({ error: 'Ya existe un usuario registrado con esta cédula.' });
-    }
-
-    // Email duplicate check
-    const existingEmail = db.users.find(u => u.correo && u.correo.toLowerCase().trim() === cleanCorreo);
-    if (existingEmail) {
-      return res.status(400).json({ error: 'Ya existe un usuario registrado con este correo.' });
-    }
-
-    const newUser: UserRecord = {
-      id: 'usr_' + Math.random().toString(36).substring(2, 9),
-      nombreCompleto: cleanNombre,
-      cedula: cleanCedula,
-      correo: cleanCorreo,
-      empresa,
-      localidad,
-      fechaHoraRegistro: new Date().toISOString(),
-      role: (cleanCedula === 'admin12345' ? 'admin' : 'user'),
-      blocked: false
-    };
-
-    db.users.push(newUser);
-    await saveDatabase(db);
-
-    res.json({ user: newUser });
   });
 
   // API - Auth Login (By Cédula and opt Correo)
   app.post('/api/auth/login', async (req, res) => {
-    const { cedula, correo } = req.body;
-    if (!cedula) {
-      return res.status(400).json({ error: 'La cédula es requerida.' });
-    }
-
-    const cleanCedula = cedula.trim();
-    const db = await loadDatabase();
-
-    let user;
-    if (correo && correo.trim() !== '') {
-      const cleanCorreo = correo.trim().toLowerCase();
-      user = db.users.find(u => u.cedula === cleanCedula && u.correo && u.correo.trim().toLowerCase() === cleanCorreo);
-      if (!user) {
-        return res.status(400).json({ error: 'No se encontró ningún usuario registrado que coincida con este correo y cédula.' });
+    try {
+      const { cedula, correo } = req.body;
+      if (!cedula) {
+        return res.status(400).json({ error: 'La cédula es requerida.' });
       }
-    } else {
-      user = db.users.find(u => u.cedula === cleanCedula);
-      if (!user) {
-        return res.status(400).json({ error: 'No se encontró ningún usuario registrado con esta cédula.' });
+
+      const cleanCedula = cedula.trim();
+      const db = await loadDatabase();
+
+      let user;
+      if (correo && correo.trim() !== '') {
+        const cleanCorreo = correo.trim().toLowerCase();
+        user = db.users.find(u => u.cedula === cleanCedula && u.correo && u.correo.trim().toLowerCase() === cleanCorreo);
+        if (!user) {
+          return res.status(400).json({ error: 'No se encontró ningún usuario registrado que coincida con este correo y cédula.' });
+        }
+      } else {
+        user = db.users.find(u => u.cedula === cleanCedula);
+        if (!user) {
+          return res.status(400).json({ error: 'No se encontró ningún usuario registrado con esta cédula.' });
+        }
       }
-    }
 
-    if (user.blocked) {
-      return res.status(403).json({ error: 'Tu cuenta ha sido bloqueada por el administrador.' });
-    }
+      if (user.blocked) {
+        return res.status(403).json({ error: 'Tu cuenta ha sido bloqueada por el administrador.' });
+      }
 
-    res.json({ user });
+      res.json({ user });
+    } catch (error: any) {
+      console.error('Login error:', error);
+      res.status(500).json({ error: 'Error interno del servidor. Por favor intenta de nuevo.' });
+    }
   });
 
   // API - Get all users (Admin only)
@@ -1439,6 +1448,7 @@ async function startServer() {
 
   // Vite development mode setup or production build fallback
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -1460,6 +1470,12 @@ async function startServer() {
 
   return app;
 }
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
 const appPromise = startServer();
 export default async function handler(req: any, res: any) {
