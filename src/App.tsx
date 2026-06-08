@@ -1028,10 +1028,18 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cedula: cleanCedula, correo: cleanCorreo })
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        if (!res.ok) {
+          setLoginError(`Error en el servidor (HTTP ${res.status}). Por favor, intenta de nuevo más tarde.`);
+          return;
+        }
+      }
 
       if (!res.ok) {
-        setLoginError(data.error || 'Error al iniciar sesión.');
+        setLoginError(data?.error || 'Error al iniciar sesión.');
         return;
       }
 
@@ -1039,7 +1047,7 @@ export default function App() {
       setCurrentUser(data.user);
       showToast(`👋 ¡Bienvenido de vuelta, ${data.user.nombreCompleto}!`);
     } catch (err) {
-      setLoginError('Error de red al intentar ingresar.');
+      setLoginError('Error de red al intentar ingresar. Revisa tu conexión.');
     } finally {
       setLoading(false);
     }
@@ -1083,10 +1091,18 @@ export default function App() {
           localidad: regLocalidad
         })
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        if (!res.ok) {
+          setRegError(`Error en el servidor (HTTP ${res.status}). Por favor, intenta de nuevo más tarde.`);
+          return;
+        }
+      }
 
       if (!res.ok) {
-        setRegError(data.error || 'Error de registro.');
+        setRegError(data?.error || 'Error de registro.');
         return;
       }
 
@@ -1094,7 +1110,7 @@ export default function App() {
       setCurrentUser(data.user);
       showToast(`🎉 ¡Registro exitoso! ¡Buena suerte, ${data.user.nombreCompleto}!`);
     } catch (err) {
-      setRegError('Error de red al intentar registrarse.');
+      setRegError('Error de red al intentar registrarse. Revisa tu conexión.');
     } finally {
       setLoading(false);
     }
