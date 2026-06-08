@@ -130,3 +130,16 @@ INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro,
 VALUES ('system_config', 1, '', '', '', '')
 ON CONFLICT (id) DO NOTHING;
 
+
+-- =========================================================
+-- TABLA: allowed_cedulas (Cédulas Permitidas)
+-- =========================================================
+CREATE TABLE IF NOT EXISTS allowed_cedulas (
+    cedula TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    empresa TEXT,
+    localidad TEXT,
+    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+

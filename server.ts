@@ -10,31 +10,7 @@ import { computeAllStandings, getRankedThirdPlacedTeams, getKnockoutWinnerId, re
 // Ecuador cedula validation
 export function validarCedulaEcuatoriana(cedula: string): boolean {
   if (!cedula || cedula.length !== 10) return false;
-  if (!/^\d+$/.test(cedula)) return false;
-
-  const provincia = parseInt(cedula.substring(0, 2), 10);
-  if (provincia < 1 || (provincia > 24 && provincia !== 30)) return false;
-
-  const tercerDigito = parseInt(cedula.charAt(2), 10);
-  if (tercerDigito >= 6) return false;
-
-  const n = cedula.length;
-  let total = 0;
-  for (let i = 0; i < n - 1; i++) {
-    let num = parseInt(cedula.charAt(i), 10);
-    if (i % 2 === 0) { // Odd positions (0, 2, 4, 6, 8 indexes)
-      num = num * 2;
-      if (num > 9) num -= 9;
-    }
-    total += num;
-  }
-
-  const digitoVerificador = parseInt(cedula.charAt(9), 10);
-  const decenaSuperior = Math.ceil(total / 10) * 10;
-  let calculado = decenaSuperior - total;
-  if (calculado === 10) calculado = 0;
-
-  return calculado === digitoVerificador;
+  return /^\d+$/.test(cedula);
 }
 
 const DB_FILE = process.env.VERCEL ? '/tmp/data_db.json' : path.join(process.cwd(), 'data_db.json');
@@ -844,8 +820,16 @@ async function startServer() {
 
       // Bypass of cedula check only if it is the special administrator test or special test cedula
       const isSpecialTest = cleanCedula === 'admin12345';
-      if (!isSpecialTest && !validarCedulaEcuatoriana(cleanCedula)) {
-        return res.status(400).json({ error: 'La cédula ingresada no es una cédula ecuatoriana válida.' });
+      if (!isSpecialTest) {
+        if (!validarCedulaEcuatoriana(cleanCedula)) {
+          return res.status(400).json({ error: 'La cédula ingresada debe tener exactamente 10 dígitos numéricos.' });
+        }
+
+        // Validate if cedula exists in the pre-allowed database table
+        const checkResult = await pool.query('SELECT * FROM allowed_cedulas WHERE cedula = $1', [cleanCedula]);
+        if (checkResult.rows.length === 0) {
+          return res.status(400).json({ error: 'La cédula ingresada no está registrada en la base de datos de usuarios permitidos.' });
+        }
       }
 
       const db = await loadDatabase();

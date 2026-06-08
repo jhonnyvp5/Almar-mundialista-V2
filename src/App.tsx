@@ -59,31 +59,7 @@ import {
 export function isEcuadorianCedulaValid(cedula: string): boolean {
   if (cedula === 'admin12345') return true;
   if (!cedula || cedula.length !== 10) return false;
-  if (!/^\d+$/.test(cedula)) return false;
-
-  const provincia = parseInt(cedula.substring(0, 2), 10);
-  if (provincia < 1 || (provincia > 24 && provincia !== 30)) return false;
-
-  const tercerDigito = parseInt(cedula.charAt(2), 10);
-  if (tercerDigito >= 6) return false;
-
-  const n = cedula.length;
-  let total = 0;
-  for (let i = 0; i < n - 1; i++) {
-    let num = parseInt(cedula.charAt(i), 10);
-    if (i % 2 === 0) { // odd positions (0, 2, 4...)
-      num = num * 2;
-      if (num > 9) num -= 9;
-    }
-    total += num;
-  }
-
-  const digitoVerificador = parseInt(cedula.charAt(9), 10);
-  const decenaSuperior = Math.ceil(total / 10) * 10;
-  let calculado = decenaSuperior - total;
-  if (calculado === 10) calculado = 0;
-
-  return calculado === digitoVerificador;
+  return /^\d+$/.test(cedula);
 }
 
 export function getTeamFlagUrl(teamId: string): string {
