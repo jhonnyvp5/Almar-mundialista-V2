@@ -1897,10 +1897,10 @@ export default function App() {
                   id="input-nombre"
                   type="text"
                   required
-                  disabled
+                  readOnly
                   value={regNombre}
-                  placeholder="Se completa automáticamente"
-                  className="w-full bg-slate-950/40 border border-slate-800/40 rounded-xl px-3.5 py-2.5 text-sm text-slate-400 cursor-not-allowed select-none font-medium"
+                  placeholder="Se completa automáticamente al validar cédula"
+                  className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-amber-400 font-bold cursor-not-allowed select-none focus:outline-none"
                 />
               </div>
 
@@ -1913,10 +1913,10 @@ export default function App() {
                     id="input-empresa-readonly"
                     type="text"
                     required
-                    disabled
+                    readOnly
                     value={regEmpresa}
-                    placeholder="Asignado automáticamente"
-                    className="w-full bg-slate-950/40 border border-slate-800/40 rounded-xl px-3.5 py-2.5 text-sm text-slate-400 cursor-not-allowed select-none font-medium"
+                    placeholder="Se completa automáticamente"
+                    className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white font-semibold cursor-not-allowed select-none focus:outline-none"
                   />
                 </div>
 
@@ -1928,10 +1928,10 @@ export default function App() {
                     id="input-localidad-readonly"
                     type="text"
                     required
-                    disabled
+                    readOnly
                     value={regLocalidad}
-                    placeholder="Asignado automáticamente"
-                    className="w-full bg-slate-950/40 border border-slate-800/40 rounded-xl px-3.5 py-2.5 text-sm text-slate-400 cursor-not-allowed select-none font-medium"
+                    placeholder="Se completa automáticamente"
+                    className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white font-semibold cursor-not-allowed select-none focus:outline-none"
                   />
                 </div>
               </div>
