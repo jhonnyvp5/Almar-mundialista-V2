@@ -797,6 +797,44 @@ async function startServer() {
 
   app.use(express.json());
 
+  // API - Auth Check Cedula
+  app.get('/api/auth/check-cedula/:cedula', async (req, res) => {
+    try {
+      const { cedula } = req.params;
+      const cleanCedula = cedula.trim().replace(/\s+/g, '');
+
+      // Special administrator test or special test bypass
+      if (cleanCedula === 'admin12345') {
+        return res.json({
+          nombre: 'ADMINISTRADOR DE PRUEBA',
+          empresa: 'PRODUMAR SA',
+          localidad: 'Matriz',
+          isAllowed: true
+        });
+      }
+
+      if (!validarCedulaEcuatoriana(cleanCedula)) {
+        return res.status(400).json({ error: 'La cédula ingresada debe tener exactamente 10 dígitos numéricos.' });
+      }
+
+      const checkResult = await pool.query('SELECT * FROM allowed_cedulas WHERE cedula = $1', [cleanCedula]);
+      if (checkResult.rows.length === 0) {
+        return res.status(404).json({ error: 'La cédula ingresada no está registrada en la base de datos de usuarios permitidos.' });
+      }
+
+      const row = checkResult.rows[0];
+      return res.json({
+        nombre: row.nombre,
+        empresa: row.empresa,
+        localidad: row.localidad,
+        isAllowed: true
+      });
+    } catch (error: any) {
+      console.error('Check cedula error:', error);
+      res.status(500).json({ error: 'Error interno del servidor al verificar la cédula.' });
+    }
+  });
+
   // API - Auth Register
   app.post('/api/auth/register', async (req, res) => {
     try {

@@ -126,6 +126,9 @@ export default function App() {
   const [loginCedula, setLoginCedula] = useState('');
   const [loginCorreo, setLoginCorreo] = useState('');
   const [authMode, setAuthMode] = useState<'register' | 'login'>('register');
+  const [checkingCedula, setCheckingCedula] = useState(false);
+  const [cedulaError, setCedulaError] = useState('');
+  const [cedulaSuccess, setCedulaSuccess] = useState(false);
 
   // Manual Classification Overrides for Bracket Generation
   const [manualFirstPlaces, setManualFirstPlaces] = useState<Record<string, string>>({}); // group -> teamId
@@ -345,6 +348,45 @@ export default function App() {
       console.error(e);
     }
   };
+
+  // Dynamic Cedula Check Effect
+  useEffect(() => {
+    const cleanCedula = regCedula.trim().replace(/\s+/g, '');
+    if (cleanCedula.length === 10 || cleanCedula === 'admin12345') {
+      const fetchCedula = async () => {
+        setCheckingCedula(true);
+        setCedulaError('');
+        setCedulaSuccess(false);
+        try {
+          const res = await fetch(`/api/auth/check-cedula/${encodeURIComponent(cleanCedula)}`);
+          if (!res.ok) {
+            const data = await res.json();
+            setCedulaError(data.error || 'La cédula no está registrada.');
+            setRegNombre('');
+            setRegEmpresa('PRODUMAR SA');
+            setRegLocalidad('San Pablo');
+            return;
+          }
+          const data = await res.json();
+          setRegNombre(data.nombre || '');
+          setRegEmpresa(data.empresa || 'PRODUMAR SA');
+          setRegLocalidad(data.localidad || 'San Pablo');
+          setCedulaSuccess(true);
+        } catch (err) {
+          setCedulaError('No se pudo verificar la cédula en el servidor.');
+        } finally {
+          setCheckingCedula(false);
+        }
+      };
+      fetchCedula();
+    } else {
+      if (regNombre || cedulaSuccess || cedulaError) {
+        setRegNombre('');
+        setCedulaSuccess(false);
+        setCedulaError('');
+      }
+    }
+  }, [regCedula]);
 
   // Splash Screen Progress Simulator effect
   useEffect(() => {
@@ -1046,6 +1088,7 @@ export default function App() {
 
       localStorage.setItem('polla_user_session', JSON.stringify(data.user));
       setCurrentUser(data.user);
+      setActiveTab('info');
       showToast(`👋 ¡Bienvenido de vuelta, ${data.user.nombreCompleto}!`);
     } catch (err) {
       setLoginError('Error de red al intentar ingresar. Revisa tu conexión.');
@@ -1109,6 +1152,7 @@ export default function App() {
 
       localStorage.setItem('polla_user_session', JSON.stringify(data.user));
       setCurrentUser(data.user);
+      setActiveTab('info');
       showToast(`🎉 ¡Registro exitoso! ¡Buena suerte, ${data.user.nombreCompleto}!`);
     } catch (err) {
       setRegError('Error de red al intentar registrarse. Revisa tu conexión.');
@@ -1797,18 +1841,37 @@ export default function App() {
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 tracking-wider uppercase mb-1.5" id="lbl-nombre">
-                  Nombre Completo *
+                <label className="block text-xs font-bold text-slate-300 tracking-wider uppercase mb-1.5" id="lbl-cedula">
+                  Número de Cédula *
                 </label>
                 <input
-                  id="input-nombre"
+                  id="input-cedula"
                   type="text"
                   required
-                  value={regNombre}
-                  onChange={(e) => setRegNombre(e.target.value)}
-                  placeholder="Nombre y Apellido"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+                  value={regCedula}
+                  onChange={(e) => setRegCedula(e.target.value)}
+                  placeholder="Ej: 0912345678"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 font-mono"
                 />
+                {checkingCedula && (
+                  <span className="text-[11px] text-amber-500 mt-1 block flex items-center gap-1 font-medium">
+                    <span className="animate-spin inline-block h-3 w-3 border-2 border-amber-500 border-t-transparent rounded-full normal-case mr-1" />
+                    Buscando cédula en la lista de permitidos...
+                  </span>
+                )}
+                {cedulaSuccess && (
+                  <span className="text-[11px] text-emerald-400 mt-1 block font-bold">
+                    ✓ Cédula registrada y autorizada.
+                  </span>
+                )}
+                {cedulaError && (
+                  <span className="text-[11px] text-rose-400 mt-1 block font-semibold">
+                    ⚠ {cedulaError}
+                  </span>
+                )}
+                {!checkingCedula && !cedulaSuccess && !cedulaError && (
+                  <span className="text-[10px] text-slate-500 mt-1 block">Ingrese su cédula para validar su pre-registro.</span>
+                )}
               </div>
 
               <div>
@@ -1827,67 +1890,57 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 tracking-wider uppercase mb-1.5" id="lbl-cedula">
-                  Número de Cédula *
+                <label className="block text-xs font-bold text-slate-400 tracking-wider uppercase mb-1.5" id="lbl-nombre">
+                  Nombre Completo
                 </label>
                 <input
-                  id="input-cedula"
+                  id="input-nombre"
                   type="text"
                   required
-                  value={regCedula}
-                  onChange={(e) => setRegCedula(e.target.value)}
-                  placeholder="Ej: 0912345678"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 font-mono"
+                  disabled
+                  value={regNombre}
+                  placeholder="Se completa automáticamente"
+                  className="w-full bg-slate-950/40 border border-slate-800/40 rounded-xl px-3.5 py-2.5 text-sm text-slate-400 cursor-not-allowed select-none font-medium"
                 />
-                <span className="text-[10px] text-slate-500 mt-1 block">La cédula se validará según el formato ecuatoriano oficial.</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 tracking-wider uppercase mb-1.5" id="lbl-empresa">
-                    Empresa *
+                  <label className="block text-xs font-bold text-slate-400 tracking-wider uppercase mb-1.5" id="lbl-empresa">
+                    Empresa
                   </label>
-                  <select
-                    id="select-empresa"
+                  <input
+                    id="input-empresa-readonly"
+                    type="text"
+                    required
+                    disabled
                     value={regEmpresa}
-                    onChange={(e) => setRegEmpresa(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  >
-                    <option value="PRODUMAR SA">PRODUMAR SA</option>
-                    <option value="LIMBOMAR SA">LIMBOMAR SA</option>
-                    <option value="LIMBOPACK SAS">LIMBOPACK SAS</option>
-                    <option value="BIOGEMAR">BIOGEMAR</option>
-                    <option value="SOCALMAR SA">SOCALMAR SA</option>
-                    <option value="PRODUPESADA SA">PRODUPESADA SA</option>
-                  </select>
+                    placeholder="Asignado automáticamente"
+                    className="w-full bg-slate-950/40 border border-slate-800/40 rounded-xl px-3.5 py-2.5 text-sm text-slate-400 cursor-not-allowed select-none font-medium"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-300 tracking-wider uppercase mb-1.5" id="lbl-localidad">
-                    Localidad *
+                  <label className="block text-xs font-bold text-slate-400 tracking-wider uppercase mb-1.5" id="lbl-localidad">
+                    Localidad
                   </label>
-                  <select
-                    id="select-localidad"
+                  <input
+                    id="input-localidad-readonly"
+                    type="text"
+                    required
+                    disabled
                     value={regLocalidad}
-                    onChange={(e) => setRegLocalidad(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
-                  >
-                    <option value="San Pablo">San Pablo</option>
-                    <option value="Santay">Santay</option>
-                    <option value="Garzal">Garzal</option>
-                    <option value="Cantagallo">Cantagallo</option>
-                    <option value="Churute">Churute</option>
-                    <option value="Matriz">Matriz</option>
-                    <option value="Durán">Durán</option>
-                  </select>
+                    placeholder="Asignado automáticamente"
+                    className="w-full bg-slate-950/40 border border-slate-800/40 rounded-xl px-3.5 py-2.5 text-sm text-slate-400 cursor-not-allowed select-none font-medium"
+                  />
                 </div>
               </div>
 
               <button
                 id="btn-registrarse"
                 type="submit"
-                disabled={loading}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 px-4 rounded-xl text-sm transition-colors mt-4 flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(245,158,11,0.2)] font-black"
+                disabled={loading || checkingCedula || !cedulaSuccess}
+                className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold py-3 px-4 rounded-xl text-sm transition-colors mt-4 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed shadow-[0_0_15px_rgba(245,158,11,0.2)] font-black"
               >
                 {loading ? 'Procesando...' : 'Comenzar a Participar →'}
               </button>
