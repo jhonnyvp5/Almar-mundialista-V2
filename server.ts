@@ -80,6 +80,7 @@ interface DatabaseSchema {
     official_firsts?: Record<string, string>;
     official_seconds?: Record<string, string>;
     official_thirds?: string[];
+    match_overrides?: Record<string, { date: string; time: string }>;
   };
 }
 
@@ -119,6 +120,7 @@ async function loadDatabase(): Promise<DatabaseSchema> {
         official_firsts: typeof conf[0].official_firsts === 'string' ? JSON.parse(conf[0].official_firsts) : conf[0].official_firsts || {},
         official_seconds: typeof conf[0].official_seconds === 'string' ? JSON.parse(conf[0].official_seconds) : conf[0].official_seconds || {},
         official_thirds: typeof conf[0].official_thirds === 'string' ? JSON.parse(conf[0].official_thirds) : conf[0].official_thirds || [],
+        match_overrides: typeof conf[0].match_overrides === 'string' ? JSON.parse(conf[0].match_overrides) : conf[0].match_overrides || {},
       } : {
         unlockedWeek: 1,
         official_balon_oro: '',
@@ -127,7 +129,8 @@ async function loadDatabase(): Promise<DatabaseSchema> {
         official_joven_torneo: '',
         official_firsts: {},
         official_seconds: {},
-        official_thirds: []
+        official_thirds: [],
+        match_overrides: {}
       }
     };
 
@@ -212,8 +215,8 @@ async function saveDatabase(db: DatabaseSchema) {
 
     if (db.config) {
       await client.query(`
-        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_firsts, official_seconds, official_thirds)
-        VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_firsts, official_seconds, official_thirds, match_overrides)
+        VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (id) DO UPDATE SET
           "unlockedWeek" = EXCLUDED."unlockedWeek",
           official_balon_oro = EXCLUDED.official_balon_oro,
@@ -222,7 +225,8 @@ async function saveDatabase(db: DatabaseSchema) {
           official_joven_torneo = EXCLUDED.official_joven_torneo,
           official_firsts = EXCLUDED.official_firsts,
           official_seconds = EXCLUDED.official_seconds,
-          official_thirds = EXCLUDED.official_thirds
+          official_thirds = EXCLUDED.official_thirds,
+          match_overrides = EXCLUDED.match_overrides
       `, [
         db.config.unlockedWeek, 
         db.config.official_balon_oro, 
@@ -231,7 +235,8 @@ async function saveDatabase(db: DatabaseSchema) {
         db.config.official_joven_torneo,
         JSON.stringify(db.config.official_firsts || {}),
         JSON.stringify(db.config.official_seconds || {}),
-        JSON.stringify(db.config.official_thirds || [])
+        JSON.stringify(db.config.official_thirds || []),
+        JSON.stringify(db.config.match_overrides || {})
       ]);
     }
 
@@ -808,6 +813,12 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  try {
+    await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS match_overrides TEXT DEFAULT '{}'`);
+  } catch (err) {
+    console.warn('Could not run ALTER TABLE config to add match_overrides:', err);
+  }
+
   app.use(express.json());
 
   // API - Auth Register
@@ -1321,6 +1332,27 @@ async function startServer() {
     db.config.official_bota_oro = official_bota_oro ?? '';
     db.config.official_joven_torneo = official_joven_torneo ?? '';
 
+    await saveDatabase(db);
+    res.json({ success: true, config: db.config });
+  });
+
+  // API - Update match schedule overrides (Admin only)
+  app.post('/api/admin/matches/schedule', async (req, res) => {
+    const requesterId = req.headers['x-user-id'] as string;
+    const { match_overrides } = req.body;
+
+    const db = await loadDatabase();
+    const requester = db.users.find(u => u.id === requesterId);
+
+    if (!requester || requester.role !== 'admin') {
+      return res.status(403).json({ error: 'Acceso denegado. Se requiere ser Administrador.' });
+    }
+
+    if (!db.config) {
+      db.config = { unlockedWeek: 1 };
+    }
+
+    db.config.match_overrides = match_overrides || {};
     await saveDatabase(db);
     res.json({ success: true, config: db.config });
   });

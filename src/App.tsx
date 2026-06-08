@@ -200,6 +200,12 @@ export default function App() {
   const [adminOfficialSeconds, setAdminOfficialSeconds] = useState<Record<string, string>>({});
   const [adminOfficialThirds, setAdminOfficialThirds] = useState<string[]>([]);
 
+  // Scheduling States
+  const [scheduleStageFilter, setScheduleStageFilter] = useState<string>('all');
+  const [scheduleWeekFilter, setScheduleWeekFilter] = useState<string>('all');
+  const [scheduleGroupFilter, setScheduleGroupFilter] = useState<string>('all');
+  const [scheduleOverrides, setScheduleOverrides] = useState<Record<string, { date: string; time: string }>>({});
+
   // Predictions states for FIFA Awards
   const [predBalonOro, setPredBalonOro] = useState('');
   const [predGuanteOro, setPredGuanteOro] = useState('');
@@ -417,17 +423,22 @@ export default function App() {
       setAdminOfficialFirsts(systemConfig.official_firsts || {});
       setAdminOfficialSeconds(systemConfig.official_seconds || {});
       setAdminOfficialThirds(systemConfig.official_thirds || []);
+      setScheduleOverrides(systemConfig.match_overrides || {});
     }
   }, [systemConfig]);
 
-  // Combine static match structures with official achievements & user predictions
+  // Combine static match structures with official achievements, user predictions & schedule overrides
   const combinedMatches = useMemo(() => {
+    const overrides = systemConfig?.match_overrides || {};
     return initialMatches.map((base) => {
       const prediction = userPredictions[base.id] || {};
       const official = officialResults[base.id] || {};
+      const matchOverride = overrides[base.id];
 
       return {
         ...base,
+        date: matchOverride?.date || base.date,
+        time: matchOverride?.time || base.time,
         // user prediction details
         predictedHome: prediction.predictedHome !== undefined ? prediction.predictedHome : '',
         predictedAway: prediction.predictedAway !== undefined ? prediction.predictedAway : '',
@@ -439,7 +450,7 @@ export default function App() {
         winnerId: official.winnerId
       };
     });
-  }, [initialMatches, userPredictions, officialResults]);
+  }, [initialMatches, userPredictions, officialResults, systemConfig]);
 
   // Compute standings in real time from predictions (only if they are filled in database / UI)
   const standings = useMemo(() => computeAllStandings(combinedMatches), [combinedMatches]);
@@ -988,19 +999,25 @@ export default function App() {
             <div className="flex gap-1.5">
               <button
                 onClick={() => selectWinnerWithSave((homeRes as any).id)}
-                className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer truncate flex-1 ${
+                className={`px-1.5 py-1 rounded text-[9px] font-bold transition-all cursor-pointer truncate flex-1 flex items-center justify-center gap-1 leading-none ${
                   pWinnerId === (homeRes as any).id ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
                 }`}
               >
-                {(homeRes as any).name || 'L'}
+                {'flag' in homeRes && (
+                  <img src={getTeamFlagUrl((homeRes as any).id)} className="w-3.5 h-2.5 object-cover rounded shadow-xs shrink-0" alt="" referrerPolicy="no-referrer" />
+                )}
+                <span className="truncate">{(homeRes as any).name || 'L'}</span>
               </button>
               <button
                 onClick={() => selectWinnerWithSave((awayRes as any).id)}
-                className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer truncate flex-1 ${
+                className={`px-1.5 py-1 rounded text-[9px] font-bold transition-all cursor-pointer truncate flex-1 flex items-center justify-center gap-1 leading-none ${
                   pWinnerId === (awayRes as any).id ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
                 }`}
               >
-                {(awayRes as any).name || 'V'}
+                {'flag' in awayRes && (
+                  <img src={getTeamFlagUrl((awayRes as any).id)} className="w-3.5 h-2.5 object-cover rounded shadow-xs shrink-0" alt="" referrerPolicy="no-referrer" />
+                )}
+                <span className="truncate">{(awayRes as any).name || 'V'}</span>
               </button>
             </div>
           </div>
@@ -1285,6 +1302,54 @@ export default function App() {
       fetchAdminData();
     } catch (e) {
       showToast('Falla de conexión al actualizar resultados.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Change local schedule override in Admin state
+  const handleScheduleChange = (matchId: string, field: 'date' | 'time', value: string) => {
+    setScheduleOverrides(prev => ({
+      ...prev,
+      [matchId]: {
+        ...(prev[matchId] || { 
+          date: systemConfig?.match_overrides?.[matchId]?.date || '', 
+          time: systemConfig?.match_overrides?.[matchId]?.time || '' 
+        }),
+        [field]: value
+      }
+    }));
+  };
+
+  const handleResetScheduleLocal = () => {
+    setScheduleOverrides(systemConfig?.match_overrides || {});
+    showToast('🔄 Cambios de horarios restablecidos localmente.');
+  };
+
+  const handleSaveMatchSchedule = async () => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/matches/schedule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser.id
+        },
+        body: JSON.stringify({ match_overrides: scheduleOverrides })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(`❌ Error: ${data.error}`);
+        return;
+      }
+
+      showToast('📅 Calendario de partidos actualizado correctamente.');
+      fetchConfig();
+    } catch {
+      showToast('❌ Error de red al guardar horarios.');
     } finally {
       setLoading(false);
     }
@@ -4678,6 +4743,170 @@ export default function App() {
               </div>
             </div>
 
+            {/* ==================== APARTADO: PROGRAMACIÓN Y HORARIOS DE PARTIDOS ==================== */}
+            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
+              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center border-b border-slate-850 pb-3 gap-4">
+                <div className="space-y-1">
+                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-amber-400" />
+                    Programación y Horarios de Partidos
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Modifica la fecha y hora de inicio de los partidos. Presiona "Guardar Horarios" para actualizar el sistema.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+                  {/* Filtro por Fase / Fase de grupos */}
+                  <div className="flex flex-col gap-1 w-full sm:w-auto">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Fase</span>
+                    <select
+                      value={scheduleStageFilter}
+                      onChange={(e) => setScheduleStageFilter(e.target.value)}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1.5 text-xs border border-slate-800 focus:outline-none focus:border-amber-500 w-full xl:w-[150px]"
+                    >
+                      <option value="all">Todas las fases</option>
+                      <option value="group">Fase de Grupos</option>
+                      <option value="1/16">1/16 Final</option>
+                      <option value="1/8">1/8 Final</option>
+                      <option value="1/4">1/4 Final</option>
+                      <option value="1/2">Semifinales</option>
+                      <option value="third_place">Tercer Puesto</option>
+                      <option value="final">La Gran Final</option>
+                    </select>
+                  </div>
+
+                  {/* Filtro por Semana */}
+                  <div className="flex flex-col gap-1 w-full sm:w-auto">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Semana</span>
+                    <select
+                      value={scheduleWeekFilter}
+                      onChange={(e) => setScheduleWeekFilter(e.target.value)}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1.5 text-xs border border-slate-800 focus:outline-none focus:border-amber-500 w-full xl:w-[130px]"
+                    >
+                      <option value="all">Todas las semanas</option>
+                      <option value="1">Semana 1</option>
+                      <option value="2">Semana 2</option>
+                      <option value="3">Semana 3</option>
+                      <option value="4">Semana 4</option>
+                      <option value="5">Semana 5</option>
+                      <option value="6">Semana 6</option>
+                    </select>
+                  </div>
+
+                  {/* Filtro por Grupo */}
+                  <div className="flex flex-col gap-1 w-full sm:w-auto">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Grupo</span>
+                    <select
+                      value={scheduleGroupFilter}
+                      onChange={(e) => setScheduleGroupFilter(e.target.value)}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1.5 text-xs border border-slate-800 focus:outline-none focus:border-amber-500 w-full xl:w-[130px]"
+                    >
+                      <option value="all">Todos los grupos</option>
+                      {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(g => (
+                        <option key={g} value={g}>Grupo {g}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid content */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto max-h-[350px] pr-1.5">
+                {(() => {
+                  const items = initialMatches.filter(m => {
+                    if (scheduleStageFilter !== 'all' && m.stage !== scheduleStageFilter) return false;
+                    const matchWeek = m.date ? getMatchWeek(m.date).toString() : '';
+                    if (scheduleWeekFilter !== 'all' && matchWeek !== scheduleWeekFilter) return false;
+                    if (scheduleGroupFilter !== 'all' && m.group !== scheduleGroupFilter) return false;
+                    return true;
+                  });
+
+                  if (items.length === 0) {
+                    return (
+                      <div className="col-span-full py-8 text-center text-xs text-slate-500 font-medium">
+                        Ningún partido coincide con los filtros aplicados.
+                      </div>
+                    );
+                  }
+
+                  return items.map((m) => {
+                    const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, true);
+                    const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, true);
+
+                    const currentVal = scheduleOverrides[m.id] || { 
+                      date: systemConfig?.match_overrides?.[m.id]?.date || m.date || '', 
+                      time: systemConfig?.match_overrides?.[m.id]?.time || m.time || '' 
+                    };
+
+                    return (
+                      <div key={m.id} className="p-3 rounded-xl bg-slate-950 border border-slate-850 flex flex-col justify-between gap-3 hover:border-slate-800 transition">
+                        <div className="flex justify-between items-center text-[9px] text-slate-500 font-bold uppercase tracking-wider border-b border-slate-900 pb-1.5">
+                          <span className="text-amber-500">M-ID {m.id} • {m.stage === 'group' ? `Grupo ${m.group}` : m.stage}</span>
+                          <span className="text-slate-400">Original: {m.date} {m.time}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 text-xs">
+                          {/* Teams description */}
+                          <div className="flex-1 truncate space-y-1">
+                            <div className="flex items-center gap-1.5 truncate">
+                              {'flag' in homeRes ? (
+                                <img src={getTeamFlagUrl((homeRes as any).id)} className="w-[15px] h-2.5 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
+                              ) : <span className="text-[10px] shrink-0">🏳️</span>}
+                              <span className="truncate font-bold text-slate-300">{'name' in homeRes ? homeRes.name : homeRes.text}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 truncate">
+                              {'flag' in awayRes ? (
+                                <img src={getTeamFlagUrl((awayRes as any).id)} className="w-[15px] h-2.5 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
+                              ) : <span className="text-[10px] shrink-0">🏳️</span>}
+                              <span className="truncate font-bold text-slate-300">{'name' in awayRes ? awayRes.name : awayRes.text}</span>
+                            </div>
+                          </div>
+
+                          {/* Date and Time selectors */}
+                          <div className="flex flex-col gap-1 w-[120px] shrink-0">
+                            <input
+                              type="text"
+                              value={currentVal.date}
+                              placeholder="AAAA-MM-DD"
+                              onChange={(e) => handleScheduleChange(m.id, 'date', e.target.value)}
+                              className="bg-slate-900 border border-slate-800 text-slate-200 text-[10px] font-bold py-1 px-1.5 rounded focus:outline-none focus:border-amber-500 text-center uppercase"
+                            />
+                            <input
+                              type="text"
+                              value={currentVal.time}
+                              placeholder="HH:MM"
+                              onChange={(e) => handleScheduleChange(m.id, 'time', e.target.value)}
+                              className="bg-slate-900 border border-slate-800 text-slate-200 text-[10px] font-bold py-1 px-1.5 rounded focus:outline-none focus:border-amber-500 text-center uppercase"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex justify-end gap-2.5 border-t border-slate-900 pt-3">
+                <button
+                  type="button"
+                  onClick={handleResetScheduleLocal}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[11px] font-black uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-700"
+                >
+                  Restablecer
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveMatchSchedule}
+                  className="px-6 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black uppercase tracking-widest rounded-xl transition cursor-pointer shadow-lg flex items-center gap-1.5"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>GUARDAR HORARIOS</span>
+                </button>
+              </div>
+            </div>
+
             {/* Registro de Ganadores de Premios Oficiales FIFA */}
             <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
               <div className="space-y-1">
@@ -5091,8 +5320,12 @@ export default function App() {
                                 >
                                   <option value="">-- Elige --</option>
                                   <option value="no_aplica">No aplica</option>
-                                  <option value={'id' in homeRes ? homeRes.id : ''}>{'name' in homeRes ? homeRes.name : 'Local'}</option>
-                                  <option value={'id' in awayRes ? awayRes.id : ''}>{'name' in awayRes ? awayRes.name : 'Visitante'}</option>
+                                  <option value={'id' in homeRes ? homeRes.id : ''}>
+                                    {'flag' in homeRes ? `${homeRes.flag} ` : ''}{'name' in homeRes ? homeRes.name : 'Local'}
+                                  </option>
+                                  <option value={'id' in awayRes ? awayRes.id : ''}>
+                                    {'flag' in awayRes ? `${awayRes.flag} ` : ''}{'name' in awayRes ? awayRes.name : 'Visitante'}
+                                  </option>
                                 </select>
                               </div>
                             )}
