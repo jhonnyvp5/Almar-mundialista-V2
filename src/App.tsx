@@ -1985,15 +1985,17 @@ export default function App() {
               </button>
             )}
 
-            <button
-              onClick={() => setActiveTab('bracket')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'bracket' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Trophy className="h-4 w-4" />
-              <span>Llaves Eliminatorias Pronóstico</span>
-            </button>
+            {currentUser?.role !== 'admin' && (
+              <button
+                onClick={() => setActiveTab('bracket')}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'bracket' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Trophy className="h-4 w-4" />
+                <span>Llaves Eliminatorias Pronóstico</span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab('bracket_official')}
