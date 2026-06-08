@@ -407,6 +407,7 @@ export default function App() {
   useEffect(() => {
     if (currentUser && currentUser.role === 'user' && unlockedWeek) {
       setProfileSearchWeek(unlockedWeek.toString());
+      setWeekFilter(unlockedWeek.toString());
     }
   }, [currentUser, unlockedWeek]);
 
@@ -2720,12 +2721,12 @@ export default function App() {
                     className="w-full bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs text-white"
                   >
                     <option value="all">Ver todas las Semanas</option>
-                    <option value="1">Semana 1 (11 Jun - 14 Jun)</option>
-                    <option value="2">Semana 2 (15 Jun - 21 Jun)</option>
-                    <option value="3">Semana 3 (22 Jun - 28 Jun)</option>
-                    <option value="4">Semana 4 (29 Jun - 05 Jul)</option>
-                    <option value="5">Semana 5 (06 Jul - 12 Jul)</option>
-                    <option value="6">Semana 6 (13 Jul - 19 Jul)</option>
+                    <option value="1">Semana 1 (11 Jun - 14 Jun){unlockedWeek === 1 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="2">Semana 2 (15 Jun - 21 Jun){unlockedWeek === 2 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="3">Semana 3 (22 Jun - 28 Jun){unlockedWeek === 3 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="4">Semana 4 (29 Jun - 05 Jul){unlockedWeek === 4 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="5">Semana 5 (06 Jul - 12 Jul){unlockedWeek === 5 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="6">Semana 6 (13 Jul - 19 Jul){unlockedWeek === 6 ? ' ⭐ (Semana Activa)' : ''}</option>
                   </select>
                 </div>
 
@@ -4537,12 +4538,12 @@ export default function App() {
                           className="bg-slate-950 text-slate-300 rounded-xl px-3 py-1.5 text-xs border border-slate-900 focus:outline-none focus:border-amber-500/50"
                         >
                           <option value="all">Todas las semanas</option>
-                          <option value="1">Semana 1</option>
-                          <option value="2">Semana 2</option>
-                          <option value="3">Semana 3</option>
-                          <option value="4">Semana 4</option>
-                          <option value="5">Semana 5</option>
-                          <option value="6">Semana 6</option>
+                          <option value="1">Semana 1{unlockedWeek === 1 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="2">Semana 2{unlockedWeek === 2 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="3">Semana 3{unlockedWeek === 3 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="4">Semana 4{unlockedWeek === 4 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="5">Semana 5{unlockedWeek === 5 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="6">Semana 6{unlockedWeek === 6 ? ' ⭐ (Semana Activa)' : ''}</option>
                         </select>
 
                         {/* Group Selection Filter */}
