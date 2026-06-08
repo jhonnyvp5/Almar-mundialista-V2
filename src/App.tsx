@@ -39,7 +39,8 @@ import {
   Target,
   HelpCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Trash2
 } from 'lucide-react';
 import { Team, Match, Group, GroupStandings, StageType } from './types';
 import { TEAMS, GROUPS, VENUES, generateGroupStageMatches, generateKnockoutMatches } from './data';
@@ -180,14 +181,22 @@ export default function App() {
   const [adminStats, setAdminStats] = useState<any>(null);
   const [unlockedWeek, setUnlockedWeek] = useState<number>(1);
 
-  // System Config with Awards
+  // System Config with Awards & Official Bracket
   const [systemConfig, setSystemConfig] = useState<any>({
     unlockedWeek: 1,
     official_balon_oro: '',
     official_guante_oro: '',
     official_bota_oro: '',
-    official_joven_torneo: ''
+    official_joven_torneo: '',
+    official_firsts: {},
+    official_seconds: {},
+    official_thirds: []
   });
+
+  // Admin Official Bracket State
+  const [adminOfficialFirsts, setAdminOfficialFirsts] = useState<Record<string, string>>({});
+  const [adminOfficialSeconds, setAdminOfficialSeconds] = useState<Record<string, string>>({});
+  const [adminOfficialThirds, setAdminOfficialThirds] = useState<string[]>([]);
 
   // Predictions states for FIFA Awards
   const [predBalonOro, setPredBalonOro] = useState('');
@@ -396,13 +405,16 @@ export default function App() {
     }
   }, [userPredictions]);
 
-  // Sync official system awards config to admin fields
+  // Sync official system config to admin fields
   useEffect(() => {
     if (systemConfig) {
       setAdminBalonOro(systemConfig.official_balon_oro || '');
       setAdminGuanteOro(systemConfig.official_guante_oro || '');
       setAdminBotaOro(systemConfig.official_bota_oro || '');
       setAdminJovenTorneo(systemConfig.official_joven_torneo || '');
+      setAdminOfficialFirsts(systemConfig.official_firsts || {});
+      setAdminOfficialSeconds(systemConfig.official_seconds || {});
+      setAdminOfficialThirds(systemConfig.official_thirds || []);
     }
   }, [systemConfig]);
 
@@ -431,13 +443,30 @@ export default function App() {
   const standings = useMemo(() => computeAllStandings(combinedMatches), [combinedMatches]);
   const rankedThirds = useMemo(() => getRankedThirdPlacedTeams(standings), [standings]);
 
-  // Check if group stage predictions and selections have been completed
+  // Check if group stage predictions and selections have been completed (Deprecated for users, but left just in case)
   const isGroupStageSelectionsCompleted = useMemo(() => {
     const hasAllFirst = GROUPS.every(g => manualFirstPlaces[g] && manualFirstPlaces[g].trim() !== '');
     const hasAllSecond = GROUPS.every(g => manualSecondPlaces[g] && manualSecondPlaces[g].trim() !== '');
     const hasEightThirds = manualThirdPlaces.length === 8;
     return hasAllFirst && hasAllSecond && hasEightThirds;
   }, [manualFirstPlaces, manualSecondPlaces, manualThirdPlaces]);
+
+  // Check if official bracket has been defined by Admin
+  const hasOfficialBracketConfigured = useMemo(() => {
+    return Object.keys(adminOfficialFirsts).length === 12 && 
+           Object.keys(adminOfficialSeconds).length === 12 && 
+           adminOfficialThirds.length === 8;
+  }, [adminOfficialFirsts, adminOfficialSeconds, adminOfficialThirds]);
+
+  // Check if all group stage matches (weeks 1, 2, 3) have official results published.
+  const isOfficialGroupStageCompleted = useMemo(() => {
+    const groupMatches = initialMatches.filter(m => m.stage === 'group');
+    return groupMatches.length > 0 && groupMatches.every(m => {
+      const score = officialResults[m.id];
+      return score && score.homeScore !== undefined && score.awayScore !== undefined;
+    });
+  }, [initialMatches, officialResults]);
+
 
   // Handle auto-populating selectors (1st, 2nd, best thirds) based on real standings
   const handleAutoClassifyWithStandings = () => {
@@ -656,8 +685,8 @@ export default function App() {
     }
   };
 
-  // Resolve team function that respects manual classification selectors, or falls back to actual standings
-  const resolveTeamWithManualOverrides = (id: string): Team | { placeholder: string; text: string } => {
+  // Resolve team function that respects the Official Admin Bracket OR the user's manual selections
+  const resolveTeamWithManualOverrides = (id: string, isOfficial: boolean = false): Team | { placeholder: string; text: string } => {
     // If it's a real direct team ID
     const directTeam = TEAMS.find((t) => t.id === id);
     if (directTeam) return directTeam;
@@ -666,17 +695,21 @@ export default function App() {
     const firstMatch = id.match(/^1([A-L])$/);
     if (firstMatch) {
       const gr = firstMatch[1];
-      if (isGroupStageSelectionsCompleted) {
-        const teamId = manualFirstPlaces[gr];
-        if (teamId) {
-          const team = TEAMS.find(t => t.id === teamId);
-          if (team) return team;
+      if (isOfficial) {
+        if (hasOfficialBracketConfigured) {
+          const teamId = adminOfficialFirsts[gr];
+          if (teamId) {
+            const team = TEAMS.find(t => t.id === teamId);
+            if (team) return team;
+          }
         }
-        // Fallback
-        const groupStandings = standings[gr];
-        if (groupStandings && groupStandings.length > 0) {
-          const team = TEAMS.find((t) => t.id === groupStandings[0].teamId);
-          if (team) return team;
+      } else {
+        if (isGroupStageSelectionsCompleted) {
+          const teamId = manualFirstPlaces[gr];
+          if (teamId) {
+            const team = TEAMS.find(t => t.id === teamId);
+            if (team) return team;
+          }
         }
       }
       return { placeholder: id, text: `1° Grupo ${gr}` };
@@ -686,17 +719,21 @@ export default function App() {
     const runnerMatch = id.match(/^2([A-L])$/);
     if (runnerMatch) {
       const gr = runnerMatch[1];
-      if (isGroupStageSelectionsCompleted) {
-        const teamId = manualSecondPlaces[gr];
-        if (teamId) {
-          const team = TEAMS.find(t => t.id === teamId);
-          if (team) return team;
+      if (isOfficial) {
+        if (hasOfficialBracketConfigured) {
+          const teamId = adminOfficialSeconds[gr];
+          if (teamId) {
+            const team = TEAMS.find(t => t.id === teamId);
+            if (team) return team;
+          }
         }
-        // Fallback
-        const groupStandings = standings[gr];
-        if (groupStandings && groupStandings.length > 1) {
-          const team = TEAMS.find((t) => t.id === groupStandings[1].teamId);
-          if (team) return team;
+      } else {
+        if (isGroupStageSelectionsCompleted) {
+          const teamId = manualSecondPlaces[gr];
+          if (teamId) {
+            const team = TEAMS.find(t => t.id === teamId);
+            if (team) return team;
+          }
         }
       }
       return { placeholder: id, text: `2do Grupo ${gr}` };
@@ -704,15 +741,23 @@ export default function App() {
 
     // Pattern C: Best thirds custom slot matching (e.g., 3_ABCDF)
     if (id.startsWith('3_')) {
-      if (isGroupStageSelectionsCompleted) {
-        // Find manual thirds that belong to the allowed groups
-        const thirdsToUse = manualThirdPlaces.length === 8 
-          ? manualThirdPlaces.map(tid => TEAMS.find(t => t.id === tid)).filter(Boolean) as Team[]
-          : rankedThirds;
-
-        const thirdsMap = resolveAllThirds(thirdsToUse);
-        if (thirdsMap[id]) {
-          return thirdsMap[id];
+      if (isOfficial) {
+        if (hasOfficialBracketConfigured) {
+          const thirdsToUse = adminOfficialThirds.map(tid => TEAMS.find(t => t.id === tid)).filter(Boolean) as Team[];
+          const thirdsMap = resolveAllThirds(thirdsToUse);
+          if (thirdsMap[id]) {
+            return thirdsMap[id];
+          }
+        }
+      } else {
+        if (isGroupStageSelectionsCompleted) {
+          const thirdsToUse = manualThirdPlaces.length === 8 
+            ? manualThirdPlaces.map(tid => TEAMS.find(t => t.id === tid)).filter(Boolean) as Team[]
+            : rankedThirds;
+          const thirdsMap = resolveAllThirds(thirdsToUse);
+          if (thirdsMap[id]) {
+            return thirdsMap[id];
+          }
         }
       }
       return { placeholder: id, text: `3ro (Gr. ${id.substring(2)})` };
@@ -724,7 +769,7 @@ export default function App() {
       const mId = `K${wkMatch[1]}`;
       const match = combinedMatches.find((m) => m.id === mId);
       if (match) {
-        const winnerId = getKnockoutWinnerIdWithOverrides(match);
+        const winnerId = getKnockoutWinnerIdWithOverrides(match, isOfficial);
         if (winnerId) {
           const team = TEAMS.find((t) => t.id === winnerId);
           if (team) return team;
@@ -739,7 +784,7 @@ export default function App() {
       const mId = `K${lkMatch[1]}`;
       const match = combinedMatches.find((m) => m.id === mId);
       if (match) {
-        const loserId = getKnockoutLoserIdWithOverrides(match);
+        const loserId = getKnockoutLoserIdWithOverrides(match, isOfficial);
         if (loserId) {
           const team = TEAMS.find((t) => t.id === loserId);
           if (team) return team;
@@ -752,14 +797,23 @@ export default function App() {
   };
 
   // Helper custom knockout winner resolver to respect manual overrides
-  function getKnockoutWinnerIdWithOverrides(match: Match): string | undefined {
-    const home = resolveTeamWithManualOverrides(match.homeTeamId);
-    const away = resolveTeamWithManualOverrides(match.awayTeamId);
+  function getKnockoutWinnerIdWithOverrides(match: Match, isOfficial: boolean = false): string | undefined {
+    const home = resolveTeamWithManualOverrides(match.homeTeamId, isOfficial);
+    const away = resolveTeamWithManualOverrides(match.awayTeamId, isOfficial);
 
     if ('placeholder' in home || 'placeholder' in away) return undefined;
 
-    const hScoreStr = match.predictedHome;
-    const aScoreStr = match.predictedAway;
+    let hScoreStr, aScoreStr, winnerId;
+    if (isOfficial) {
+      // Use official scores from the match (which are appended to combinedMatches from DB matches)
+      hScoreStr = (match as any).homeScore !== undefined ? String((match as any).homeScore) : undefined;
+      aScoreStr = (match as any).awayScore !== undefined ? String((match as any).awayScore) : undefined;
+      winnerId = (match as any).winnerId;
+    } else {
+      hScoreStr = (match as any).predictedHome;
+      aScoreStr = (match as any).predictedAway;
+      winnerId = (match as any).predictedWinnerId;
+    }
 
     if (hScoreStr === undefined || hScoreStr.trim() === '' || aScoreStr === undefined || aScoreStr.trim() === '') {
       return undefined;
@@ -773,42 +827,49 @@ export default function App() {
     if (hScore > aScore) return home.id;
     if (hScore < aScore) return away.id;
 
-    if (match.predictedWinnerId && (match.predictedWinnerId === home.id || match.predictedWinnerId === away.id)) {
-      return match.predictedWinnerId;
+    if (winnerId && (winnerId === home.id || winnerId === away.id)) {
+      return winnerId;
     }
     return home.id; // penalty fallback
   }
 
-  function getKnockoutLoserIdWithOverrides(match: Match): string | undefined {
-    const home = resolveTeamWithManualOverrides(match.homeTeamId);
-    const away = resolveTeamWithManualOverrides(match.awayTeamId);
+  function getKnockoutLoserIdWithOverrides(match: Match, isOfficial: boolean = false): string | undefined {
+    const home = resolveTeamWithManualOverrides(match.homeTeamId, isOfficial);
+    const away = resolveTeamWithManualOverrides(match.awayTeamId, isOfficial);
 
     if ('placeholder' in home || 'placeholder' in away) return undefined;
 
-    const winnerId = getKnockoutWinnerIdWithOverrides(match);
+    const winnerId = getKnockoutWinnerIdWithOverrides(match, isOfficial);
     if (!winnerId) return undefined;
 
     return winnerId === home.id ? away.id : home.id;
   }
 
-  const renderBracketMatchCard = (m: any) => {
-    const homeRes = resolveTeamWithManualOverrides(m.homeTeamId);
-    const awayRes = resolveTeamWithManualOverrides(m.awayTeamId);
-    const winnerId = getKnockoutWinnerIdWithOverrides(m);
+  const renderBracketMatchCard = (m: any, isOfficial: boolean = false) => {
+    const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, isOfficial);
+    const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, isOfficial);
+    const winnerId = getKnockoutWinnerIdWithOverrides(m, isOfficial);
 
     const isHomePlaceholder = 'placeholder' in homeRes;
     const isAwayPlaceholder = 'placeholder' in awayRes;
 
-    const hScore = userPredictions[m.id]?.predictedHome || '';
-    const aScore = userPredictions[m.id]?.predictedAway || '';
-    const pWinnerId = userPredictions[m.id]?.predictedWinnerId;
+    let hScore, aScore, pWinnerId;
+    if (isOfficial) {
+      hScore = m.homeScore !== undefined ? m.homeScore.toString() : '';
+      aScore = m.awayScore !== undefined ? m.awayScore.toString() : '';
+      pWinnerId = m.winnerId;
+    } else {
+      hScore = userPredictions[m.id]?.predictedHome || '';
+      aScore = userPredictions[m.id]?.predictedAway || '';
+      pWinnerId = userPredictions[m.id]?.predictedWinnerId;
+    }
 
     const isTimeLocked = isMatchLockedForTime(m);
     const isWeeklyLocked = isMatchWeeklyLocked(m.date);
     const hasOfficialResult = m.homeScore !== undefined;
-    const isLocked = m.completed || isTimeLocked || isWeeklyLocked || hasOfficialResult;
+    const isLocked = isOfficial ? true : m.completed || isTimeLocked || isWeeklyLocked || hasOfficialResult;
 
-    const isDisabled = isLocked || isHomePlaceholder || isAwayPlaceholder;
+    const isDisabled = isOfficial || isLocked || isHomePlaceholder || isAwayPlaceholder;
     const isTie = hScore !== '' && aScore !== '' && parseInt(hScore, 10) === parseInt(aScore, 10);
     const isReadyToSave = hScore !== '' && aScore !== '' && (!isTie || pWinnerId);
 
@@ -1912,15 +1973,17 @@ export default function App() {
               <span>Fase de Grupos</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('calendar')}
-              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'calendar' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Calendar className="h-4 w-4" />
-              <span>Mis Pronósticos</span>
-            </button>
+            {currentUser?.role !== 'admin' && (
+              <button
+                onClick={() => setActiveTab('calendar')}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'calendar' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Calendar className="h-4 w-4" />
+                <span>Mis Pronósticos</span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab('bracket')}
@@ -1929,18 +1992,30 @@ export default function App() {
               }`}
             >
               <Trophy className="h-4 w-4" />
-              <span>Llaves Eliminatorias</span>
+              <span>Llaves Eliminatorias Pronóstico</span>
             </button>
 
             <button
-              onClick={() => setActiveTab('awards')}
+              onClick={() => setActiveTab('bracket_official')}
               className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'awards' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                activeTab === 'bracket_official' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Award className="h-4 w-4" />
-              <span>Premios FIFA</span>
+              <Trophy className="h-4 w-4 text-emerald-400" />
+              <span>Llaves Eliminatorias Oficial FIFA</span>
             </button>
+
+            {currentUser?.role !== 'admin' && (
+              <button
+                onClick={() => setActiveTab('awards')}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'awards' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Award className="h-4 w-4" />
+                <span>Premios FIFA</span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab('ranking')}
@@ -2010,15 +2085,17 @@ export default function App() {
                 <p className="text-sm sm:text-base text-slate-300 max-w-3xl font-medium leading-relaxed">
                   🏆 Es tu momento de demostrar que sabes de fútbol. Predice los resultados de los partidos y si aciertas, ¡entras al sorteo de premios!
                 </p>
-                <div className="pt-2">
-                  <button
-                    onClick={() => setActiveTab('calendar')}
-                    className="px-6 py-3 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.25)] flex items-center gap-2 cursor-pointer"
-                  >
-                    <span>Comenzar mis Pronósticos</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
+                {currentUser?.role !== 'admin' && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setActiveTab('calendar')}
+                      className="px-6 py-3 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(245,158,11,0.25)] flex items-center gap-2 cursor-pointer"
+                    >
+                      <span>Comenzar mis Pronósticos</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2202,7 +2279,7 @@ export default function App() {
 
                     {/* Manual classification overridden dropdowns */}
                     {/* Manual classification overridden dropdowns */}
-                    {(() => {
+                    {currentUser?.role !== 'admin' && (() => {
                       const isGroupOverriddenInDb = !!(
                         userPredictions[`group_override_first_${gId}`]?.predictedWinnerId &&
                         userPredictions[`group_override_second_${gId}`]?.predictedWinnerId &&
@@ -2353,149 +2430,151 @@ export default function App() {
             </div>
 
             {/* Selecting best thirds list */}
-            <div className="bg-slate-900/60 border border-slate-900 p-6 rounded-2xl space-y-4">
-              <div className="space-y-1">
-                <h3 className="font-extrabold text-sm text-white uppercase tracking-wider">
-                  Selección de los mejores Terceros Lugares (Exactamente 8 clasificados)
-                </h3>
-                <p className="text-xs text-slate-400">
-                  El mundial requiere clasificar los 8 mejores terceros lugares de los 12 grupos. Configúralos para armar las llaves eliminatorias correspondientes.
-                </p>
-              </div>
+            {currentUser?.role !== 'admin' && (
+              <div className="bg-slate-900/60 border border-slate-900 p-6 rounded-2xl space-y-4">
+                <div className="space-y-1">
+                  <h3 className="font-extrabold text-sm text-white uppercase tracking-wider">
+                    Selección de los mejores Terceros Lugares (Exactamente 8 clasificados)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    El mundial requiere clasificar los 8 mejores terceros lugares de los 12 grupos. Configúralos para armar las llaves eliminatorias correspondientes.
+                  </p>
+                </div>
 
-              {/* Grid of options */}
-              {(() => {
-                const candidates = GROUPS.map((gId) => {
-                  const thirdTeamId = manualThirdsByGroup[gId];
-                  if (!thirdTeamId || thirdTeamId === 'no_aplica') return null;
-                  const team = TEAMS.find(t => t.id === thirdTeamId);
-                  if (!team) return null;
-                  return { gId, team, thirdTeamId };
-                }).filter(Boolean);
+                {/* Grid of options */}
+                {(() => {
+                  const candidates = GROUPS.map((gId) => {
+                    const thirdTeamId = manualThirdsByGroup[gId];
+                    if (!thirdTeamId || thirdTeamId === 'no_aplica') return null;
+                    const team = TEAMS.find(t => t.id === thirdTeamId);
+                    if (!team) return null;
+                    return { gId, team, thirdTeamId };
+                  }).filter(Boolean);
 
-                if (candidates.length === 0) {
+                  if (candidates.length === 0) {
+                    return (
+                      <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-800 rounded-xl">
+                        ⚠️ Selecciona algún equipo como "3er Lugar" en las tarjetas de grupos para habilitar su postulación aquí.
+                      </div>
+                    );
+                  }
+
                   return (
-                    <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-800 rounded-xl">
-                      ⚠️ Selecciona algún equipo como "3er Lugar" en las tarjetas de grupos para habilitar su postulación aquí.
-                    </div>
-                  );
-                }
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 pt-2">
+                      {candidates.map((item) => {
+                        if (!item) return null;
+                        const { gId, team, thirdTeamId } = item;
+                        const isSelected = manualThirdPlaces.includes(team.id);
 
-                return (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3 pt-2">
-                    {candidates.map((item) => {
-                      if (!item) return null;
-                      const { gId, team, thirdTeamId } = item;
-                      const isSelected = manualThirdPlaces.includes(team.id);
+                        const groupStandings = standings[gId];
+                        const teamStanding = groupStandings?.find(s => s.teamId === thirdTeamId);
+                        const points = teamStanding ? teamStanding.points : 0;
+                        const goalDifference = teamStanding ? teamStanding.goalDifference : 0;
 
-                      const groupStandings = standings[gId];
-                      const teamStanding = groupStandings?.find(s => s.teamId === thirdTeamId);
-                      const points = teamStanding ? teamStanding.points : 0;
-                      const goalDifference = teamStanding ? teamStanding.goalDifference : 0;
+                        const isButtonDisabled = isGroupStageSelectionsLocked();
 
-                      const isButtonDisabled = isGroupStageSelectionsLocked();
-
-                      return (
-                        <button
-                          key={team.id}
-                          disabled={isButtonDisabled}
-                          onClick={() => {
-                            if (isGroupStageSelectionsLocked()) {
-                              showToast('🔒 El registro de posiciones de la fase de grupos está bloqueado. El primer partido inicia en menos de 1 hora.');
-                              return;
-                            }
-
-                            let updatedList: string[];
-                            if (isSelected) {
-                              updatedList = manualThirdPlaces.filter(tid => tid !== team.id);
-                            } else {
-                              if (manualThirdPlaces.length >= 8) {
-                                showToast('⚠️ Solo se permiten 8 mejores terceros.');
+                        return (
+                          <button
+                            key={team.id}
+                            disabled={isButtonDisabled}
+                            onClick={() => {
+                              if (isGroupStageSelectionsLocked()) {
+                                showToast('🔒 El registro de posiciones de la fase de grupos está bloqueado. El primer partido inicia en menos de 1 hora.');
                                 return;
                               }
-                              updatedList = [...manualThirdPlaces, team.id];
-                            }
-                            setManualThirdPlaces(updatedList);
-                            handleSaveBestThirds(updatedList);
 
-                            // Auto-fill "no_aplica" for the remaining groups if exactly 8 thirds are selected
-                            if (updatedList.length === 8) {
-                              const newThirdsByGroup = { ...manualThirdsByGroup };
-                              const payloadToSave: Record<string, any> = {};
+                              let updatedList: string[];
+                              if (isSelected) {
+                                updatedList = manualThirdPlaces.filter(tid => tid !== team.id);
+                              } else {
+                                if (manualThirdPlaces.length >= 8) {
+                                  showToast('⚠️ Solo se permiten 8 mejores terceros.');
+                                  return;
+                                }
+                                updatedList = [...manualThirdPlaces, team.id];
+                              }
+                              setManualThirdPlaces(updatedList);
+                              handleSaveBestThirds(updatedList);
 
-                              GROUPS.forEach((groupCode) => {
-                                const currentThirdTeamId = manualThirdsByGroup[groupCode] || '';
-                                if (currentThirdTeamId !== 'no_aplica') {
-                                  if (!currentThirdTeamId || !updatedList.includes(currentThirdTeamId)) {
-                                    newThirdsByGroup[groupCode] = 'no_aplica';
+                              // Auto-fill "no_aplica" for the remaining groups if exactly 8 thirds are selected
+                              if (updatedList.length === 8) {
+                                const newThirdsByGroup = { ...manualThirdsByGroup };
+                                const payloadToSave: Record<string, any> = {};
 
-                                    const firstVal = manualFirstPlaces[groupCode] || '';
-                                    const secondVal = manualSecondPlaces[groupCode] || '';
+                                GROUPS.forEach((groupCode) => {
+                                  const currentThirdTeamId = manualThirdsByGroup[groupCode] || '';
+                                  if (currentThirdTeamId !== 'no_aplica') {
+                                    if (!currentThirdTeamId || !updatedList.includes(currentThirdTeamId)) {
+                                      newThirdsByGroup[groupCode] = 'no_aplica';
 
-                                    // Only save if first and second are already registered/selected!
-                                    if (firstVal && secondVal) {
-                                      payloadToSave[`group_override_first_${groupCode}`] = {
-                                        predictedHome: '0',
-                                        predictedAway: '0',
-                                        predictedWinnerId: firstVal,
-                                        completed: true
-                                      };
-                                      payloadToSave[`group_override_second_${groupCode}`] = {
-                                        predictedHome: '0',
-                                        predictedAway: '0',
-                                        predictedWinnerId: secondVal,
-                                        completed: true
-                                      };
-                                      payloadToSave[`group_override_third_${groupCode}`] = {
-                                        predictedHome: '0',
-                                        predictedAway: '0',
-                                        predictedWinnerId: 'no_aplica',
-                                        completed: true
-                                      };
+                                      const firstVal = manualFirstPlaces[groupCode] || '';
+                                      const secondVal = manualSecondPlaces[groupCode] || '';
+
+                                      // Only save if first and second are already registered/selected!
+                                      if (firstVal && secondVal) {
+                                        payloadToSave[`group_override_first_${groupCode}`] = {
+                                          predictedHome: '0',
+                                          predictedAway: '0',
+                                          predictedWinnerId: firstVal,
+                                          completed: true
+                                        };
+                                        payloadToSave[`group_override_second_${groupCode}`] = {
+                                          predictedHome: '0',
+                                          predictedAway: '0',
+                                          predictedWinnerId: secondVal,
+                                          completed: true
+                                        };
+                                        payloadToSave[`group_override_third_${groupCode}`] = {
+                                          predictedHome: '0',
+                                          predictedAway: '0',
+                                          predictedWinnerId: 'no_aplica',
+                                          completed: true
+                                        };
+                                      }
                                     }
                                   }
+                                });
+
+                                setManualThirdsByGroup(newThirdsByGroup);
+
+                                // Save group overrides to DB
+                                if (Object.keys(payloadToSave).length > 0 && currentUser) {
+                                  fetch(`/api/predictions/${currentUser.id}`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ predictions: payloadToSave })
+                                  })
+                                  .then(res => res.json())
+                                  .then(data => {
+                                    if (data.success) {
+                                      setUserPredictions(prev => ({ ...prev, ...payloadToSave }));
+                                    }
+                                  })
+                                  .catch(err => console.error('Error auto-saving group thirds:', err));
                                 }
-                              });
-
-                              setManualThirdsByGroup(newThirdsByGroup);
-
-                              // Save group overrides to DB
-                              if (Object.keys(payloadToSave).length > 0 && currentUser) {
-                                fetch(`/api/predictions/${currentUser.id}`, {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ predictions: payloadToSave })
-                                })
-                                .then(res => res.json())
-                                .then(data => {
-                                  if (data.success) {
-                                    setUserPredictions(prev => ({ ...prev, ...payloadToSave }));
-                                  }
-                                })
-                                .catch(err => console.error('Error auto-saving group thirds:', err));
                               }
-                            }
-                          }}
-                          className={`p-3 border rounded-xl flex flex-col items-center text-center gap-1.5 transition-all cursor-pointer ${
-                            isSelected 
-                              ? 'bg-amber-500/10 border-amber-500 text-amber-400 font-bold shadow-md'
-                              : 'bg-slate-950/60 border-slate-850 text-slate-300 hover:border-slate-700'
-                          } ${isButtonDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          <img src={getTeamFlagUrl(team.id)} className="w-10 h-7 object-cover rounded shadow border border-slate-800" alt="" referrerPolicy="no-referrer" />
-                          <span className="text-[10px] truncate w-full font-semibold">{team.name}</span>
-                          <span className="text-[9px] text-slate-500 font-mono">Gp. {gId} | Pts: {points} | DG: {goalDifference}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+                            }}
+                            className={`p-3 border rounded-xl flex flex-col items-center text-center gap-1.5 transition-all cursor-pointer ${
+                              isSelected 
+                                ? 'bg-amber-500/10 border-amber-500 text-amber-400 font-bold shadow-md'
+                                : 'bg-slate-950/60 border-slate-850 text-slate-300 hover:border-slate-700'
+                            } ${isButtonDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <img src={getTeamFlagUrl(team.id)} className="w-10 h-7 object-cover rounded shadow border border-slate-800" alt="" referrerPolicy="no-referrer" />
+                            <span className="text-[10px] truncate w-full font-semibold">{team.name}</span>
+                            <span className="text-[9px] text-slate-500 font-mono">Gp. {gId} | Pts: {points} | DG: {goalDifference}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
 
-              <div className="text-right text-xs font-bold text-amber-400">
-                Seleccionados de terceros: {manualThirdPlaces.length} / 8
+                <div className="text-right text-xs font-bold text-amber-400">
+                  Seleccionados de terceros: {manualThirdPlaces.length} / 8
+                </div>
               </div>
-            </div>
+            )}
 
           </div>
         )}
@@ -2826,7 +2905,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ==================== TAB: BRACKET MAP (LLAVES) ==================== */}
+        {/* ==================== TAB: BRACKET MAP USER PRONOSTICOS (LLAVES) ==================== */}
         {activeTab === 'bracket' && (
           <div className="space-y-6">
             
@@ -2834,10 +2913,10 @@ export default function App() {
               <div className="space-y-1">
                 <h2 className="text-xl font-extrabold text-white uppercase tracking-tight flex items-center gap-2">
                   <Trophy className="h-5 w-5 text-amber-500" />
-                  Cuadro Eliminatorio Automático de Partidos
+                  Cuadro Eliminatorio Pronosticado
                 </h2>
                 <p className="text-xs text-slate-400 max-w-2xl">
-                  Armado y simulación automática del bracket siguiendo las posiciones clasificatorias configuradas de forma oficial.
+                  Armado y simulación automática del bracket siguiendo TUS posiciones clasificatorias configuradas en Fase de Grupos.
                 </p>
               </div>
 
@@ -2854,20 +2933,11 @@ export default function App() {
                 </div>
                 <div className="space-y-1.5 flex-1 text-center sm:text-left">
                   <h3 className="font-bold text-base text-amber-400 tracking-tight flex items-center justify-center sm:justify-start gap-2">
-                    Fase de grupos por definir
+                    Fase de Grupos Por Definir
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
-                    Para habilitar y pronosticar los partidos de las llaves eliminatorias, primero debes registrar las posiciones finales del <strong>1er lugar, 2do lugar y mejores terceros</strong> para todos los grupos en la sección de <strong>Fase de Grupos</strong>.
+                    Para pronosticar este cuadro de eliminatorias debes ir a Fase de Grupos y seleccionar los primeros, segundos y los 8 mejores terceros lugares.
                   </p>
-                  <div className="pt-2">
-                    <button
-                      onClick={() => setActiveTab('groups')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-950 bg-amber-400 rounded-lg hover:bg-amber-300 transition-colors shadow-md cursor-pointer"
-                    >
-                      Ir a Fase de Grupos
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
@@ -2878,25 +2948,25 @@ export default function App() {
               {/* STAGE: 1/16 (Round of 32) */}
               <div className="min-w-[240px] flex flex-col gap-6 justify-center">
                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Dieciseisavos (1/16)</div>
-                {combinedMatches.filter(m => m.stage === '1/16').map((m) => renderBracketMatchCard(m))}
+                {combinedMatches.filter(m => m.stage === '1/16').map((m) => renderBracketMatchCard(m, false))}
               </div>
 
               {/* STAGE: 1/8 (Round of 16) */}
               <div className="min-w-[240px] flex flex-col gap-6 justify-center">
                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Octavos de Final (1/8)</div>
-                {combinedMatches.filter(m => m.stage === '1/8').map((m) => renderBracketMatchCard(m))}
+                {combinedMatches.filter(m => m.stage === '1/8').map((m) => renderBracketMatchCard(m, false))}
               </div>
 
               {/* STAGE: 1/4 (Quarter-finals) */}
               <div className="min-w-[240px] flex flex-col gap-12 justify-center">
                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Cuartos de Final (1/4)</div>
-                {combinedMatches.filter(m => m.stage === '1/4').map((m) => renderBracketMatchCard(m))}
+                {combinedMatches.filter(m => m.stage === '1/4').map((m) => renderBracketMatchCard(m, false))}
               </div>
 
               {/* STAGE: 1/2 (Semifinals) */}
               <div className="min-w-[240px] flex flex-col gap-24 justify-center">
                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Semifinales</div>
-                {combinedMatches.filter(m => m.stage === '1/2').map((m) => renderBracketMatchCard(m))}
+                {combinedMatches.filter(m => m.stage === '1/2').map((m) => renderBracketMatchCard(m, false))}
               </div>
 
               {/* STAGE: FINAL (La Gran Final & Campeón) */}
@@ -2904,7 +2974,7 @@ export default function App() {
                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Gran Final y Podio</div>
                 
                 {combinedMatches.filter(m => m.stage === 'final').map((m) => {
-                  const winnerId = getKnockoutWinnerIdWithOverrides(m);
+                  const winnerId = getKnockoutWinnerIdWithOverrides(m, false);
                   const champion = winnerId ? TEAMS.find(t => t.id === winnerId) : null;
 
                   return (
@@ -2921,7 +2991,7 @@ export default function App() {
                       )}
 
                       {/* Final block */}
-                      {renderBracketMatchCard(m)}
+                      {renderBracketMatchCard(m, false)}
 
                     </div>
                   );
@@ -2929,6 +2999,101 @@ export default function App() {
               </div>
 
             </div>
+
+          </div>
+        )}
+
+        {/* ==================== TAB: BRACKET MAP OFFICIAL ==================== */}
+        {activeTab === 'bracket_official' && (
+          <div className="space-y-6">
+            
+            <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-1">
+                <h2 className="text-xl font-extrabold text-white uppercase tracking-tight flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-emerald-500" />
+                  Cuadro Eliminatorio Oficial FIFA
+                </h2>
+                <p className="text-xs text-slate-400 max-w-2xl">
+                  Bracket oficial con base a los resultados y equipos clasificados oficiales del torneo. Solo el administrador puede editar estos marcadores.
+                </p>
+              </div>
+            </div>
+
+            {(!hasOfficialBracketConfigured || !isOfficialGroupStageCompleted) && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 p-5 rounded-2xl flex flex-col sm:flex-row items-center sm:items-start gap-4 shadow-lg shadow-emerald-500/5">
+                <div className="bg-emerald-500/20 p-3 rounded-xl shrink-0">
+                  <ShieldAlert className="h-6 w-6 text-emerald-400" />
+                </div>
+                <div className="space-y-1.5 flex-1 text-center sm:text-left">
+                  <h3 className="font-bold text-base text-emerald-400 tracking-tight flex items-center justify-center sm:justify-start gap-2">
+                    Llaves Eliminatorias Oficiales Por Definir
+                  </h3>
+                  <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
+                    Las llaves eliminatorias definitivas oficiales estarán disponibles cuando se hayan jugado todos los partidos de las tres primeras semanas (Fase de Grupos) y el administrador configure los clasificados.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Layout representation of World Cup Brackets */}
+            {hasOfficialBracketConfigured && isOfficialGroupStageCompleted && (
+              <div className="flex overflow-x-auto gap-8 py-6 px-2">
+              
+              {/* STAGE: 1/16 (Round of 32) */}
+              <div className="min-w-[240px] flex flex-col gap-6 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Dieciseisavos (1/16)</div>
+                {combinedMatches.filter(m => m.stage === '1/16').map((m) => renderBracketMatchCard(m, true))}
+              </div>
+
+              {/* STAGE: 1/8 (Round of 16) */}
+              <div className="min-w-[240px] flex flex-col gap-6 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Octavos de Final (1/8)</div>
+                {combinedMatches.filter(m => m.stage === '1/8').map((m) => renderBracketMatchCard(m, true))}
+              </div>
+
+              {/* STAGE: 1/4 (Quarter-finals) */}
+              <div className="min-w-[240px] flex flex-col gap-12 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Cuartos de Final (1/4)</div>
+                {combinedMatches.filter(m => m.stage === '1/4').map((m) => renderBracketMatchCard(m, true))}
+              </div>
+
+              {/* STAGE: 1/2 (Semifinals) */}
+              <div className="min-w-[240px] flex flex-col gap-24 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Semifinales</div>
+                {combinedMatches.filter(m => m.stage === '1/2').map((m) => renderBracketMatchCard(m, true))}
+              </div>
+
+              {/* STAGE: FINAL (La Gran Final & Campeón) */}
+              <div className="min-w-[260px] flex flex-col gap-6 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Gran Final y Podio</div>
+                
+                {combinedMatches.filter(m => m.stage === 'final').map((m) => {
+                  const winnerId = getKnockoutWinnerIdWithOverrides(m, true);
+                  const champion = winnerId ? TEAMS.find(t => t.id === winnerId) : null;
+
+                  return (
+                    <div key={m.id} className="space-y-6">
+                      
+                      {/* Champion Crown box */}
+                      {champion && (
+                        <div className="bg-gradient-to-tr from-emerald-500 to-green-300 p-4 rounded-xl text-slate-950 text-center space-y-1 shadow-[0_0_20px_rgba(16,185,129,0.3)] border border-emerald-400 flex flex-col items-center justify-center">
+                          <Crown className="h-6 w-6 text-slate-950 fill-slate-950/20 mb-1" />
+                          <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-950">Campeón Oficial del Torneo:</div>
+                          <img src={getTeamFlagUrl(champion.id)} className="w-12 h-8 object-cover rounded-md shadow-md border border-emerald-600/30 my-1.5" alt="" referrerPolicy="no-referrer" />
+                          <div className="text-sm font-black uppercase tracking-tight text-slate-950">{champion.name}</div>
+                        </div>
+                      )}
+
+                      {/* Final block */}
+                      {renderBracketMatchCard(m, true)}
+
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+            )}
 
           </div>
         )}
@@ -3708,7 +3873,7 @@ export default function App() {
             </div>
 
             {/* General score counters & statistics */}
-            {(() => {
+            {currentUser?.role !== 'admin' && (() => {
               const uStats = ranking.find((u) => u.id === currentUser.id) || {
                 puntos: 0,
                 aciertosExactos: 0,
@@ -4519,7 +4684,30 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="text-right">
+              <div className="flex justify-end gap-2 text-right">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setAdminBalonOro('');
+                    setAdminGuanteOro('');
+                    setAdminBotaOro('');
+                    setAdminJovenTorneo('');
+                    if (currentUser) {
+                      try {
+                        const res = await fetch('/api/admin/config/awards', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
+                          body: JSON.stringify({ official_balon_oro: '', official_guante_oro: '', official_bota_oro: '', official_joven_torneo: '' })
+                        });
+                        if (res.ok) { showToast("🗑️ Premios eliminados exitosamente."); }
+                      } catch { showToast("❌ Error al borrar premios"); }
+                    }
+                  }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 border border-slate-700 hover:border-slate-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Limpiar</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleSaveAdminAwards}
@@ -4532,6 +4720,157 @@ export default function App() {
             </div>
 
             {/* Grid Split: Users Admin vs Score Registration */}
+            {/* Configuración Oficial de Llave Eliminatoria */}
+            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
+              <div className="space-y-1">
+                <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                  <Trophy className="h-4 w-4 text-amber-400" />
+                  Llave Eliminatoria Oficial (Equipos Clasificados)
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Calcula automáticamente los primeros y segundos lugares según los resultados oficiales registrados. 
+                  Selecciona exactamente los <strong>8 mejores terceros</strong> a continuación y guarda para oficializar el bracket eliminatorio.
+                </p>
+              </div>
+
+              {(() => {
+                // Compute temporary official standings from already saved matches
+                const offMatches = initialMatches.map(m => {
+                  const saved = officialResults[m.id] || {};
+                  return { 
+                    ...m, 
+                    predictedHome: saved.homeScore !== undefined ? String(saved.homeScore) : '', 
+                    predictedAway: saved.awayScore !== undefined ? String(saved.awayScore) : '' 
+                  };
+                });
+                const offStandings = computeAllStandings(offMatches);
+                const offFirsts: Record<string, string> = {};
+                const offSeconds: Record<string, string> = {};
+                GROUPS.forEach(g => {
+                   if (offStandings[g] && offStandings[g].length >= 2) {
+                     offFirsts[g] = offStandings[g][0].teamId;
+                     offSeconds[g] = offStandings[g][1].teamId;
+                   }
+                });
+
+                const computedThirds = getRankedThirdPlacedTeams(offStandings);
+
+                const handleSaveBracket = async () => {
+                   if (!currentUser) return;
+                   if (adminOfficialThirds.length !== 8) {
+                     showToast("⚠️ Debe seleccionar exactamente 8 mejores terceros."); 
+                     return;
+                   }
+                   try {
+                     const res = await fetch('/api/admin/config/bracket', {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
+                       body: JSON.stringify({ 
+                         official_firsts: offFirsts, 
+                         official_seconds: offSeconds, 
+                         official_thirds: adminOfficialThirds 
+                       })
+                     });
+                     if (res.ok) {
+                       showToast("✅ Llave Eliminatoria Oficial guardada con éxito.");
+                       fetchConfig(); // Resync state immediately
+                     }
+                   } catch {
+                     showToast("❌ Error al guardar datos en la DB");
+                   }
+                };
+
+                return (
+                  <div className="space-y-4">
+                     <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-850">
+                       <div className="flex justify-between items-center mb-3">
+                         <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                           1. Mejores Terceros Detectados (Selecciona 8)
+                         </h4>
+                         <button 
+                           onClick={() => setAdminOfficialThirds(computedThirds.slice(0, 8).map(t => t.id))}
+                           className="text-[10px] bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-2 py-1 rounded-md transition-colors"
+                         >
+                           Autocompletar Mejores 8
+                         </button>
+                       </div>
+                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                          {computedThirds.map(t => {
+                            const isSelected = adminOfficialThirds.includes(t.id);
+                            return (
+                              <button
+                                key={t.id}
+                                onClick={() => {
+                                  let nt = [...adminOfficialThirds];
+                                  if (isSelected) {
+                                    nt = nt.filter(id => id !== t.id);
+                                  } else {
+                                    if (nt.length < 8) nt.push(t.id);
+                                  }
+                                  setAdminOfficialThirds(nt);
+                                }}
+                                className={`px-3 py-2 border rounded-xl flex items-center justify-between text-[11px] font-bold transition-all ${
+                                  isSelected 
+                                    ? 'border-amber-500 bg-amber-500/10 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.1)]' 
+                                    : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-600'
+                                } cursor-pointer`}
+                              >
+                                 <span className="truncate">{t.name} (G{t.group})</span>
+                                 {isSelected && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
+                              </button>
+                            );
+                          })}
+                          {computedThirds.length === 0 && (
+                            <div className="col-span-full text-xs text-slate-500 italic py-2">
+                              No hay datos de terceros aún. Ingrese marcadores en los partidos para calcularlos.
+                            </div>
+                          )}
+                       </div>
+                       <div className="text-right text-[10px] font-bold text-slate-400 mt-2">
+                         Seleccionados: {adminOfficialThirds.length} / 8
+                       </div>
+                     </div>
+
+                     <div className="flex justify-end gap-2 pt-1">
+                       <button
+                         onClick={async () => {
+                           if (!currentUser) return;
+                           try {
+                             const res = await fetch('/api/admin/config/bracket', {
+                               method: 'POST',
+                               headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
+                               body: JSON.stringify({ official_firsts: {}, official_seconds: {}, official_thirds: [] })
+                             });
+                             if (res.ok) {
+                               setAdminOfficialFirsts({});
+                               setAdminOfficialSeconds({});
+                               setAdminOfficialThirds([]);
+                               showToast("🗑️ Llave Eliminatoria eliminada con éxito.");
+                               fetchConfig();
+                             }
+                           } catch {
+                             showToast("❌ Error al borrar llave en la DB");
+                           }
+                         }}
+                         className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer inline-flex items-center gap-2 border border-slate-700 hover:border-slate-600"
+                       >
+                         <Trash2 className="h-4 w-4" />
+                         <span>ELIMINAR LLAVE</span>
+                       </button>
+                       <button 
+                         onClick={handleSaveBracket} 
+                         disabled={adminOfficialThirds.length !== 8}
+                         className="bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 px-6 py-2.5 font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                       >
+                         <Save className="h-4 w-4" />
+                         <span>OFICIALIZAR LLAVE ELIMINATORIA</span>
+                       </button>
+                     </div>
+                  </div>
+                )
+              })()}
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
               {/* Left Column: Official Score Registration panel (7/12) */}
@@ -4577,8 +4916,8 @@ export default function App() {
                     .filter(m => selectedAdminMatchStage === 'all' || m.stage === selectedAdminMatchStage)
                     .filter(m => selectedAdminMatchWeek === 'all' || getMatchWeek(m.date).toString() === selectedAdminMatchWeek)
                     .map((m) => {
-                      const homeRes = resolveTeamWithManualOverrides(m.homeTeamId);
-                      const awayRes = resolveTeamWithManualOverrides(m.awayTeamId);
+                      const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, true);
+                      const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, true);
 
                       const savedScore = officialResults[m.id] || {};
                       
@@ -4650,27 +4989,62 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Winner dropdown for ties */}
-                          {isTie && (
-                            <div className="flex items-center justify-end gap-1.5 text-[10px] text-slate-450 mt-1">
-                              <span>Ganador penales:</span>
-                              <select
-                                value={inputWinner || ''}
-                                onChange={(e) => {
-                                  setAdminScores(prev => ({
-                                    ...prev,
-                                    [m.id]: { ...(prev[m.id] || { home: '', away: '' }), winner: e.target.value }
-                                  }));
+                          {/* Winner dropdown for ties & Delete action */}
+                          <div className={`flex items-center mt-1.5 ${isTie ? 'justify-between' : 'justify-start'}`}>
+                            {savedScore.homeScore !== undefined && (
+                              <button
+                                onClick={async () => {
+                                  if (!currentUser) return;
+                                  try {
+                                    const res = await fetch('/api/admin/results', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
+                                      body: JSON.stringify({ results: [{ matchId: m.id, homeScore: '', awayScore: '', winnerId: '' }] })
+                                    });
+                                    if (res.ok) {
+                                      showToast("🗑️ Marcador oficial eliminado.");
+                                      setOfficialResults(prev => {
+                                        const next = { ...prev };
+                                        delete next[m.id];
+                                        return next;
+                                      });
+                                      setAdminScores(prev => {
+                                        const next = { ...prev };
+                                        delete next[m.id];
+                                        return next;
+                                      });
+                                      fetchRankings();
+                                    }
+                                  } catch { showToast("❌ Error al borrar el marcador"); }
                                 }}
-                                className="bg-slate-900 border border-slate-800 rounded text-[10px] p-0.5 text-amber-400 focus:outline-none"
+                                className="flex items-center gap-1 text-[9px] text-rose-400 hover:text-rose-300 font-bold uppercase transition bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20"
                               >
-                                <option value="">-- Elige --</option>
-                                <option value="no_aplica">No aplica</option>
-                                <option value={'id' in homeRes ? homeRes.id : ''}>{'name' in homeRes ? homeRes.name : 'Local'}</option>
-                                <option value={'id' in awayRes ? awayRes.id : ''}>{'name' in awayRes ? awayRes.name : 'Visitante'}</option>
-                              </select>
-                            </div>
-                          )}
+                                <Trash2 className="h-3 w-3" />
+                                Eliminar
+                              </button>
+                            )}
+
+                            {isTie && (
+                              <div className={`flex items-center justify-end gap-1.5 text-[10px] text-slate-450 ${savedScore.homeScore === undefined ? 'w-full' : ''}`}>
+                                <span>Ganador penales:</span>
+                                <select
+                                  value={inputWinner || ''}
+                                  onChange={(e) => {
+                                    setAdminScores(prev => ({
+                                      ...prev,
+                                      [m.id]: { ...(prev[m.id] || { home: '', away: '' }), winner: e.target.value }
+                                    }));
+                                  }}
+                                  className="bg-slate-900 border border-slate-800 rounded text-[10px] p-0.5 text-amber-400 focus:outline-none"
+                                >
+                                  <option value="">-- Elige --</option>
+                                  <option value="no_aplica">No aplica</option>
+                                  <option value={'id' in homeRes ? homeRes.id : ''}>{'name' in homeRes ? homeRes.name : 'Local'}</option>
+                                  <option value={'id' in awayRes ? awayRes.id : ''}>{'name' in awayRes ? awayRes.name : 'Visitante'}</option>
+                                </select>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}

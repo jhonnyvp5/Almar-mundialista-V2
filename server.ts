@@ -5,6 +5,7 @@ import pool from './neonDb.ts';
 import * as xlsx from 'xlsx';
 import { createServer as createViteServer } from 'vite';
 import { TEAMS, GROUPS, generateGroupStageMatches, generateKnockoutMatches } from './src/data';
+import { Team } from './src/types';
 import { computeAllStandings, getRankedThirdPlacedTeams, getKnockoutWinnerId, resolveAllThirds } from './src/utils';
 
 // Ecuador cedula validation
@@ -77,6 +78,9 @@ interface DatabaseSchema {
     official_guante_oro?: string;
     official_bota_oro?: string;
     official_joven_torneo?: string;
+    official_firsts?: Record<string, string>;
+    official_seconds?: Record<string, string>;
+    official_thirds?: string[];
   };
 }
 
@@ -113,12 +117,18 @@ async function loadDatabase(): Promise<DatabaseSchema> {
         official_guante_oro: conf[0].official_guante_oro || '',
         official_bota_oro: conf[0].official_bota_oro || '',
         official_joven_torneo: conf[0].official_joven_torneo || '',
+        official_firsts: typeof conf[0].official_firsts === 'string' ? JSON.parse(conf[0].official_firsts) : conf[0].official_firsts || {},
+        official_seconds: typeof conf[0].official_seconds === 'string' ? JSON.parse(conf[0].official_seconds) : conf[0].official_seconds || {},
+        official_thirds: typeof conf[0].official_thirds === 'string' ? JSON.parse(conf[0].official_thirds) : conf[0].official_thirds || [],
       } : {
         unlockedWeek: 1,
         official_balon_oro: '',
         official_guante_oro: '',
         official_bota_oro: '',
-        official_joven_torneo: ''
+        official_joven_torneo: '',
+        official_firsts: {},
+        official_seconds: {},
+        official_thirds: []
       }
     };
 
@@ -203,15 +213,27 @@ async function saveDatabase(db: DatabaseSchema) {
 
     if (db.config) {
       await client.query(`
-        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo)
-        VALUES ('system_config', $1, $2, $3, $4, $5)
+        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_firsts, official_seconds, official_thirds)
+        VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (id) DO UPDATE SET
           "unlockedWeek" = EXCLUDED."unlockedWeek",
           official_balon_oro = EXCLUDED.official_balon_oro,
           official_guante_oro = EXCLUDED.official_guante_oro,
           official_bota_oro = EXCLUDED.official_bota_oro,
-          official_joven_torneo = EXCLUDED.official_joven_torneo
-      `, [db.config.unlockedWeek, db.config.official_balon_oro, db.config.official_guante_oro, db.config.official_bota_oro, db.config.official_joven_torneo]);
+          official_joven_torneo = EXCLUDED.official_joven_torneo,
+          official_firsts = EXCLUDED.official_firsts,
+          official_seconds = EXCLUDED.official_seconds,
+          official_thirds = EXCLUDED.official_thirds
+      `, [
+        db.config.unlockedWeek, 
+        db.config.official_balon_oro, 
+        db.config.official_guante_oro, 
+        db.config.official_bota_oro, 
+        db.config.official_joven_torneo,
+        JSON.stringify(db.config.official_firsts || {}),
+        JSON.stringify(db.config.official_seconds || {}),
+        JSON.stringify(db.config.official_thirds || [])
+      ]);
     }
 
     for (const m of db.matches) {
@@ -370,7 +392,42 @@ async function saveDatabase(db: DatabaseSchema) {
 
     // Compute official group standings
     const officialAllStandings = computeAllStandings(officialGroupMatches);
-    const officialRankedThirds = getRankedThirdPlacedTeams(officialAllStandings);
+    let officialRankedThirds = getRankedThirdPlacedTeams(officialAllStandings);
+
+    if (db.config && db.config.official_thirds && db.config.official_thirds.length === 8) {
+      officialRankedThirds = db.config.official_thirds.map(tid => TEAMS.find(t => t.id === tid)).filter(Boolean) as Team[];
+    }
+    
+    // Also inject overrides into the officialAllStandings directly to spoof them for getKnockoutWinnerId
+    if (db.config?.official_firsts && Object.keys(db.config.official_firsts).length > 0) {
+      Object.keys(db.config.official_firsts).forEach(gId => {
+        const teamId = db.config!.official_firsts![gId];
+        if (officialAllStandings[gId]) {
+          const idx = officialAllStandings[gId].findIndex(s => s.teamId === teamId);
+          if (idx !== -1 && idx !== 0) {
+            const temp = officialAllStandings[gId][0];
+            officialAllStandings[gId][0] = officialAllStandings[gId][idx];
+            officialAllStandings[gId][idx] = temp;
+          }
+        }
+      });
+    }
+
+    if (db.config?.official_seconds && Object.keys(db.config.official_seconds).length > 0) {
+      Object.keys(db.config.official_seconds).forEach(gId => {
+        const teamId = db.config!.official_seconds![gId];
+        if (officialAllStandings[gId]) {
+          const idx = officialAllStandings[gId].findIndex(s => s.teamId === teamId);
+          if (idx !== -1 && idx !== 1 && officialAllStandings[gId].length > 1) {
+            // Swap with 1st index
+            const temp = officialAllStandings[gId][1];
+            officialAllStandings[gId][1] = officialAllStandings[gId][idx];
+            officialAllStandings[gId][idx] = temp;
+          }
+        }
+      });
+    }
+
     const officialTop8Thirds = officialRankedThirds.slice(0, 8).map(t => t.id);
 
     // Check which groups are fully finalized (all 6 matches have official scores)
@@ -1206,6 +1263,30 @@ async function startServer() {
     }
 
     db.config.unlockedWeek = numWeek;
+    await saveDatabase(db);
+    res.json({ success: true, config: db.config });
+  });
+
+  // API - Update official bracket in config (Admin only)
+  app.post('/api/admin/config/bracket', async (req, res) => {
+    const requesterId = req.headers['x-user-id'] as string;
+    const { official_firsts, official_seconds, official_thirds } = req.body;
+
+    const db = await loadDatabase();
+    const requester = db.users.find(u => u.id === requesterId);
+
+    if (!requester || requester.role !== 'admin') {
+      return res.status(403).json({ error: 'Acceso denegado. Se requiere ser Administrador.' });
+    }
+
+    if (!db.config) {
+      db.config = { unlockedWeek: 1 };
+    }
+
+    db.config.official_firsts = official_firsts;
+    db.config.official_seconds = official_seconds;
+    db.config.official_thirds = official_thirds;
+
     await saveDatabase(db);
     res.json({ success: true, config: db.config });
   });
