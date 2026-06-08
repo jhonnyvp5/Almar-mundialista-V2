@@ -4494,14 +4494,13 @@ export default function App() {
               </div>
 
               <div className="flex gap-2">
-                <a
-                  href="/api/admin/export"
-                  download
-                  className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 font-bold text-white text-xs rounded-xl transition-colors cursor-pointer"
+                <button
+                  disabled
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 font-bold text-slate-500 text-xs rounded-xl cursor-not-allowed opacity-50 border border-slate-700"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   <span>Exportar a Excel (CSV)</span>
-                </a>
+                </button>
               </div>
             </div>
 

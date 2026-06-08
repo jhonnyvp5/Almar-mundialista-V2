@@ -10,7 +10,7 @@ export default defineConfig(() => {
       react(), 
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         injectRegister: 'auto',
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
@@ -18,28 +18,27 @@ export default defineConfig(() => {
           clientsClaim: true,
         },
         manifest: {
-          name: 'Polla Mundialista 2026',
-          short_name: 'Mundial26',
-          description: 'Tu polla y simulador completo del Mundial FIFA 2026',
+          name: 'Almar Mundial 2026',
+          short_name: 'AlmarGOOOL',
           theme_color: '#0A2540',
-          background_color: '#041221',
+          background_color: '#FFFFFF',
           display: 'standalone',
           orientation: 'portrait',
           icons: [
             {
-              src: 'pwa-192x192.svg',
+              src: 'pwa-192x192.png',
               sizes: '192x192',
-              type: 'image/svg+xml'
+              type: 'image/png'
             },
             {
-              src: 'pwa-192x192.svg',
+              src: 'pwa-512x512.png',
               sizes: '512x512',
-              type: 'image/svg+xml'
+              type: 'image/png'
             },
             {
-              src: 'pwa-192x192.svg',
+              src: 'pwa-512x512.png',
               sizes: '512x512',
-              type: 'image/svg+xml',
+              type: 'image/png',
               purpose: 'any maskable'
             }
           ]
