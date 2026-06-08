@@ -403,6 +403,13 @@ export default function App() {
     }
   }, [currentUser]);
 
+  // Set default "Semana de partidos" filter for standard users on login or active week changes
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'user' && unlockedWeek) {
+      setProfileSearchWeek(unlockedWeek.toString());
+    }
+  }, [currentUser, unlockedWeek]);
+
   // Sync predictions values to states
   useEffect(() => {
     if (userPredictions) {
