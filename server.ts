@@ -1448,7 +1448,8 @@ async function startServer() {
 
   // Vite development mode setup or production build fallback
   if (process.env.NODE_ENV !== 'production') {
-    const { createServer: createViteServer } = await import('vite');
+    const vitePkg = 'vite';
+    const { createServer: createViteServer } = await import(vitePkg);
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -1470,12 +1471,6 @@ async function startServer() {
 
   return app;
 }
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 const appPromise = startServer();
 export default async function handler(req: any, res: any) {
