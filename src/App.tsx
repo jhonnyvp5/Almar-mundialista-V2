@@ -3184,6 +3184,181 @@ export default function App() {
               </div>
             </div>
 
+            {/* ==================== PANEL: PODIO DE LOS 5 PRIMEROS LUGARES ==================== */}
+            {ranking.length > 0 && (
+              <div className="bg-gradient-to-b from-slate-900/10 to-slate-900/40 border border-slate-900 rounded-3xl p-6 shadow-2xl max-w-4xl mx-auto space-y-6 relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
+                
+                <div className="text-center font-black text-xs uppercase tracking-[0.2em] text-amber-400 flex items-center justify-center gap-2">
+                  <Trophy className="h-4 w-4 text-amber-500 animate-pulse" />
+                  <span>Podio de Honor • Top 5 de Líderes</span>
+                </div>
+
+                {/* Top 3 Podium Stands */}
+                <div className="grid grid-cols-3 gap-3 sm:gap-6 items-end pt-8 pb-4 max-w-2xl mx-auto px-1 sm:px-4">
+                  {/* 2do Lugar */}
+                  <div className="flex flex-col items-center">
+                    {ranking[1] ? (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 15 }} 
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.1 }}
+                        className="w-full flex flex-col items-center"
+                      >
+                        <div className="relative mb-2 flex flex-col items-center text-center">
+                          <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">🥈</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-1">2° Lugar</span>
+                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={ranking[1].nombre}>
+                            {ranking[1].nombre}
+                          </div>
+                          <div className="text-[9px] text-slate-500 font-semibold truncate max-w-[85px] sm:max-w-[150px]">
+                            {ranking[1].empresa || ranking[1].localidad || '-'}
+                          </div>
+                        </div>
+                        {/* Stand pillar */}
+                        <div className="w-full bg-slate-800/40 border border-slate-700/40 h-20 rounded-t-xl flex flex-col items-center justify-center shadow-lg pt-1 relative overflow-hidden backdrop-blur-sm">
+                          <span className="text-xl font-black text-slate-300 font-mono">{ranking[1].puntos}</span>
+                          <span className="text-[9px] font-black text-slate-550 uppercase tracking-widest">Puntos</span>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <div className="w-full flex flex-col items-center opacity-20">
+                        <span className="text-2xl">🥈</span>
+                        <div className="w-full bg-slate-900/30 h-16 rounded-t-xl border border-dashed border-slate-800"></div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 1er Lugar (Center, tallest) */}
+                  <div className="flex flex-col items-center">
+                    {ranking[0] ? (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 15 }} 
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="w-full flex flex-col items-center relative"
+                      >
+                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_8px_rgba(242,156,17,0.5)]">
+                          <Crown className="h-6 w-6 fill-amber-500/10 animate-bounce" />
+                        </div>
+                        <div className="relative mb-2 flex flex-col items-center text-center">
+                          <span className="text-4xl filter drop-shadow-[0_4px_6px_rgba(242,156,17,0.3)]">🥇</span>
+                          <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider mt-1">Líder Absoluto</span>
+                          <div className="text-sm font-black text-white mt-0.5 truncate max-w-[100px] sm:max-w-[170px] px-1" title={ranking[0].nombre}>
+                            {ranking[0].nombre}
+                          </div>
+                          <div className="text-[9px] text-slate-400 font-semibold truncate max-w-[100px] sm:max-w-[170px]">
+                            {ranking[0].empresa || ranking[0].localidad || '-'}
+                          </div>
+                        </div>
+                        {/* Stand pillar */}
+                        <div className="w-full bg-gradient-to-b from-amber-500/20 to-amber-500/5 border border-amber-500/30 h-28 rounded-t-xl flex flex-col items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden backdrop-blur-sm">
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.08),transparent)]" />
+                          <span className="text-2xl font-black text-amber-400 font-mono relative z-10">{ranking[0].puntos}</span>
+                          <span className="text-[10px] font-black text-amber-500/80 uppercase tracking-widest relative z-10">Puntos</span>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <div className="w-full flex flex-col items-center opacity-20">
+                        <span className="text-2xl">🥇</span>
+                        <div className="w-full bg-slate-900/30 h-24 rounded-t-xl border border-dashed border-slate-800"></div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3er Lugar */}
+                  <div className="flex flex-col items-center">
+                    {ranking[2] ? (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 15 }} 
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                        className="w-full flex flex-col items-center"
+                      >
+                        <div className="relative mb-2 flex flex-col items-center text-center">
+                          <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">🥉</span>
+                          <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider mt-1">3° Lugar</span>
+                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={ranking[2].nombre}>
+                            {ranking[2].nombre}
+                          </div>
+                          <div className="text-[9px] text-slate-500 font-semibold truncate max-w-[85px] sm:max-w-[150px]">
+                            {ranking[2].empresa || ranking[2].localidad || '-'}
+                          </div>
+                        </div>
+                        {/* Stand pillar */}
+                        <div className="w-full bg-slate-800/20 border border-slate-700/25 h-16 rounded-t-xl flex flex-col items-center justify-center shadow-md pt-0.5 relative overflow-hidden backdrop-blur-sm">
+                          <span className="text-base font-black text-amber-600/90 font-mono">{ranking[2].puntos}</span>
+                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Puntos</span>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <div className="w-full flex flex-col items-center opacity-20">
+                        <span className="text-2xl">🥉</span>
+                        <div className="w-full bg-slate-900/30 h-12 rounded-t-xl border border-dashed border-slate-800"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4to and 5to Lugar panels */}
+                {(ranking[3] || ranking[4]) && (
+                  <div className="flex flex-col sm:flex-row justify-center gap-3 max-w-xl mx-auto pt-2">
+                    {ranking[3] && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }} 
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.4, delay: 0.3 }}
+                        className="flex-1 bg-slate-950/80 border border-slate-850 p-3 rounded-2xl flex items-center justify-between gap-3 shadow-md hover:border-slate-800 transition"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-[10px] bg-slate-900 px-2.5 py-1.5 rounded-lg text-slate-400 font-black font-mono">4°</span>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-200 truncate" title={ranking[3].nombre}>
+                              {ranking[3].nombre}
+                            </div>
+                            <div className="text-[9px] text-slate-500 truncate font-semibold">
+                              {ranking[3].empresa || ranking[3].localidad || '-'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <span className="text-xs font-black text-slate-350 font-mono bg-slate-900 px-2 py-1 rounded-lg">
+                            {ranking[3].puntos} pts
+                          </span>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {ranking[4] && (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }} 
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.4, delay: 0.4 }}
+                        className="flex-1 bg-slate-950/80 border border-slate-850 p-3 rounded-2xl flex items-center justify-between gap-3 shadow-md hover:border-slate-800 transition"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-[10px] bg-slate-900 px-2.5 py-1.5 rounded-lg text-slate-400 font-black font-mono">5°</span>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-200 truncate" title={ranking[4].nombre}>
+                              {ranking[4].nombre}
+                            </div>
+                            <div className="text-[9px] text-slate-500 truncate font-semibold">
+                              {ranking[4].empresa || ranking[4].localidad || '-'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <span className="text-xs font-black text-slate-350 font-mono bg-slate-900 px-2 py-1 rounded-lg">
+                            {ranking[4].puntos} pts
+                          </span>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Ranking table */}
             <div className="bg-slate-900/30 border border-slate-900 rounded-2xl overflow-hidden shadow-xl max-w-4xl mx-auto">
               <div className="overflow-x-auto">
@@ -3207,8 +3382,17 @@ export default function App() {
                             {index === 0 ? '🥇 1' : (index === 1 ? '🥈 2' : (index === 2 ? '🥉 3' : index + 1))}
                           </td>
                           <td className="p-4 font-bold text-slate-250 text-sm">
-                            {u.nombre}
-                            {u.id === currentUser?.id && <span className="ml-1.5 text-[9px] bg-amber-500 text-slate-950 font-bold px-1.5 py-0.5 rounded">TÚ</span>}
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                              <span>{u.nombre}</span>
+                              <span className="text-[10px] text-slate-500 font-medium font-sans">
+                                ({u.empresa || '-'} • {u.localidad || '-'})
+                              </span>
+                              {u.id === currentUser?.id && (
+                                <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase tracking-wider self-start sm:self-auto mt-1 sm:mt-0">
+                                  TÚ
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4 text-center font-black text-base text-amber-400 font-mono bg-amber-500/5">{u.puntos} pts</td>
                         </tr>

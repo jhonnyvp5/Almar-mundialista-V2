@@ -1403,13 +1403,35 @@ async function startServer() {
   // API - Get Ranking
   app.get('/api/ranking', async (req, res) => {
     try {
-      // We also need the user info, let's join users table
+      // Perform a LEFT JOIN starting from users to include ALL users who are not admin
       const { rows: fullRanking } = await pool.query(`
-        SELECT r.*, u.*
-        FROM user_rankings r
-        JOIN users u ON r."userId" = u.id
+        SELECT 
+          u.id AS "userId",
+          u."nombreCompleto" AS "nombreCompleto",
+          u.empresa,
+          u.localidad,
+          u.cedula,
+          u.correo,
+          u."fechaHoraRegistro" AS "fechaHoraRegistro",
+          u.role,
+          u.blocked,
+          COALESCE(r.puntos, 0) AS puntos,
+          COALESCE(r."puntosFaseGrupos", 0) AS "puntosFaseGrupos",
+          COALESCE(r."puntosCampeon", 0) AS "puntosCampeon",
+          COALESCE(r."aciertosExactos", 0) AS "aciertosExactos",
+          COALESCE(r."aciertosGanador", 0) AS "aciertosGanador",
+          COALESCE(r."aciertosGolesEquipo", 0) AS "aciertosGolesEquipo",
+          COALESCE(r."aciertosDiferenciaGol", 0) AS "aciertosDiferenciaGol",
+          COALESCE(r."aciertosPrimeros", 0) AS "aciertosPrimeros",
+          COALESCE(r."aciertosSegundos", 0) AS "aciertosSegundos",
+          COALESCE(r."aciertosTerceros", 0) AS "aciertosTerceros",
+          COALESCE(r."puntosBalonOro", 0) AS "puntosBalonOro",
+          COALESCE(r."puntosGuanteOro", 0) AS "puntosGuanteOro",
+          COALESCE(r."puntosBotaOro", 0) AS "puntosBotaOro",
+          COALESCE(r."puntosJovenTorneo", 0) AS "puntosJovenTorneo"
+        FROM users u
+        LEFT JOIN user_rankings r ON u.id = r."userId"
         WHERE u.role != 'admin'
-        ORDER BY r.puntos DESC
       `);
       
       const stats = fullRanking.map(r => ({
@@ -1422,21 +1444,55 @@ async function startServer() {
         fechaRegistro: r.fechaHoraRegistro,
         role: r.role,
         blocked: r.blocked,
-        puntos: r.puntos,
-        puntosFaseGrupos: r.puntosFaseGrupos,
-        puntosCampeon: r.puntosCampeon,
-        aciertosExactos: r.aciertosExactos,
-        aciertosGanador: r.aciertosGanador,
-        aciertosGolesEquipo: r.aciertosGolesEquipo,
-        aciertosDiferenciaGol: r.aciertosDiferenciaGol,
-        aciertosPrimeros: r.aciertosPrimeros,
-        aciertosSegundos: r.aciertosSegundos,
-        aciertosTerceros: r.aciertosTerceros,
-        puntosBalonOro: r.puntosBalonOro,
-        puntosGuanteOro: r.puntosGuanteOro,
-        puntosBotaOro: r.puntosBotaOro,
-        puntosJovenTorneo: r.puntosJovenTorneo,
+        puntos: Number(r.puntos),
+        puntosFaseGrupos: Number(r.puntosFaseGrupos),
+        puntosCampeon: Number(r.puntosCampeon),
+        aciertosExactos: Number(r.aciertosExactos),
+        aciertosGanador: Number(r.aciertosGanador),
+        aciertosGolesEquipo: Number(r.aciertosGolesEquipo),
+        aciertosDiferenciaGol: Number(r.aciertosDiferenciaGol),
+        aciertosPrimeros: Number(r.aciertosPrimeros),
+        aciertosSegundos: Number(r.aciertosSegundos),
+        aciertosTerceros: Number(r.aciertosTerceros),
+        puntosBalonOro: Number(r.puntosBalonOro),
+        puntosGuanteOro: Number(r.puntosGuanteOro),
+        puntosBotaOro: Number(r.puntosBotaOro),
+        puntosJovenTorneo: Number(r.puntosJovenTorneo),
       }));
+
+      // Helper function to extract last name from "nombreCompleto"
+      const getLastName = (fullName?: string): string => {
+        if (!fullName) return '';
+        const parts = fullName.trim().split(/\s+/);
+        return parts[parts.length - 1] || '';
+      };
+
+      // Custom Sorting:
+      // - Users with puntos > 0 go at the top, sorted by puntos (DESC), then within same points, sorted by last name (ASC).
+      // - Users with points = 0 are sorted entirely alphabetically by last name (ASC) at the bottom.
+      stats.sort((a, b) => {
+        const pA = a.puntos || 0;
+        const pB = b.puntos || 0;
+
+        if (pA > 0 && pB > 0) {
+          // Both have points -> Highest points first
+          if (pB !== pA) return pB - pA;
+          // Tie-breaker -> Alphabetical by last name
+          const lnA = getLastName(a.nombre);
+          const lnB = getLastName(b.nombre);
+          return lnA.localeCompare(lnB, 'es', { sensitivity: 'base' });
+        } else if (pA > 0 && pB === 0) {
+          return -1; // user a has points, goes above
+        } else if (pA === 0 && pB > 0) {
+          return 1; // user b has points, goes above
+        } else {
+          // Both have 0 points -> Alphabetical by last name
+          const lnA = getLastName(a.nombre);
+          const lnB = getLastName(b.nombre);
+          return lnA.localeCompare(lnB, 'es', { sensitivity: 'base' });
+        }
+      });
+
       res.json(stats);
     } catch (e) {
       console.error(e);
