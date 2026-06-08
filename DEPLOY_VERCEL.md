@@ -28,9 +28,12 @@ Si prefieres usar la línea de comandos de Vercel desde tu máquina virtual loca
    ```
 
 ## Notas Importantes sobre el Backend en Vercel:
-- **Base de Datos:** El proyecto utiliza actualmente un archivo local `data_db.json` para guardar la información. La documentación oficial de Vercel indica que su entorno Serverless es de "solo-lectura" (read-only) y efímero, lo que significa que el archivo se guardará en `/tmp` y **se reiniciará constantemente** si la función decae. Para un ambiente de producción real, te sugerimos migrar a una base de datos real como Firestore, Vercel KV, Supabase o Cloud SQL.
+- **Base de Datos:** El proyecto ha sido migrado exitosamente a **Neon Postgres**, eliminando la limitación del entorno "read-only" de Vercel (donde no se podía guardar en un archivo local). Tu base de datos es ahora relacional, escalable y persistente.
+- **Variables de Entorno:**
+  Para que la aplicación lea e interactúe con la base de datos de Neon en Vercel, **debes configurar la variable de entorno `DATABASE_URL`** en el panel de control del proyecto en Vercel (Vercel > Project Settings > Environment Variables).
 - El archivo `vercel.json` se encarga de rutear de manera inteligente:
   - Todo el tráfico de activos (assets) tiene caché agresivo para que cargue ultra rápido.
-  - El ruteo SPA evitará errores 404 al recargar si estás en páginas como `/ranking`.
-  - Todo tráfico a `/api/*` se ejecutará de forma segura a través de los Serverless Functions apuntando al Express App (`server.ts`).
-- La PWA permite instalar la aplicación en Android, iOS (Add to Home Screen) y escritorio con caché offline usando Service Workers, permitiendo una experiencia nativa.
+  - El Service Worker (`sw.js`) y el manifiesto (`manifest.webmanifest`) tienen directivas de cero caché para siempre detectar actualizaciones y permitir a la recarga de nuevas versiones PWA.
+  - El ruteo SPA evitará errores 404 al recargar si se utiliza React Router (aunque aquí es una SPA en 1 URL, las reglas base lo cubren).
+  - Todo tráfico a `/api/*` se ejecutará de forma segura a través de los Serverless Functions apuntando a tu backend (`server.ts`).
+- La PWA permite instalar la aplicación "AlmarGOOOL" en Android, iOS (a través de Safari -"Add to Home Screen") y de escritorio (Chrome/Edge/Safari), brindando una experiencia offline básica, carga relámpago e interacciones parecidas a una app puramente nativa.

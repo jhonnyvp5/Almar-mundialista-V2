@@ -172,6 +172,8 @@ export default function App() {
   const [activeRuleAccordion, setActiveRuleAccordion] = useState<number | null>(0);
   const [profileSearchTerm, setProfileSearchTerm] = useState('');
   const [profileSearchWeek, setProfileSearchWeek] = useState<string>('all');
+  const [profileSearchGroup, setProfileSearchGroup] = useState<string>('all');
+  const [profileSearchKnockout, setProfileSearchKnockout] = useState<string>('all');
   const [profileOnlyWithPoints, setProfileOnlyWithPoints] = useState(false);
 
   // General States
@@ -1864,20 +1866,6 @@ export default function App() {
                 />
               </div>
 
-              <div className="flex justify-end pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginCorreo('admin@polla.com');
-                    setLoginCedula('admin12345');
-                    showToast('🔑 Credenciales administrador demo colocadas. ¡Recuerda haberlo registrado primero!');
-                  }}
-                  className="text-[11px] font-semibold text-amber-505 text-amber-400 hover:underline hover:text-amber-300 cursor-pointer"
-                >
-                  Autocompletar Demo Admin
-                </button>
-              </div>
-
               <button
                 id="btn-login"
                 type="submit"
@@ -2052,16 +2040,7 @@ export default function App() {
             )}
           </nav>
 
-          {/* Quick random generator */}
-          {activeTab === 'calendar' && (
-            <button
-              onClick={handleRandomFillPendingPredictions}
-              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-505 border border-indigo-500/20 text-indigo-400 rounded-lg text-xs font-bold transition-colors"
-            >
-              <Dice5 className="h-3.5 w-3.5" />
-              <span>Simular Vacíos</span>
-            </button>
-          )}
+
 
         </div>
       </div>
@@ -2208,21 +2187,7 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="shrink-0 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleAutoClassifyWithStandings}
-                  disabled={isGroupStageSelectionsLocked()}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 font-bold text-xs rounded-xl transition-colors cursor-pointer ${
-                    isGroupStageSelectionsLocked()
-                      ? 'bg-slate-800 text-slate-500 border border-slate-750 opacity-50 cursor-not-allowed'
-                      : 'bg-amber-500 hover:bg-amber-600 text-slate-950'
-                  }`}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  <span>Autocalcular del Standing</span>
-                </button>
-              </div>
+
             </div>
 
             {/* Grid of 12 Groups */}
@@ -3952,35 +3917,51 @@ export default function App() {
                     </div>
 
                     <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-4 flex flex-col justify-between">
-                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">Acierto Ganador</span>
-                        <div className="mt-2.5">
-                          <span className="text-2xl font-black font-mono text-slate-200 block">{uStats.aciertosGanador}</span>
-                          <span className="text-[10px] text-emerald-400 font-bold block">+{uStats.aciertosGanador * 3} Pts (+3 c/u)</span>
+                      <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
+                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase mb-3 leading-tight">Acierto Ganador</span>
+                        <div className="flex flex-col items-center">
+                          <span className="text-3xl font-black font-mono text-slate-200">{uStats.aciertosGanador}</span>
+                          <span className="text-[10px] text-slate-500 font-medium">veces</span>
+                        </div>
+                        <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-full">
+                          <span className="text-[11px] text-emerald-400 font-black block">+{uStats.aciertosGanador * 3} Pts</span>
+                          <span className="text-[8px] text-emerald-400/70 font-bold uppercase tracking-widest">(3 Pts c/u)</span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-4 flex flex-col justify-between">
-                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">Marcador Exacto</span>
-                        <div className="mt-2.5">
-                          <span className="text-2xl font-black font-mono text-slate-200 block">{uStats.aciertosExactos}</span>
-                          <span className="text-[10px] text-emerald-400 font-bold block">+{uStats.aciertosExactos * 2} Pts (+2 c/u)</span>
+                      <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
+                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase mb-3 leading-tight">Marcador Exacto</span>
+                        <div className="flex flex-col items-center">
+                          <span className="text-3xl font-black font-mono text-slate-200">{uStats.aciertosExactos}</span>
+                          <span className="text-[10px] text-slate-500 font-medium">veces</span>
+                        </div>
+                        <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-full">
+                          <span className="text-[11px] text-emerald-400 font-black block">+{uStats.aciertosExactos * 2} Pts</span>
+                          <span className="text-[8px] text-emerald-400/70 font-bold uppercase tracking-widest">(2 Pts c/u)</span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-4 flex flex-col justify-between">
-                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">Goles Equipo</span>
-                        <div className="mt-2.5">
-                          <span className="text-2xl font-black font-mono text-slate-200 block">{uStats.aciertosGolesEquipo}</span>
-                          <span className="text-[10px] text-emerald-400 font-bold block">+{uStats.aciertosGolesEquipo * 1} Pts (+1 c/u)</span>
+                      <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
+                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase mb-3 leading-tight">Goles Equipo</span>
+                        <div className="flex flex-col items-center">
+                          <span className="text-3xl font-black font-mono text-slate-200">{uStats.aciertosGolesEquipo}</span>
+                          <span className="text-[10px] text-slate-500 font-medium">veces</span>
+                        </div>
+                        <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-full">
+                          <span className="text-[11px] text-emerald-400 font-black block">+{uStats.aciertosGolesEquipo * 1} Pts</span>
+                          <span className="text-[8px] text-emerald-400/70 font-bold uppercase tracking-widest">(1 Pts c/u)</span>
                         </div>
                       </div>
 
-                      <div className="bg-slate-900/20 border border-slate-900 rounded-2xl p-4 flex flex-col justify-between">
-                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase">Dif. Goles</span>
-                        <div className="mt-2.5">
-                          <span className="text-2xl font-black font-mono text-slate-200 block">{uStats.aciertosDiferenciaGol}</span>
-                          <span className="text-[10px] text-emerald-400 font-bold block">+{uStats.aciertosDiferenciaGol * 1} Pts (+1)</span>
+                      <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
+                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase mb-3 leading-tight">Dif. Goles</span>
+                        <div className="flex flex-col items-center">
+                          <span className="text-3xl font-black font-mono text-slate-200">{uStats.aciertosDiferenciaGol}</span>
+                          <span className="text-[10px] text-slate-500 font-medium">veces</span>
+                        </div>
+                        <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-full">
+                          <span className="text-[11px] text-emerald-400 font-black block">+{uStats.aciertosDiferenciaGol * 1} Pts</span>
+                          <span className="text-[8px] text-emerald-400/70 font-bold uppercase tracking-widest">(1 Pts c/u)</span>
                         </div>
                       </div>
                     </div>
@@ -4292,6 +4273,43 @@ export default function App() {
                           <option value="6">Semana 6</option>
                         </select>
 
+                        {/* Group Selection Filter */}
+                        <select
+                          value={profileSearchGroup}
+                          onChange={(e) => {
+                            setProfileSearchGroup(e.target.value);
+                            if (e.target.value !== 'all') {
+                              setProfileSearchKnockout('all'); // mutually exclusive for usability
+                            }
+                          }}
+                          className="bg-slate-950 text-slate-300 rounded-xl px-3 py-1.5 text-xs border border-slate-900 focus:outline-none focus:border-amber-500/50"
+                        >
+                          <option value="all">Fase de Grupos (Todos)</option>
+                          {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(g => (
+                            <option key={g} value={g}>Grupo {g}</option>
+                          ))}
+                        </select>
+
+                        {/* Knockout Selection Filter */}
+                        <select
+                          value={profileSearchKnockout}
+                          onChange={(e) => {
+                            setProfileSearchKnockout(e.target.value);
+                            if (e.target.value !== 'all') {
+                              setProfileSearchGroup('all'); // mutually exclusive for usability
+                            }
+                          }}
+                          className="bg-slate-950 text-slate-300 rounded-xl px-3 py-1.5 text-xs border border-slate-900 focus:outline-none focus:border-amber-500/50"
+                        >
+                          <option value="all">Llaves (Todas)</option>
+                          <option value="1/16">16avos de Final</option>
+                          <option value="1/8">Octavos de Final</option>
+                          <option value="1/4">Cuartos de Final</option>
+                          <option value="1/2">Semifinales</option>
+                          <option value="third_place">3er Puesto</option>
+                          <option value="final">Final</option>
+                        </select>
+
                         {/* Search field */}
                         <div className="relative">
                           <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
@@ -4335,6 +4353,14 @@ export default function App() {
                           }
                         }
 
+                        if (profileSearchGroup !== 'all') {
+                          if (m.type !== 'group' || m.group !== profileSearchGroup) return false;
+                        }
+
+                        if (profileSearchKnockout !== 'all') {
+                          if (m.type !== 'knockout' || m.stage !== profileSearchKnockout) return false;
+                        }
+
                         const matchesSearch = 
                           homeName.toLowerCase().includes(profileSearchTerm.toLowerCase()) ||
                           awayName.toLowerCase().includes(profileSearchTerm.toLowerCase()) ||
@@ -4376,7 +4402,16 @@ export default function App() {
                               }`}>
                                 {/* Card top metadata */}
                                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase tracking-wider pb-2 border-b border-white/5 mb-3">
-                                  <span>{m._stageName || m.stage}</span>
+                                  <span>
+                                    {m.type === 'group' ? `Grupo ${m.group}` :
+                                      m.stage === '1/16' ? '16avos de Final - Llave Eliminatoria' :
+                                      m.stage === '1/8' ? 'Octavos de Final - Llave Eliminatoria' :
+                                      m.stage === '1/4' ? 'Cuartos de Final - Llave Eliminatoria' :
+                                      m.stage === '1/2' ? 'Semifinal - Llave Eliminatoria' :
+                                      m.stage === 'third_place' ? '3er Puesto - Llave Eliminatoria' :
+                                      m.stage === 'final' ? 'Final - Llave Eliminatoria' : m.stage
+                                    }
+                                  </span>
                                   <span>{m.date} - {m.time}</span>
                                 </div>
 
