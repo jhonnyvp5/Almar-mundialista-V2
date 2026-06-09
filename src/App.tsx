@@ -99,6 +99,38 @@ const CONFETTI_PARTICLES = Array.from({ length: 48 }).map((_, i) => {
   };
 });
 
+export const AWARDS_BALON_ORO = [
+  "Kylian Mbappé", "Lamine Yamal", "Jude Bellingham", "Vinícius Júnior", "Harry Kane",
+  "Jamal Musiala", "Florian Wirtz", "Ousmane Dembélé", "Pedri", "Cole Palmer",
+  "Bukayo Saka", "Lautaro Martínez", "Lionel Messi", "Julián Álvarez", "Bruno Fernandes",
+  "Vitinha", "Luis Díaz", "Federico Valverde", "Nico Williams", "Mohamed Salah",
+  "Erling Haaland", "Cristiano Ronaldo", "Santiago Giménez", "Moisés Caicedo", "Enner Valencia"
+].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+export const AWARDS_BOTA_ORO = [
+  "Kylian Mbappé", "Harry Kane", "Erling Haaland", "Lautaro Martínez", "Julián Álvarez",
+  "Vinícius Júnior", "Cristiano Ronaldo", "Mohamed Salah", "Victor Osimhen", "Luis Díaz",
+  "Santiago Giménez", "Jonathan David", "Alexander Isak", "Gonçalo Ramos", "Patrik Schick",
+  "Benjamin Šeško", "Enner Valencia", "Rodrygo", "Ousmane Dembélé", "Michael Olise",
+  "Lamine Yamal", "Akram Afif", "Almoez Ali", "Mikel Oyarzabal", "Julián Quiñones"
+].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+export const AWARDS_GUANTE_ORO = [
+  "Emiliano Martínez", "Alisson Becker", "Gianluigi Donnarumma", "Unai Simón", "Mike Maignan",
+  "Thibaut Courtois", "Diogo Costa", "David Raya", "Gregor Kobel", "Jordan Pickford",
+  "Ederson", "Yann Sommer", "Jan Oblak", "Bart Verbruggen", "Andriy Lunin",
+  "Giorgi Mamardashvili", "André Onana", "Kevin Mier", "Camilo Vargas", "Guillermo Ochoa",
+  "Hernán Galíndez", "Dominik Livaković", "Meshaal Barsham", "Zion Suzuki", "Matt Turner"
+].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+export const AWARDS_JOVEN_TORNEO = [
+  "Lamine Yamal", "Endrick", "Pau Cubarsí", "Warren Zaïre-Emery", "João Neves",
+  "Désiré Doué", "Arda Güler", "Kendry Páez", "Gilberto Mora", "Estevão",
+  "Claudio Echeverri", "Geovany Quenda", "Dean Huijsen", "Jorrel Hato", "Ethan Nwaneri",
+  "Mathys Tel", "Bilal El Khannouss", "Abdukodir Khusanov", "Yan Diomande", "Lennart Karl",
+  "Nico O'Reilly", "Franco Mastantuono", "Assane Diao", "Lucas Bergvall", "Finn Surman"
+].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
 export default function App() {
   // Splash Screen State
   const [showSplash, setShowSplash] = useState(true);
@@ -3929,14 +3961,19 @@ export default function App() {
                     </div>
 
                     <div className="space-y-3">
-                      <input
-                        type="text"
+                      <select
                         disabled={hasSavedAwards}
                         value={predBalonOro}
                         onChange={(e) => setPredBalonOro(e.target.value)}
-                        placeholder="Escribe el nombre del jugador..."
-                        className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 w-full"
-                      />
+                        className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full"
+                      >
+                        <option value="" className="text-slate-500 bg-[#020713]">Selecciona un candidato...</option>
+                        {AWARDS_BALON_ORO.map((p) => (
+                          <option key={p} value={p} className="text-slate-200 bg-[#020713]">
+                            {p}
+                          </option>
+                        ))}
+                      </select>
                       
                       {/* Interactive block showing locked state banner */}
                       {hasSavedAwards && (
@@ -3994,14 +4031,19 @@ export default function App() {
                     </div>
 
                     <div className="space-y-3">
-                      <input
-                        type="text"
+                      <select
                         disabled={hasSavedAwards}
                         value={predGuanteOro}
                         onChange={(e) => setPredGuanteOro(e.target.value)}
-                        placeholder="Escribe el nombre del arquero..."
-                        className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 w-full"
-                      />
+                        className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full"
+                      >
+                        <option value="" className="text-slate-500 bg-[#020713]">Selecciona un arquero...</option>
+                        {AWARDS_GUANTE_ORO.map((p) => (
+                          <option key={p} value={p} className="text-slate-200 bg-[#020713]">
+                            {p}
+                          </option>
+                        ))}
+                      </select>
                       {hasSavedAwards && (
                         <div className="space-y-2">
                           <div className="text-[10px] uppercase font-black tracking-wider text-amber-500/80 flex items-center gap-1">
@@ -4057,14 +4099,19 @@ export default function App() {
                     </div>
 
                     <div className="space-y-3">
-                      <input
-                        type="text"
+                      <select
                         disabled={hasSavedAwards}
                         value={predBotaOro}
                         onChange={(e) => setPredBotaOro(e.target.value)}
-                        placeholder="Escribe el nombre del goleador..."
-                        className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 w-full"
-                      />
+                        className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full"
+                      >
+                        <option value="" className="text-slate-500 bg-[#020713]">Selecciona un goleador...</option>
+                        {AWARDS_BOTA_ORO.map((p) => (
+                          <option key={p} value={p} className="text-slate-200 bg-[#020713]">
+                            {p}
+                          </option>
+                        ))}
+                      </select>
                       {hasSavedAwards && (
                         <div className="space-y-2">
                           <div className="text-[10px] uppercase font-black tracking-wider text-amber-500/80 flex items-center gap-1">
@@ -4120,14 +4167,19 @@ export default function App() {
                     </div>
 
                     <div className="space-y-3">
-                      <input
-                        type="text"
+                      <select
                         disabled={hasSavedAwards}
                         value={predJovenTorneo}
                         onChange={(e) => setPredJovenTorneo(e.target.value)}
-                        placeholder="Escribe el nombre del jugador..."
-                        className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 w-full"
-                      />
+                        className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full"
+                      >
+                        <option value="" className="text-slate-500 bg-[#020713]">Selecciona un jugador joven...</option>
+                        {AWARDS_JOVEN_TORNEO.map((p) => (
+                          <option key={p} value={p} className="text-slate-200 bg-[#020713]">
+                            {p}
+                          </option>
+                        ))}
+                      </select>
                       {hasSavedAwards && (
                         <div className="space-y-2">
                           <div className="text-[10px] uppercase font-black tracking-wider text-amber-500/80 flex items-center gap-1">
@@ -5193,46 +5245,66 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Balón de Oro</label>
-                  <input
-                    type="text"
+                  <select
                     value={adminBalonOro}
                     onChange={(e) => setAdminBalonOro(e.target.value)}
-                    placeholder="Nombre del Jugador..."
-                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 w-full"
-                  />
+                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                  >
+                    <option value="" className="text-slate-500 bg-[#020713]">Selecciona un jugador...</option>
+                    {AWARDS_BALON_ORO.map((p) => (
+                      <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
+                        {p}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Guante de Oro</label>
-                  <input
-                    type="text"
+                  <select
                     value={adminGuanteOro}
                     onChange={(e) => setAdminGuanteOro(e.target.value)}
-                    placeholder="Nombre del Arquero..."
-                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 w-full"
-                  />
+                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                  >
+                    <option value="" className="text-slate-500 bg-[#020713]">Selecciona un arquero...</option>
+                    {AWARDS_GUANTE_ORO.map((p) => (
+                      <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
+                        {p}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Bota de Oro</label>
-                  <input
-                    type="text"
+                  <select
                     value={adminBotaOro}
                     onChange={(e) => setAdminBotaOro(e.target.value)}
-                    placeholder="Nombre del Goleador..."
-                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 w-full"
-                  />
+                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                  >
+                    <option value="" className="text-slate-500 bg-[#020713]">Selecciona un goleador...</option>
+                    {AWARDS_BOTA_ORO.map((p) => (
+                      <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
+                        {p}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Jugador Joven del Torneo</label>
-                  <input
-                    type="text"
+                  <select
                     value={adminJovenTorneo}
                     onChange={(e) => setAdminJovenTorneo(e.target.value)}
-                    placeholder="Nombre del Jugador Joven..."
-                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/50 w-full"
-                  />
+                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                  >
+                    <option value="" className="text-slate-500 bg-[#020713]">Selecciona un jugador joven...</option>
+                    {AWARDS_JOVEN_TORNEO.map((p) => (
+                      <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
+                        {p}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
