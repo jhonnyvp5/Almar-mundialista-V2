@@ -2198,6 +2198,68 @@ export default function App() {
               </div>
             </div>
 
+            {/* New section: Limit dates/deadlines */}
+            <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-[#040e21] p-6 shadow-xl">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+                  <div className="h-10 w-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                    <Clock className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white uppercase tracking-tight">
+                      ⏰ ¿Hasta cuándo puedes participar?
+                    </h3>
+                    <p className="text-[10px] text-amber-400/80 font-bold uppercase tracking-wider">Fechas límite importantes (Hora de Ecuador)</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Deadline 1: Matches */}
+                  <div className="bg-[#020712] p-4 rounded-xl border border-slate-800/60 space-y-1.5 hover:border-amber-500/30 transition-all">
+                    <div className="flex items-center gap-2 text-amber-400">
+                      <span className="text-sm">⚽</span>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">Partidos</h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Puedes predecir el resultado de cada partido hasta <strong className="text-white">1 hora antes</strong> del pitazo inicial.
+                    </p>
+                  </div>
+
+                  {/* Deadline 2: Selecciones clasificadas */}
+                  <div className="bg-[#020712] p-4 rounded-xl border border-slate-800/60 space-y-1.5 hover:border-amber-500/30 transition-all">
+                    <div className="flex items-center gap-2 text-amber-400">
+                      <span className="text-sm">🏆</span>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">Selecciones Clasificadas</h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                      (1ros, 2dos y mejores terceros): Tienes hasta el <strong className="text-amber-400 font-bold">domingo 14 de junio a las 23:59 ECU</strong> para registrar tus predicciones de clasificados.
+                    </p>
+                  </div>
+
+                  {/* Deadline 3: Premios FIFA */}
+                  <div className="bg-[#020712] p-4 rounded-xl border border-slate-800/60 space-y-1.5 hover:border-amber-500/30 transition-all">
+                    <div className="flex items-center gap-2 text-amber-400">
+                      <span className="text-sm">🥇</span>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-200">Premios FIFA</h4>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                      (Balón de Oro, Guante de Oro, Bota de Oro y Jugador Joven): Tienes hasta el <strong className="text-amber-400 font-bold">domingo 14 de junio a las 23:59 ECU</strong> para votar por los ganadores.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/5 border border-amber-500/10 p-3 rounded-lg flex items-start gap-2.5 text-xs text-slate-400 leading-relaxed font-semibold">
+                  <span>💡</span>
+                  <p>
+                    <strong className="text-amber-400 uppercase tracking-wider text-[10px] block mb-0.5">Recuerda:</strong> 
+                    Una vez cerrado el plazo de cada categoría, ya no podrás modificar tus predicciones. ¡Analiza bien antes de votar!
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Bento Grid highlighting features */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
@@ -2205,19 +2267,19 @@ export default function App() {
               <div className="bg-[#030a16]/80 p-6 sm:p-8 rounded-2xl border border-white/10 flex flex-col justify-between space-y-4 backdrop-blur-md">
                 <div className="space-y-3">
                   <div className="h-12 w-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                    <Gift className="h-6 w-6" />
+                    <Trophy className="h-6 w-6" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-white uppercase tracking-tight">🎽 ¿Qué puedes ganar?</h3>
-                    <p className="text-xs text-amber-400 font-bold uppercase tracking-wider mt-0.5">Sorteos y sorpresas de la semana</p>
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight">🏆 ¡Polla Mundialista Almar 2026!</h3>
+                    <p className="text-xs text-amber-400 font-bold uppercase tracking-wider mt-0.5">⚽ ¡Predice y gana!</p>
                   </div>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                    Camisetas oficiales de la <strong className="text-white font-bold">Selección Ecuatoriana 🇪🇨</strong> y sorpresas mundialistas para los que más acierten en la semana.
+                    Cada semana publicaremos el ranking actualizado para que veas cómo vas. El colaborador con más puntos al finalizar el Mundial se lleva una <span className="text-amber-400 font-bold">🎽 camiseta oficial de La Tri</span>.
                   </p>
                 </div>
                 <div className="bg-[#020710] border border-white/5 p-3 rounded-xl flex items-center gap-2 text-slate-400 text-xs font-semibold">
                   <span>✨</span>
-                  <span>¡Cada semana habrá un ganador!</span>
+                  <span>¡Cada semana se publicará el ranking!</span>
                 </div>
               </div>
 
