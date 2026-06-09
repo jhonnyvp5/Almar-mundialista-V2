@@ -824,7 +824,7 @@ async function startServer() {
 
       const row = checkResult.rows[0];
       return res.json({
-        nombre: row.nombre,
+        nombre: row.nombre_completo || row.nombre,
         empresa: row.empresa,
         localidad: row.localidad,
         isAllowed: true
