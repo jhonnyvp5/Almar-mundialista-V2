@@ -57,6 +57,7 @@ interface DatabaseSchema {
     official_seconds?: Record<string, string>;
     official_thirds?: string[];
     match_overrides?: Record<string, { date: string; time: string }>;
+    deadline?: string;
   };
 }
 
@@ -97,6 +98,7 @@ async function loadDatabase(): Promise<DatabaseSchema> {
         official_seconds: typeof conf[0].official_seconds === 'string' ? JSON.parse(conf[0].official_seconds) : conf[0].official_seconds || {},
         official_thirds: typeof conf[0].official_thirds === 'string' ? JSON.parse(conf[0].official_thirds) : conf[0].official_thirds || [],
         match_overrides: typeof conf[0].match_overrides === 'string' ? JSON.parse(conf[0].match_overrides) : conf[0].match_overrides || {},
+        deadline: conf[0].deadline || '2026-06-14T23:59:00'
       } : {
         unlockedWeek: 1,
         official_balon_oro: '',
@@ -106,7 +108,8 @@ async function loadDatabase(): Promise<DatabaseSchema> {
         official_firsts: {},
         official_seconds: {},
         official_thirds: [],
-        match_overrides: {}
+        match_overrides: {},
+        deadline: '2026-06-14T23:59:00'
       }
     };
 
@@ -191,8 +194,8 @@ async function saveDatabase(db: DatabaseSchema) {
 
     if (db.config) {
       await client.query(`
-        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_firsts, official_seconds, official_thirds, match_overrides)
-        VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9)
+        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_firsts, official_seconds, official_thirds, match_overrides, deadline)
+        VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         ON CONFLICT (id) DO UPDATE SET
           "unlockedWeek" = EXCLUDED."unlockedWeek",
           official_balon_oro = EXCLUDED.official_balon_oro,
@@ -202,7 +205,8 @@ async function saveDatabase(db: DatabaseSchema) {
           official_firsts = EXCLUDED.official_firsts,
           official_seconds = EXCLUDED.official_seconds,
           official_thirds = EXCLUDED.official_thirds,
-          match_overrides = EXCLUDED.match_overrides
+          match_overrides = EXCLUDED.match_overrides,
+          deadline = EXCLUDED.deadline
       `, [
         db.config.unlockedWeek, 
         db.config.official_balon_oro, 
@@ -212,7 +216,8 @@ async function saveDatabase(db: DatabaseSchema) {
         JSON.stringify(db.config.official_firsts || {}),
         JSON.stringify(db.config.official_seconds || {}),
         JSON.stringify(db.config.official_thirds || []),
-        JSON.stringify(db.config.match_overrides || {})
+        JSON.stringify(db.config.match_overrides || {}),
+        db.config.deadline || '2026-06-14T23:59:00'
       ]);
     }
 
@@ -795,6 +800,12 @@ async function startServer() {
     console.warn('Could not run ALTER TABLE config to add match_overrides:', err);
   }
 
+  try {
+    await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS deadline TEXT DEFAULT '2026-06-14T23:59:00'`);
+  } catch (err) {
+    console.warn('Could not run ALTER TABLE config to add deadline:', err);
+  }
+
   app.use(express.json());
 
   // API - Auth Check Cedula
@@ -1217,6 +1228,22 @@ async function startServer() {
 
     // Read match meta dates for time locking
     const incomingMatchIds = Object.keys(predictions);
+
+    // Check general deadline for Fase de grupos, Llaves Eliminatorias, and Premios FIFA
+    const deadlineStr = db.config?.deadline || '2026-06-14T23:59:00';
+    const dlIso = deadlineStr.includes('-05:00') || deadlineStr.includes('Z') ? deadlineStr : deadlineStr + '-05:00';
+    const deadlineMs = new Date(dlIso).getTime();
+    if (Date.now() > deadlineMs && user.role !== 'admin') {
+      const hasRestricted = incomingMatchIds.some(id => 
+        id.startsWith('G-') || 
+        id.startsWith('K') || 
+        id.startsWith('group_override_') || 
+        id.startsWith('award_')
+      );
+      if (hasRestricted) {
+        return res.status(400).json({ error: 'La fecha límite para registrar "Fase de Grupos", "Llaves Eliminatorias" y "Premios FIFA" ha expirado.' });
+      }
+    }
     
     // Validate time lock & complete lock
     for (const matchId of incomingMatchIds) {
@@ -1305,6 +1332,27 @@ async function startServer() {
     }
 
     db.config.unlockedWeek = numWeek;
+    await saveDatabase(db);
+    res.json({ success: true, config: db.config });
+  });
+
+  // API - Update prediction deadline (Admin only)
+  app.post('/api/admin/config/deadline', async (req, res) => {
+    const requesterId = req.headers['x-user-id'] as string;
+    const { deadline } = req.body;
+
+    const db = await loadDatabase();
+    const requester = db.users.find(u => u.id === requesterId);
+
+    if (!requester || requester.role !== 'admin') {
+      return res.status(403).json({ error: 'Acceso denegado. Se requiere ser Administrador.' });
+    }
+
+    if (!db.config) {
+      db.config = { unlockedWeek: 1 };
+    }
+
+    db.config.deadline = deadline || '2026-06-14T23:59:00';
     await saveDatabase(db);
     res.json({ success: true, config: db.config });
   });

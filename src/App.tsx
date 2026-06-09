@@ -228,6 +228,7 @@ export default function App() {
   const [adminGuanteOro, setAdminGuanteOro] = useState('');
   const [adminBotaOro, setAdminBotaOro] = useState('');
   const [adminJovenTorneo, setAdminJovenTorneo] = useState('');
+  const [adminDeadline, setAdminDeadline] = useState('2026-06-14T23:59:00');
   
   // Admin Participant Filters & Search & Deletion States
   const [adminCompanyFilter, setAdminCompanyFilter] = useState<string>('all');
@@ -271,6 +272,77 @@ export default function App() {
     } catch (e) {
       console.error('Error fetching config:', e);
     }
+  };
+
+  const isPastDeadline = (): boolean => {
+    if (currentUser?.role === 'admin') return false;
+    const deadlineStr = systemConfig?.deadline || '2026-06-14T23:59:00';
+    const dlIso = deadlineStr.includes('-05:00') || deadlineStr.includes('Z') ? deadlineStr : deadlineStr + '-05:00';
+    const deadlineMs = new Date(dlIso).getTime();
+    return Date.now() > deadlineMs;
+  };
+
+  const formatDeadlineFriendly = (isoStr: string) => {
+    try {
+      const d = new Date(isoStr.includes('-05:00') || isoStr.includes('Z') ? isoStr : isoStr + '-05:00');
+      if (isNaN(d.getTime())) return 'domingo 14 de junio a las 23:59 ECU';
+
+      const dayNames = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+      const monthNames = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+      ];
+      
+      const dayName = dayNames[d.getDay()];
+      const day = d.getDate();
+      const monthName = monthNames[d.getMonth()];
+      const hours = d.getHours().toString().padStart(2, '0');
+      const minutes = d.getMinutes().toString().padStart(2, '0');
+      
+      return `${dayName} ${day} de ${monthName} a las ${hours}:${minutes} ECU`;
+    } catch (err) {
+      return 'domingo 14 de junio a las 23:59 ECU';
+    }
+  };
+
+  const renderDeadlineBanner = () => {
+    const isExpired = isPastDeadline();
+    const deadlineStr = systemConfig?.deadline || '2026-06-14T23:59:00';
+    const friendlyDate = formatDeadlineFriendly(deadlineStr);
+
+    if (isExpired) {
+      return (
+        <div className="bg-red-950/20 border border-red-900/40 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="bg-red-500/10 p-2.5 rounded-xl border border-red-500/20 shrink-0">
+            <Lock className="h-5 w-5 text-red-400" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="font-extrabold text-sm uppercase text-red-400 tracking-wider">
+              Plazo Límite Expirado
+            </h4>
+            <p className="text-xs text-slate-400">
+              El plazo para registrar o modificar pronósticos en esta sección venció el <span className="text-red-400 font-bold">{friendlyDate}</span>. Ya no es posible modificar registros.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 flex items-start gap-4">
+        <div className="bg-amber-500/10 p-2 rounded-xl border border-amber-500/20 shrink-0">
+          <Clock className="h-5 w-5 text-amber-400" />
+        </div>
+        <div className="space-y-1">
+          <h4 className="text-sm font-black text-amber-400 uppercase tracking-wide">
+            Plazo Límite de Registro Abierto
+          </h4>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Tienes hasta el <strong className="text-amber-400 font-bold">{friendlyDate}</strong> para registrar o modificar tus pronósticos en esta sección de forma segura.
+          </p>
+        </div>
+      </div>
+    );
   };
 
   // Sync data with server
@@ -482,6 +554,7 @@ export default function App() {
       setAdminOfficialSeconds(systemConfig.official_seconds || {});
       setAdminOfficialThirds(systemConfig.official_thirds || []);
       setScheduleOverrides(systemConfig.match_overrides || {});
+      setAdminDeadline(systemConfig.deadline || '2026-06-14T23:59:00');
     }
   }, [systemConfig]);
 
@@ -619,6 +692,10 @@ export default function App() {
 
   const handleSaveAwardPredictions = async () => {
     if (!currentUser) return;
+    if (isPastDeadline()) {
+      showToast('❌ El plazo de registro ha expirado.');
+      return;
+    }
     const payload: Record<string, any> = {
       award_balon_oro: {
         predictedHome: '0',
@@ -699,6 +776,10 @@ export default function App() {
   // Save manual classification of completed group to DB
   const handleSaveGroupSelections = async (gId: string, firstVal: string, secondVal: string, thirdVal: string) => {
     if (!currentUser) return;
+    if (isPastDeadline()) {
+      showToast('❌ El plazo de registro ha expirado.');
+      return;
+    }
     
     const payload: Record<string, any> = {};
     payload[`group_override_first_${gId}`] = {
@@ -938,7 +1019,8 @@ export default function App() {
     const isTimeLocked = isMatchLockedForTime(m);
     const isWeeklyLocked = isMatchWeeklyLocked(m.date);
     const hasOfficialResult = m.homeScore !== undefined;
-    const isLocked = isOfficial ? true : m.completed || isTimeLocked || isWeeklyLocked || hasOfficialResult;
+    const isExpired = isPastDeadline();
+    const isLocked = isOfficial ? true : m.completed || isTimeLocked || isWeeklyLocked || hasOfficialResult || isExpired;
 
     const isDisabled = isOfficial || isLocked || isHomePlaceholder || isAwayPlaceholder;
     const isTie = hScore !== '' && aScore !== '' && parseInt(hScore, 10) === parseInt(aScore, 10);
@@ -953,6 +1035,10 @@ export default function App() {
     };
 
     const selectWinnerWithSave = async (selectedId: string) => {
+      if (isPastDeadline()) {
+        showToast('❌ El plazo de registro ha expirado.');
+        return;
+      }
       setUserPredictions(prev => {
         const matchPred = prev[m.id] || { predictedHome: '', predictedAway: '' };
         return { ...prev, [m.id]: { ...matchPred, predictedWinnerId: selectedId } };
@@ -1225,6 +1311,7 @@ export default function App() {
 
   // Check if group stage manual classification is locked (1 hour before first match start)
   const isGroupStageSelectionsLocked = (): boolean => {
+    if (isPastDeadline()) return true;
     const serverTimeMs = Date.now();
     // First match starts on 2026-06-11 at 14:00. Note: month 5 is June (0-indexed)
     const firstMatchTimeMs = new Date(2026, 5, 11, 14, 0).getTime();
@@ -1278,6 +1365,10 @@ export default function App() {
   // Save single prediction to backend database, locking it once registered!
   const handleSavePrediction = async (matchId: string, matchDate: string, matchTime: string) => {
     if (!currentUser) return;
+    if (isPastDeadline()) {
+      showToast('❌ El plazo de registro ha expirado.');
+      return;
+    }
 
     const pred = userPredictions[matchId];
     if (!pred || pred.predictedHome === '' || pred.predictedAway === '') {
@@ -1533,6 +1624,36 @@ export default function App() {
       showToast(`🔓 Semana ${week} de partidos habilitada exitosamente.`);
     } catch (e) {
       showToast('❌ Error de conexión al actualizar la configuración.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update prediction submission deadline (Admin Only)
+  const handleUpdateDeadline = async () => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+
+    try {
+      setLoading(true);
+      const res = await fetch('/api/admin/config/deadline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser.id,
+        },
+        body: JSON.stringify({ deadline: adminDeadline }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(`❌ Error: ${data.error || 'No se pudo actualizar el límite'}`);
+        return;
+      }
+
+      setSystemConfig(data.config);
+      showToast('🕒 Fecha límite de registro actualizada exitosamente.');
+    } catch (e) {
+      showToast('❌ Error de conexión al actualizar el plazo límite.');
     } finally {
       setLoading(false);
     }
@@ -2372,21 +2493,7 @@ export default function App() {
         {activeTab === 'groups' && (
           <div className="space-y-8">
             
-            {isGroupStageSelectionsLocked() && (
-              <div className="bg-red-950/20 border border-red-900/40 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="bg-red-500/10 p-2.5 rounded-xl border border-red-500/20 shrink-0">
-                  <Lock className="h-5 w-5 text-red-400" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="font-extrabold text-sm uppercase text-red-400 tracking-wider">
-                    Posiciones de Fase de Grupos Bloqueadas
-                  </h4>
-                  <p className="text-xs text-slate-400">
-                    Las clasificaciones de primer y segundo lugar de cada grupo, así como los mejores terceros lugares, ya no pueden ser modificados. El primer encuentro del Mundial 2026 inicia en menos de 1 hora o ya ha comenzado (11 de Junio, 14:00).
-                  </p>
-                </div>
-              </div>
-            )}
+            {renderDeadlineBanner()}
 
             <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-1">
@@ -3087,6 +3194,8 @@ export default function App() {
         {/* ==================== TAB: BRACKET MAP USER PRONOSTICOS (LLAVES) ==================== */}
         {activeTab === 'bracket' && (
           <div className="space-y-6">
+            
+            {renderDeadlineBanner()}
             
             <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-1">
@@ -3887,6 +3996,8 @@ export default function App() {
             userPredictions?.award_bota_oro?.predictedWinnerId?.trim() ||
             userPredictions?.award_joven_torneo?.predictedWinnerId?.trim()
           );
+          const isDeadlineExpired = isPastDeadline();
+          const isAwardsLocked = hasSavedAwards || isDeadlineExpired;
 
           return (
             <div className="space-y-8 animate-fade-in max-w-6xl mx-auto">
@@ -3913,6 +4024,8 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              {renderDeadlineBanner()}
 
               {/* Status Alert Banner */}
               {hasSavedAwards ? (
@@ -3946,7 +4059,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* BALÓN DE ORO */}
                   <div className={`relative transition-all duration-305 rounded-2xl p-5 border ${
-                    hasSavedAwards ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
+                    isAwardsLocked ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
                   }`}>
                     <div className="space-y-1.5 mb-4">
                       <div className="flex items-center justify-between">
@@ -3962,7 +4075,7 @@ export default function App() {
 
                     <div className="space-y-3">
                       <select
-                        disabled={hasSavedAwards}
+                        disabled={isAwardsLocked}
                         value={predBalonOro}
                         onChange={(e) => setPredBalonOro(e.target.value)}
                         className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full"
@@ -3976,7 +4089,7 @@ export default function App() {
                       </select>
                       
                       {/* Interactive block showing locked state banner */}
-                      {hasSavedAwards && (
+                      {isAwardsLocked && (
                         <div className="space-y-2">
                           <div className="text-[10px] uppercase font-black tracking-wider text-amber-500/80 flex items-center gap-1">
                             <Lock className="h-3 w-3 text-amber-500" /> Candidato Bloqueado
@@ -4016,7 +4129,7 @@ export default function App() {
 
                   {/* GUANTE DE ORO */}
                   <div className={`relative transition-all duration-305 rounded-2xl p-5 border ${
-                    hasSavedAwards ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
+                    isAwardsLocked ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
                   }`}>
                     <div className="space-y-1.5 mb-4">
                       <div className="flex items-center justify-between">
@@ -4032,7 +4145,7 @@ export default function App() {
 
                     <div className="space-y-3">
                       <select
-                        disabled={hasSavedAwards}
+                        disabled={isAwardsLocked}
                         value={predGuanteOro}
                         onChange={(e) => setPredGuanteOro(e.target.value)}
                         className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full"
@@ -4044,7 +4157,7 @@ export default function App() {
                           </option>
                         ))}
                       </select>
-                      {hasSavedAwards && (
+                      {isAwardsLocked && (
                         <div className="space-y-2">
                           <div className="text-[10px] uppercase font-black tracking-wider text-amber-500/80 flex items-center gap-1">
                             <Lock className="h-3 w-3 text-amber-500" /> Candidato Bloqueado
@@ -4084,7 +4197,7 @@ export default function App() {
 
                   {/* BOTA DE ORO */}
                   <div className={`relative transition-all duration-305 rounded-2xl p-5 border ${
-                    hasSavedAwards ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
+                    isAwardsLocked ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
                   }`}>
                     <div className="space-y-1.5 mb-4">
                       <div className="flex items-center justify-between">
@@ -4100,7 +4213,7 @@ export default function App() {
 
                     <div className="space-y-3">
                       <select
-                        disabled={hasSavedAwards}
+                        disabled={isAwardsLocked}
                         value={predBotaOro}
                         onChange={(e) => setPredBotaOro(e.target.value)}
                         className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full"
@@ -4112,7 +4225,7 @@ export default function App() {
                           </option>
                         ))}
                       </select>
-                      {hasSavedAwards && (
+                      {isAwardsLocked && (
                         <div className="space-y-2">
                           <div className="text-[10px] uppercase font-black tracking-wider text-amber-500/80 flex items-center gap-1">
                             <Lock className="h-3 w-3 text-amber-500" /> Candidato Bloqueado
@@ -4152,7 +4265,7 @@ export default function App() {
 
                   {/* JUGADOR JOVEN */}
                   <div className={`relative transition-all duration-305 rounded-2xl p-5 border ${
-                    hasSavedAwards ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
+                    isAwardsLocked ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
                   }`}>
                     <div className="space-y-1.5 mb-4">
                       <div className="flex items-center justify-between">
@@ -4168,7 +4281,7 @@ export default function App() {
 
                     <div className="space-y-3">
                       <select
-                        disabled={hasSavedAwards}
+                        disabled={isAwardsLocked}
                         value={predJovenTorneo}
                         onChange={(e) => setPredJovenTorneo(e.target.value)}
                         className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full"
@@ -4180,7 +4293,7 @@ export default function App() {
                           </option>
                         ))}
                       </select>
-                      {hasSavedAwards && (
+                      {isAwardsLocked && (
                         <div className="space-y-2">
                           <div className="text-[10px] uppercase font-black tracking-wider text-amber-500/80 flex items-center gap-1">
                             <Lock className="h-3 w-3 text-amber-500" /> Candidato Bloqueado
@@ -4220,7 +4333,7 @@ export default function App() {
                 </div>
 
                 {/* Submitting actions */}
-                {!hasSavedAwards && (
+                {!isAwardsLocked && (
                   <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <p className="text-[11px] text-slate-400 font-medium font-sans">
                       ⚠️ Asegúrate de rellenar las categorías correctamente antes de continuar. No se podrán editar después.
@@ -5062,6 +5175,39 @@ export default function App() {
                 >
                   <span className="text-xs font-black uppercase">Semana 6</span>
                   <span className="text-[9px] font-bold opacity-60 font-mono">(13 - 19 Jul)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Control de Límite Global de Registro (Fase de Grupos, Llaves y Premios FIFA) */}
+            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
+              <div className="space-y-1">
+                <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 text-amber-500" />
+                  Plazo Límite de Registro de Pronósticos
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Ajusta la fecha y hora límite para "Fase de grupos", "Llaves Eliminatorias Pronósticos" y "Premios FIFA". Pasada esta fecha, el sistema no permitirá guardar registros a usuarios comunes.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-end gap-4 max-w-xl">
+                <div className="space-y-1 flex-1 w-full">
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Fecha y Hora Límite (Formato local/ECU)</label>
+                  <input
+                    type="datetime-local"
+                    value={adminDeadline}
+                    onChange={(e) => setAdminDeadline(e.target.value)}
+                    className="bg-slate-950 text-slate-200 border border-slate-800 focus:outline-none focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-xs font-bold w-full"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleUpdateDeadline}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-sans font-black uppercase tracking-wider text-xs rounded-xl shadow-md transition-all hover:scale-[1.02] cursor-pointer inline-flex items-center gap-2 shrink-0 h-[40px] justify-center"
+                >
+                  <Save className="h-4 w-4 text-slate-950" />
+                  <span>Guardar Plazo Límite</span>
                 </button>
               </div>
             </div>
