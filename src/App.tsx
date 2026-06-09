@@ -3547,20 +3547,21 @@ export default function App() {
                 <div className="p-4 sm:p-6 bg-[#030a16]/65 space-y-6">
                   
                   {/* Elegant table with 3 professional columns, detailing removed */}
-                  <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-950/95 shadow-2xl">
-                    <table className="w-full text-left border-collapse text-xs">
+                  <div className="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/95 shadow-2xl">
+                    <table className="w-full text-left border-collapse text-xs min-w-[700px]">
                       <thead>
-                        <tr className="bg-gradient-to-b from-[#091b35] to-[#040f21] text-slate-200 uppercase text-[10px] tracking-widest font-black border-b border-light-white/10 border-white/10">
+                        <tr className="bg-gradient-to-b from-[#091b35] to-[#040f21] text-slate-200 uppercase text-[10px] tracking-widest font-black border-b border-white/10">
                           <th className="p-4 pl-5">Tipo de Predicción</th>
-                          <th className="p-4 text-center w-36">Puntos</th>
-                          <th className="p-4 pr-5 w-48">Cuando se Otorga</th>
+                          <th className="p-4 text-center w-32">Puntos</th>
+                          <th className="p-4 w-44">Cuando se Otorga</th>
+                          <th className="p-4 pr-5">Detalle</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
                         
                         {/* SECTION: PARTIDOS */}
                         <tr className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
-                          <td colSpan={3} className="p-3 pl-5 text-amber-400 font-extrabold tracking-wider uppercase text-[10px] bg-[#020b17] border-y border-white/5">
+                          <td colSpan={4} className="p-3 pl-5 text-amber-400 font-extrabold tracking-wider uppercase text-[10px] bg-[#020b17] border-y border-white/5">
                             ⚽ PARTIDOS — Se otorgan al finalizar cada partido
                           </td>
                         </tr>
@@ -3574,7 +3575,10 @@ export default function App() {
                               3 pts
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al terminar el partido</td>
+                          <td className="p-4 text-slate-300 font-medium">Al terminar el partido</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed animate-fade-in">
+                            El más común. Acertar si gana local, visita o empate.
+                          </td>
                         </tr>
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
@@ -3586,7 +3590,10 @@ export default function App() {
                               +2 pts (total 5)
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al terminar el partido</td>
+                          <td className="p-4 text-slate-300 font-medium">Al terminar el partido</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            Adicional al ganador. Acertar el marcador exacto es el más difícil y marca la diferencia.
+                          </td>
                         </tr>
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
@@ -3598,7 +3605,10 @@ export default function App() {
                               1 pt
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al terminar el partido</td>
+                          <td className="p-4 text-slate-300 font-medium">Al terminar el partido</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            Por cada equipo del que aciertes los goles exactos.
+                          </td>
                         </tr>
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
@@ -3610,12 +3620,15 @@ export default function App() {
                               1 pt
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al terminar el partido</td>
+                          <td className="p-4 text-slate-300 font-medium">Al terminar el partido</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            Si aciertas la diferencia entre los goles de ambos equipos.
+                          </td>
                         </tr>
 
                         {/* SECTION: FASE DE GRUPOS */}
                         <tr className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
-                          <td colSpan={3} className="p-3 pl-5 text-amber-400 font-extrabold tracking-wider uppercase text-[10px] bg-[#020b17] border-y border-white/5">
+                          <td colSpan={4} className="p-3 pl-5 text-amber-400 font-extrabold tracking-wider uppercase text-[10px] bg-[#020b17] border-y border-white/5">
                             👥 FASE DE GRUPOS — Se otorgan al cerrar la fase de grupos
                           </td>
                         </tr>
@@ -3629,7 +3642,10 @@ export default function App() {
                               5 pts
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al cerrar fase de grupos</td>
+                          <td className="p-4 text-slate-300 font-medium">Al cerrar fase de grupos</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            Por cada líder de grupo que aciertes. Son 12 grupos en total.
+                          </td>
                         </tr>
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
@@ -3641,7 +3657,10 @@ export default function App() {
                               5 pts
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al cerrar fase de grupos</td>
+                          <td className="p-4 text-slate-300 font-medium">Al cerrar fase de grupos</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            Por cada segundo clasificado que aciertes.
+                          </td>
                         </tr>
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
@@ -3653,12 +3672,15 @@ export default function App() {
                               5 pts
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al cerrar fase de grupos</td>
+                          <td className="p-4 text-slate-300 font-medium">Al cerrar fase de grupos</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            8 equipos de 12 terceros pasan. Por cada tercero clasificado que aciertes.
+                          </td>
                         </tr>
 
                         {/* SECTION: PREMIOS FIFA */}
                         <tr className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
-                          <td colSpan={3} className="p-3 pl-5 text-amber-400 font-extrabold tracking-wider uppercase text-[10px] bg-[#020b17] border-y border-white/5">
+                          <td colSpan={4} className="p-3 pl-5 text-amber-400 font-extrabold tracking-wider uppercase text-[10px] bg-[#020b17] border-y border-white/5">
                             🏆 PREMIOS FIFA — Se otorgan al final del torneo
                           </td>
                         </tr>
@@ -3672,7 +3694,10 @@ export default function App() {
                               12 pts
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            La predicción más importante. Quien acierte el campeón puede cambiar el ranking completo.
+                          </td>
                         </tr>
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
@@ -3684,7 +3709,10 @@ export default function App() {
                               10 pts
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            Premio FIFA al mejor jugador del torneo. Muy difícil de predecir desde el inicio.
+                          </td>
                         </tr>
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
@@ -3696,7 +3724,10 @@ export default function App() {
                               10 pts
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            Premio FIFA al mejor portero del torneo.
+                          </td>
                         </tr>
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
@@ -3708,7 +3739,10 @@ export default function App() {
                               7 pts
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            En caso de empate en goles, todos los que acertaron reciben los 7 puntos completos.
+                          </td>
                         </tr>
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
@@ -3720,7 +3754,26 @@ export default function App() {
                               8 pts
                             </span>
                           </td>
-                          <td className="p-4 pr-5 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 text-slate-300 font-medium">Al final del torneo</td>
+                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
+                            Premio al jugador sub-21 más destacado. Premio nuevo en el Mundial 2026.
+                          </td>
+                        </tr>
+
+                        {/* PUNTOS MAXIMOS POSIBLES ROW */}
+                        <tr className="hover:bg-white/5 transition-colors font-bold uppercase text-[10.5px] border-t border-[#1e293b] bg-amber-500/5">
+                          <td className="p-4 pl-5 text-amber-400">
+                            PUNTOS MÁXIMOS POSIBLES
+                          </td>
+                          <td className="p-4 text-center text-amber-400 font-extrabold font-mono">
+                            Ver nota
+                          </td>
+                          <td className="p-4 text-slate-300 font-semibold">
+                            
+                          </td>
+                          <td className="p-4 pr-5 text-slate-300 font-bold">
+                            Partidos + Clasificados + Premios FIFA
+                          </td>
                         </tr>
                       </tbody>
                     </table>
