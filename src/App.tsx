@@ -3458,15 +3458,18 @@ export default function App() {
                           </div>
                         </div>
                         {/* Stand pillar */}
-                        <div className="w-full bg-slate-800/40 border border-slate-700/40 h-20 rounded-t-xl flex flex-col items-center justify-center shadow-lg pt-1 relative overflow-hidden backdrop-blur-sm">
+                        <div className="w-full bg-slate-800/45 border border-slate-700/50 h-20 rounded-t-xl flex flex-col items-center justify-center shadow-lg pt-1 relative overflow-hidden backdrop-blur-sm">
                           <span className="text-xl font-black text-slate-300 font-mono">{ranking[1].puntos}</span>
-                          <span className="text-[9px] font-black text-slate-550 uppercase tracking-widest">Puntos</span>
+                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Puntos</span>
                         </div>
                       </motion.div>
                     ) : (
-                      <div className="w-full flex flex-col items-center opacity-20">
-                        <span className="text-2xl">🥈</span>
-                        <div className="w-full bg-slate-900/30 h-16 rounded-t-xl border border-dashed border-slate-800"></div>
+                      <div className="w-full flex flex-col items-center opacity-45 hover:opacity-60 transition-all duration-300">
+                        <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">🥈</span>
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mt-1 mb-1.5">Por Definir</span>
+                        <div className="w-full bg-slate-950/40 border border-dashed border-slate-700/60 h-20 rounded-t-xl flex items-center justify-center backdrop-blur-xs">
+                          <span className="text-slate-600 font-mono text-xs font-black">-</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3494,16 +3497,19 @@ export default function App() {
                           </div>
                         </div>
                         {/* Stand pillar */}
-                        <div className="w-full bg-gradient-to-b from-amber-500/20 to-amber-500/5 border border-amber-500/30 h-28 rounded-t-xl flex flex-col items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden backdrop-blur-sm">
+                        <div className="w-full bg-gradient-to-b from-amber-500/25 to-amber-500/5 border border-amber-500/40 h-28 rounded-t-xl flex flex-col items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.2)] relative overflow-hidden backdrop-blur-sm">
                           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.08),transparent)]" />
-                          <span className="text-2xl font-black text-amber-400 font-mono relative z-10">{ranking[0].puntos}</span>
-                          <span className="text-[10px] font-black text-amber-500/80 uppercase tracking-widest relative z-10">Puntos</span>
+                          <span className="text-4xl font-black text-amber-400 font-mono relative z-10 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">{ranking[0].puntos}</span>
+                          <span className="text-[10px] font-black text-amber-500/90 uppercase tracking-widest relative z-10">Puntos</span>
                         </div>
                       </motion.div>
                     ) : (
-                      <div className="w-full flex flex-col items-center opacity-20">
-                        <span className="text-2xl">🥇</span>
-                        <div className="w-full bg-slate-900/30 h-24 rounded-t-xl border border-dashed border-slate-800"></div>
+                      <div className="w-full flex flex-col items-center opacity-45 hover:opacity-60 transition-all duration-300">
+                        <span className="text-4xl filter drop-shadow-[0_4px_6px_rgba(242,156,17,0.3)]">🥇</span>
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mt-1 mb-1.5">Por Definir</span>
+                        <div className="w-full bg-slate-950/40 border border-dashed border-slate-700/60 h-28 rounded-t-xl flex items-center justify-center backdrop-blur-xs">
+                          <span className="text-slate-600 font-mono text-xs font-black">-</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3528,15 +3534,18 @@ export default function App() {
                           </div>
                         </div>
                         {/* Stand pillar */}
-                        <div className="w-full bg-slate-800/20 border border-slate-700/25 h-16 rounded-t-xl flex flex-col items-center justify-center shadow-md pt-0.5 relative overflow-hidden backdrop-blur-sm">
-                          <span className="text-base font-black text-amber-600/90 font-mono">{ranking[2].puntos}</span>
-                          <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Puntos</span>
+                        <div className="w-full bg-gradient-to-b from-amber-700/20 to-transparent border border-amber-700/40 h-16 rounded-t-xl flex flex-col items-center justify-center shadow-lg pt-1 relative overflow-hidden backdrop-blur-sm">
+                          <span className="text-lg font-black text-amber-500 font-mono relative z-10 filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{ranking[2].puntos}</span>
+                          <span className="text-[9px] font-black text-amber-600/80 uppercase tracking-widest relative z-10">Puntos</span>
                         </div>
                       </motion.div>
                     ) : (
-                      <div className="w-full flex flex-col items-center opacity-20">
-                        <span className="text-2xl">🥉</span>
-                        <div className="w-full bg-slate-900/30 h-12 rounded-t-xl border border-dashed border-slate-800"></div>
+                      <div className="w-full flex flex-col items-center opacity-45 hover:opacity-60 transition-all duration-300">
+                        <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">🥉</span>
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mt-1 mb-1.5">Por Definir</span>
+                        <div className="w-full bg-slate-950/40 border border-dashed border-slate-700/60 h-16 rounded-t-xl flex items-center justify-center backdrop-blur-xs">
+                          <span className="text-slate-600 font-mono text-xs font-black">-</span>
+                        </div>
                       </div>
                     )}
                   </div>
