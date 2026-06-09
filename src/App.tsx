@@ -3595,36 +3595,7 @@ export default function App() {
                             Adicional al ganador. Acertar el marcador exacto es el más difícil y marca la diferencia.
                           </td>
                         </tr>
-                        <tr className="hover:bg-white/5 transition-colors">
-                          <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
-                            <span className="text-amber-500/50 text-sm">◽</span>
-                            Goles de un equipo
-                          </td>
-                          <td className="p-4 text-center">
-                            <span className="inline-block bg-amber-500/15 border border-amber-500/20 text-slate-200 text-[10px] font-black px-3 py-1 rounded-md font-mono">
-                              1 pt
-                            </span>
-                          </td>
-                          <td className="p-4 text-slate-300 font-medium">Al terminar el partido</td>
-                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
-                            Por cada equipo del que aciertes los goles exactos.
-                          </td>
-                        </tr>
-                        <tr className="hover:bg-white/5 transition-colors">
-                          <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
-                            <span className="text-amber-500/50 text-sm">◽</span>
-                            Diferencia de gol exacta
-                          </td>
-                          <td className="p-4 text-center">
-                            <span className="inline-block bg-amber-500/15 border border-amber-500/20 text-slate-200 text-[10px] font-black px-3 py-1 rounded-md font-mono">
-                              1 pt
-                            </span>
-                          </td>
-                          <td className="p-4 text-slate-300 font-medium">Al terminar el partido</td>
-                          <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
-                            Si aciertas la diferencia entre los goles de ambos equipos.
-                          </td>
-                        </tr>
+
 
                         {/* SECTION: FASE DE GRUPOS */}
                         <tr className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent">
@@ -3747,7 +3718,7 @@ export default function App() {
                         <tr className="hover:bg-white/5 transition-colors">
                           <td className="p-4 pl-5 font-bold text-white flex items-center gap-2">
                             <span className="text-amber-500/50 text-sm">◽</span>
-                            Jugador más joven del torneo
+                            Mejor jugador joven del torneo
                           </td>
                           <td className="p-4 text-center">
                             <span className="inline-block bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-black px-3 py-1 rounded-md font-mono">
@@ -3756,7 +3727,7 @@ export default function App() {
                           </td>
                           <td className="p-4 text-slate-300 font-medium">Al final del torneo</td>
                           <td className="p-4 pr-5 text-slate-400 font-medium leading-relaxed">
-                            Premio al jugador sub-21 más destacado. Premio nuevo en el Mundial 2026.
+                            Premio al jugador sub-21 mas destacado. Premio nuevo en el Mundial 2026.
                           </td>
                         </tr>
 
@@ -3790,7 +3761,7 @@ export default function App() {
                           <span>Puntos Máximos Posibles</span>
                         </div>
                         <p className="text-2xl font-black text-white font-mono leading-none">
-                          955 <span className="text-amber-400 text-xs font-bold font-sans">PTS MAX</span>
+                          747 <span className="text-amber-400 text-xs font-bold font-sans">PTS MAX</span>
                         </p>
                       </div>
                       <div className="mt-3.5 pt-2.5 border-t border-white/5 text-[10.5px] text-slate-400 font-medium">
@@ -3828,24 +3799,24 @@ export default function App() {
                       </div>
                       <ul className="text-[10.5px] space-y-1 text-slate-300 font-medium">
                         <li className="flex justify-between">
-                          <span>Partidos fase de grupos (72 partidos x max. 7 pts):</span>
-                          <span className="font-mono text-white font-bold">hasta 504 pts</span>
+                          <span>Partidos fase de grupos (72 partidos x máx. 5 pts):</span>
+                          <span className="font-mono text-white font-bold">hasta 360 pts</span>
                         </li>
                         <li className="flex justify-between">
-                          <span>Partidos fases eliminatorias (32 partidos x max. 7 pts):</span>
-                          <span className="font-mono text-white font-bold">hasta 224 pts</span>
+                          <span>Partidos fases eliminatorias (32 partidos x máx. 5 pts):</span>
+                          <span className="font-mono text-white font-bold">hasta 160 pts</span>
                         </li>
                         <li className="flex justify-between">
                           <span>Clasificados de grupo (36 predicciones x 5 pts):</span>
                           <span className="font-mono text-white font-bold">hasta 180 pts</span>
                         </li>
                         <li className="flex justify-between">
-                          <span>Premios FIFA al final (campeon + 4 premios):</span>
+                          <span>Premios FIFA al final (campeón + 4 premios):</span>
                           <span className="font-mono text-white font-bold">hasta 47 pts</span>
                         </li>
                         <li className="flex justify-between text-amber-400 font-black border-t border-white/5 pt-1 mt-1 text-[11px]">
                           <span>TOTAL MÁXIMO POSIBLE:</span>
-                          <span className="font-mono">955 pts</span>
+                          <span className="font-mono">747 pts</span>
                         </li>
                       </ul>
                     </div>
@@ -4299,16 +4270,13 @@ export default function App() {
                   }
                 }
 
-                const homeGoalsCorrect = pHome === oHome;
-                const awayGoalsCorrect = pAway === oAway;
-                const goalDiffCorrect = (pHome - pAway) === (oHome - oAway);
+                const homeGoalsCorrect = false;
+                const awayGoalsCorrect = false;
+                const goalDiffCorrect = false;
 
                 let total = 0;
                 if (winnerCorrect) total += 3;
                 if (exactCorrect) total += 2;
-                if (homeGoalsCorrect) total += 1;
-                if (awayGoalsCorrect) total += 1;
-                if (goalDiffCorrect) total += 1;
 
                 return {
                   total,
@@ -4333,7 +4301,7 @@ export default function App() {
                       <span className="text-xs text-slate-500 mt-1">Calculado en base a resultados oficiales</span>
                     </div>
 
-                    <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
                         <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase mb-3 leading-tight">Acierto Ganador</span>
                         <div className="flex flex-col items-center">
@@ -4355,30 +4323,6 @@ export default function App() {
                         <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-full">
                           <span className="text-[11px] text-emerald-400 font-black block">+{uStats.aciertosExactos * 2} Pts</span>
                           <span className="text-[8px] text-emerald-400/70 font-bold uppercase tracking-widest">(2 Pts c/u)</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
-                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase mb-3 leading-tight">Goles Equipo</span>
-                        <div className="flex flex-col items-center">
-                          <span className="text-3xl font-black font-mono text-slate-200">{uStats.aciertosGolesEquipo}</span>
-                          <span className="text-[10px] text-slate-500 font-medium">veces</span>
-                        </div>
-                        <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-full">
-                          <span className="text-[11px] text-emerald-400 font-black block">+{uStats.aciertosGolesEquipo * 1} Pts</span>
-                          <span className="text-[8px] text-emerald-400/70 font-bold uppercase tracking-widest">(1 Pts c/u)</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex flex-col justify-center items-center text-center">
-                        <span className="text-[10px] font-black tracking-wider text-slate-400 uppercase mb-3 leading-tight">Dif. Goles</span>
-                        <div className="flex flex-col items-center">
-                          <span className="text-3xl font-black font-mono text-slate-200">{uStats.aciertosDiferenciaGol}</span>
-                          <span className="text-[10px] text-slate-500 font-medium">veces</span>
-                        </div>
-                        <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl w-full">
-                          <span className="text-[11px] text-emerald-400 font-black block">+{uStats.aciertosDiferenciaGol * 1} Pts</span>
-                          <span className="text-[8px] text-emerald-400/70 font-bold uppercase tracking-widest">(1 Pts c/u)</span>
                         </div>
                       </div>
                     </div>
@@ -4609,11 +4553,11 @@ export default function App() {
                         <div className="space-y-1">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                              <Activity className="h-3.5 w-3.5 text-amber-500" /> Jugador Joven
+                              <Activity className="h-3.5 w-3.5 text-amber-500" /> Mejor Jugador Joven
                             </span>
                             <span className="text-[9px] font-black font-mono text-slate-500">8 pts</span>
                           </div>
-                          <p className="text-[9.5px] text-slate-400 font-semibold">Jugador más joven de la copa</p>
+                          <p className="text-[9.5px] text-slate-400 font-semibold">Premio al jugador sub-21 mas destacado</p>
                         </div>
                         
                         <input
@@ -4894,15 +4838,6 @@ export default function App() {
                                       </span>
                                       <span className={pointsHelp.exactCorrect ? 'text-emerald-500' : 'text-slate-700'}>
                                         {pointsHelp.exactCorrect ? '✓' : '✗'} Exacto (+2)
-                                      </span>
-                                      <span className={pointsHelp.homeGoalsCorrect ? 'text-emerald-500' : 'text-slate-700'}>
-                                        {pointsHelp.homeGoalsCorrect ? '✓' : '✗'} Gol L (+1)
-                                      </span>
-                                      <span className={pointsHelp.awayGoalsCorrect ? 'text-emerald-500' : 'text-slate-700'}>
-                                        {pointsHelp.awayGoalsCorrect ? '✓' : '✗'} Gol V (+1)
-                                      </span>
-                                      <span className={pointsHelp.goalDiffCorrect ? 'text-emerald-500' : 'text-slate-700'}>
-                                        {pointsHelp.goalDiffCorrect ? '✓' : '✗'} Dif (+1)
                                       </span>
                                     </div>
                                   )}

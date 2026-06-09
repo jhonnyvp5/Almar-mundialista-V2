@@ -487,6 +487,7 @@ async function saveDatabase(db: DatabaseSchema) {
         }
 
         // Scoring rules:
+        // Line-by-line official rules update:
         // 1. Selección del ganador: 3 points
         if (isWinnerCorrect) {
           puntos += 3;
@@ -499,19 +500,15 @@ async function saveDatabase(db: DatabaseSchema) {
           aciertosExactos += 1;
         }
 
-        // 3. Goles de un equipo: 1 point per team
+        // Goles de un equipo & Diferencia de gol do NOT grant points in the new rule update.
         if (pHome === oHome) {
-          puntos += 1;
           aciertosGolesEquipo += 1;
         }
         if (pAway === oAway) {
-          puntos += 1;
           aciertosGolesEquipo += 1;
         }
 
-        // 4. Diferencia de gol: 1 point
         if ((pHome - pAway) === (oHome - oAway)) {
-          puntos += 1;
           aciertosDiferenciaGol += 1;
         }
       });
@@ -776,11 +773,14 @@ async function saveDatabase(db: DatabaseSchema) {
       });
     });
 
-    // Sort by points desc, then exact fits desc, then winner hits desc, then name asc
+    // Sort by points desc, then by form submission date/time (earliest first), then name asc
     return ranking.sort((a, b) => {
       if (b.puntos !== a.puntos) return b.puntos - a.puntos;
-      if (b.aciertosExactos !== a.aciertosExactos) return b.aciertosExactos - a.aciertosExactos;
-      if (b.aciertosGanador !== a.aciertosGanador) return b.aciertosGanador - a.aciertosGanador;
+      
+      const timeA = a.fechaRegistro ? new Date(a.fechaRegistro).getTime() : Infinity;
+      const timeB = b.fechaRegistro ? new Date(b.fechaRegistro).getTime() : Infinity;
+      if (timeA !== timeB) return timeA - timeB;
+
       return a.nombre.localeCompare(b.nombre);
     });
   }
