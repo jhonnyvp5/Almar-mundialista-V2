@@ -267,6 +267,7 @@ export default function App() {
         if (typeof data.unlockedWeek === 'number') {
           setUnlockedWeek(data.unlockedWeek);
           setSelectedAdminMatchWeek(data.unlockedWeek.toString());
+          setScheduleWeekFilter(data.unlockedWeek.toString());
         }
       }
     } catch (e) {
@@ -1621,6 +1622,7 @@ export default function App() {
 
       setUnlockedWeek(week);
       setSelectedAdminMatchWeek(week.toString());
+      setScheduleWeekFilter(week.toString());
       showToast(`🔓 Semana ${week} de partidos habilitada exitosamente.`);
     } catch (e) {
       showToast('❌ Error de conexión al actualizar la configuración.');
