@@ -2299,7 +2299,7 @@ export default function App() {
                 </div>
                 <div className="bg-[#020710] border border-white/5 p-3 rounded-xl flex items-center gap-2 text-slate-400 text-xs font-semibold">
                   <Clock className="h-4 w-4 text-amber-500 shrink-0" />
-                  <span>Tienes hasta antes del pitazo inicial para participar. ¡No te quedes fuera!</span>
+                  <span>Tienes hasta 1 hora antes del pitazo inicial para participar. ¡No te quedes fuera!</span>
                 </div>
               </div>
 
