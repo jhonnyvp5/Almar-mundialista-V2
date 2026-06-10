@@ -54,6 +54,7 @@ import {
   simulateMatchScores,
   resolveAllThirds
 } from './utils';
+import { AlmarLogo } from './components/AlmarLogo';
 
 // Ecuador Cédula validación logic client-side
 export function isEcuadorianCedulaValid(cedula: string): boolean {
@@ -1949,13 +1950,13 @@ export default function App() {
           </p>
         </div>
 
-        {/* MIDDLE: Glowing Trophy circle & Welcome Card */}
+        {/* MIDDLE: Glowing Logo circle & Welcome Card */}
         <div className="w-full max-w-sm flex flex-col items-center text-center px-6 relative z-20 my-auto py-4">
           <div className="relative mb-5 scale-110">
             {/* Glowing arena ring in the center */}
-            <div className="absolute -inset-4 rounded-full bg-blue-500/15 blur-xl opacity-90 animate-pulse" />
-            <div className="relative h-20 w-20 rounded-full border-2 border-blue-500/35 shadow-[0_0_25px_rgba(59,130,246,0.5)] bg-[#030a16]/90 flex items-center justify-center">
-              <Trophy className="h-10 w-10 text-amber-400 drop-shadow-[0_2px_10px_rgba(245,158,11,0.6)]" />
+            <div className="absolute -inset-4 rounded-full bg-teal-500/15 blur-xl opacity-90 animate-pulse" />
+            <div className="relative h-20 w-20 rounded-full border-2 border-teal-500/35 shadow-[0_0_25px_rgba(20,184,166,0.5)] bg-[#030a16]/90 flex items-center justify-center overflow-hidden">
+              <AlmarLogo iconOnly className="h-12 w-auto" />
             </div>
           </div>
 
@@ -2039,11 +2040,11 @@ export default function App() {
 
         <div className="max-w-md w-full bg-slate-900/80 border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8 relative z-10 backdrop-blur-md">
           {/* Header Title */}
-          <div className="text-center mb-6">
-            <div className="inline-flex h-14 w-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 items-center justify-center shadow-xl ring-2 ring-amber-400/25 mb-4">
-              <Trophy className="h-7 w-7 text-slate-950" />
+          <div className="text-center mb-6 flex flex-col items-center">
+            <div className="mb-4 bg-slate-950/60 p-3 rounded-2xl border border-slate-850 shadow-xl inline-block">
+              <AlmarLogo className="h-12 w-auto" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white uppercase">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white uppercase mt-1">
               Polla Mundialista 2026
             </h1>
             <p className="text-xs text-slate-400 mt-1">
@@ -2278,8 +2279,8 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center shadow-lg">
-              <Trophy className="h-5 w-5 text-slate-950" />
+            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850 shadow-md">
+              <AlmarLogo iconOnly className="h-7 w-auto" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -2563,9 +2564,17 @@ export default function App() {
                     <h3 className="text-lg font-black text-white uppercase tracking-tight">📋 ¿Cómo funciona?</h3>
                     <p className="text-xs text-amber-400 font-bold uppercase tracking-wider mt-0.5">Paso a paso para participar</p>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                    Ingresa tus datos, predice cuántos goles marca cada equipo en el tiempo reglamentario (1er y 2do tiempo ordinario de 90&apos; minutos, no aplica los tiempos extra ni penales) y espera los resultados.
-                  </p>
+                  <div className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium space-y-3.5">
+                    <p className="font-bold text-white flex items-center gap-1.5">
+                      <span>📝</span> <span>Ingresa tus datos y realiza tus pronósticos para el torneo.</span>
+                    </p>
+                    <p className="text-slate-300">
+                      Predice cuántos goles marcará cada equipo en cada partido, elige a los clasificados y ganadores de cada grupo, selecciona a los ganadores de los premios FIFA y pronostica quién será el campeón del torneo.
+                    </p>
+                    <p className="text-amber-400 font-bold flex items-start gap-1.5">
+                      <span className="shrink-0 mt-0.5">⚽</span> <span>Mientras más aciertos tengas, más puntos acumularás. Consulta el sistema de puntuación para conocer cómo se asignan los puntos y aumentar tus posibilidades de ganar.</span>
+                    </p>
+                  </div>
                 </div>
                 <div className="bg-[#020710] border border-white/5 p-3 rounded-xl flex items-center gap-2 text-slate-400 text-xs font-semibold">
                   <Clock className="h-4 w-4 text-amber-500 shrink-0" />
