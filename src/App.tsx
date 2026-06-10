@@ -140,11 +140,11 @@ export const AWARDS_BOTA_ORO = [
   "Vinícius Júnior", "Cristiano Ronaldo", "Mohamed Salah", "Victor Osimhen", "Luis Díaz",
   "Santiago Giménez", "Jonathan David", "Alexander Isak", "Gonçalo Ramos", "Patrik Schick",
   "Benjamin Šeško", "Enner Valencia", "Rodrygo", "Ousmane Dembélé", "Michael Olise",
-  "Lamine Yamal", "Akram Afif", "Almoez Ali", "Mikel Oyarzabal", "Julián Quiñones"
+  "Lamine Yamal", "Akram Afif", "Almoez Ali", "Mikel Oyarzabal", "Julián Quiñones", "Lionel Messi"
 ].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 
 export const AWARDS_GUANTE_ORO = [
-  "Emiliano Martínez", "Alisson Becker", "Gianluigi Donnarumma", "Unai Simón", "Mike Maignan",
+  "Emiliano Martínez", "Alisson Becker", "Unai Simón", "Mike Maignan",
   "Thibaut Courtois", "Diogo Costa", "David Raya", "Gregor Kobel", "Jordan Pickford",
   "Ederson", "Yann Sommer", "Jan Oblak", "Bart Verbruggen", "Andriy Lunin",
   "Giorgi Mamardashvili", "André Onana", "Kevin Mier", "Camilo Vargas", "Guillermo Ochoa",
@@ -153,10 +153,10 @@ export const AWARDS_GUANTE_ORO = [
 
 export const AWARDS_JOVEN_TORNEO = [
   "Lamine Yamal", "Endrick", "Pau Cubarsí", "Warren Zaïre-Emery", "João Neves",
-  "Désiré Doué", "Arda Güler", "Kendry Páez", "Gilberto Mora", "Estevão",
-  "Claudio Echeverri", "Geovany Quenda", "Dean Huijsen", "Jorrel Hato", "Ethan Nwaneri",
+  "Désiré Doué", "Arda Güler", "Kendry Páez", "Gilberto Mora",
+  "Geovany Quenda", "Jorrel Hato", "Ethan Nwaneri",
   "Mathys Tel", "Bilal El Khannouss", "Abdukodir Khusanov", "Yan Diomande", "Lennart Karl",
-  "Nico O'Reilly", "Franco Mastantuono", "Assane Diao", "Lucas Bergvall", "Finn Surman"
+  "Nico O'Reilly", "Assane Diao", "Lucas Bergvall", "Finn Surman"
 ].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 
 export default function App() {
