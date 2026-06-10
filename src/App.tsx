@@ -1908,7 +1908,8 @@ export default function App() {
             src="https://images.unsplash.com/photo-1579952365544-300539940e45?q=80&w=1200"
             alt="Soccer ball in stadium on grass field under lights"
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover object-center opacity-95 scale-100"
+            className="w-full h-full object-cover object-center opacity-95 scale-100 hidden sm:block"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
           {/* Subtle top/bottom gradients to maintain high UI text contrast while keeping the stadium structure and center grass soccer ball completely bright and vivid */}
           <div className="absolute inset-x-0 top-0 h-[45%] bg-gradient-to-b from-[#0a1e3e] via-[#041026]/75 to-transparent" />
