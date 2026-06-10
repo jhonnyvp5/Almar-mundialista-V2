@@ -161,6 +161,7 @@ export default function App() {
   const [checkingCedula, setCheckingCedula] = useState(false);
   const [cedulaError, setCedulaError] = useState('');
   const [cedulaSuccess, setCedulaSuccess] = useState(false);
+  const [dataConsent, setDataConsent] = useState(false);
 
   // Manual Classification Overrides for Bracket Generation
   const [manualFirstPlaces, setManualFirstPlaces] = useState<Record<string, string>>({}); // group -> teamId
@@ -2177,10 +2178,30 @@ export default function App() {
                 </div>
               </div>
 
+              <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4.5 space-y-3 mt-4">
+                <h4 className="text-xs font-black text-amber-400 uppercase tracking-widest">
+                  Autorización de Datos Personales
+                </h4>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Al registrarme, autorizo a Grupo Almar a recopilar y utilizar mis datos personales para crear y administrar mi cuenta, para gestionar mi participación en la Polla Mundialista.
+                </p>
+                <label className="flex items-start gap-2.5 cursor-pointer pt-1 select-none">
+                  <input
+                    type="checkbox"
+                    checked={dataConsent}
+                    onChange={(e) => setDataConsent(e.target.checked)}
+                    className="mt-0.5 rounded border-slate-800 bg-slate-950 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900"
+                  />
+                  <span className="text-[11px] text-slate-300 font-bold leading-tight">
+                    He leído y acepto el tratamiento de mis datos personales.
+                  </span>
+                </label>
+              </div>
+
               <button
                 id="btn-registrarse"
                 type="submit"
-                disabled={loading || checkingCedula || !cedulaSuccess}
+                disabled={loading || checkingCedula || !cedulaSuccess || !dataConsent}
                 className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold py-3 px-4 rounded-xl text-sm transition-colors mt-4 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed shadow-[0_0_15px_rgba(245,158,11,0.2)] font-black"
               >
                 {loading ? 'Procesando...' : 'Comenzar a Participar →'}
