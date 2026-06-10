@@ -226,6 +226,11 @@ export default function App() {
   const [adminStats, setAdminStats] = useState<any>(null);
   const [unlockedWeek, setUnlockedWeek] = useState<number>(1);
 
+  // States for PWA installation
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallInstructions, setShowInstallInstructions] = useState<boolean>(false);
+  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+
   // Computations for ranking filtering and pagination
   const rankingWithRanks = useMemo(() => {
     return ranking.map((u, i) => ({
@@ -593,6 +598,240 @@ export default function App() {
       setWeekFilter(unlockedWeek.toString());
     }
   }, [currentUser, unlockedWeek]);
+
+  // PWA installation tracking and initialization effect
+  useEffect(() => {
+    // Check if the application is running in standalone mode (already installed)
+    const checkStandalone = () => {
+      const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+      setIsStandalone(isStandaloneMode);
+    };
+
+    checkStandalone();
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    
+    // Also listen to display-mode change
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      setIsStandalone(e.matches);
+    };
+    
+    // Support older Safari & standard browsers
+    try {
+      mediaQuery.addEventListener('change', handleDisplayModeChange);
+    } catch {
+      try {
+        (mediaQuery as any).addListener(handleDisplayModeChange);
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      try {
+        mediaQuery.removeEventListener('change', handleDisplayModeChange);
+      } catch {
+        try {
+          (mediaQuery as any).removeListener(handleDisplayModeChange);
+        } catch (err) {
+          console.warn(err);
+        }
+      }
+    };
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      try {
+        // Show the install prompt
+        deferredPrompt.prompt();
+        // Wait for the user to respond to the prompt
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response to the install prompt: ${outcome}`);
+        if (outcome === 'accepted') {
+          // We've used the prompt, and can't use it again
+          setDeferredPrompt(null);
+        }
+      } catch (err) {
+        console.error('Error triggering PWA install prompt:', err);
+        setShowInstallInstructions(true);
+      }
+    } else {
+      // No prompt available (e.g. iOS or manually triggered), show the modal of instructions
+      setShowInstallInstructions(true);
+    }
+  };
+
+  const renderInstallButtonAndModal = () => {
+    if (isStandalone) return null;
+
+    const deviceOS = (() => {
+      const ua = window.navigator.userAgent.toLowerCase();
+      if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) {
+        return 'ios';
+      }
+      if (ua.includes('android')) {
+        return 'android';
+      }
+      return 'desktop';
+    })();
+
+    return (
+      <>
+        {/* Floating install button */}
+        <div className="fixed bottom-6 left-6 z-50">
+          <button
+            onClick={handleInstallApp}
+            className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-500 text-slate-950 font-black px-4 py-2.5 rounded-full text-xs shadow-[0_4px_15px_rgba(245,158,11,0.4)] hover:shadow-[0_4px_25px_rgba(245,158,11,0.5)] transition duration-300 scale-100 active:scale-95 cursor-pointer uppercase tracking-wider select-none border border-amber-400/20"
+            id="pwa-install-button"
+            title="Instalar aplicación en tu dispositivo"
+          >
+            <Download className="h-4 w-4 shrink-0 stroke-[3] animate-bounce" />
+            <span>Instalar App</span>
+          </button>
+        </div>
+
+        {/* Custom PWA visual instruction modal */}
+        {showInstallInstructions && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative">
+              {/* Header decor */}
+              <div className="bg-gradient-to-r from-amber-500 to-amber-600 h-1.5 w-full" />
+              
+              <div className="p-6">
+                {/* Title */}
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500">
+                      <Download className="h-5 w-5 shrink-0" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                        Instalar AlmarGOOOL
+                      </h3>
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">
+                        {deviceOS === 'ios' ? '📱 Dispositivo iOS' : deviceOS === 'android' ? '📱 Dispositivo Android' : '💻 Computador / Escritorio'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowInstallInstructions(false)}
+                    className="text-slate-500 hover:text-white transition duration-200 p-1 cursor-pointer font-bold text-sm"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Instructions body based on detected OS */}
+                <div className="space-y-4 my-5 text-xs text-slate-300">
+                  {deviceOS === 'ios' && (
+                    <>
+                      <p className="font-medium text-slate-200 leading-normal">
+                        Sigue estos sencillos pasos para instalar la aplicación en tu iPhone o iPad:
+                      </p>
+                      <div className="space-y-3 pl-1">
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">1</span>
+                          <p className="leading-relaxed">Abre el navegador <strong className="text-white">Safari</strong> para ingresar a la app.</p>
+                        </div>
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">2</span>
+                          <p className="leading-relaxed">Toca el botón <strong className="text-white">Compartir 📤</strong> en la barra de navegación (cuadrado con flecha hacia arriba).</p>
+                        </div>
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">3</span>
+                          <p className="leading-relaxed">Desplázate hacia abajo y selecciona <strong className="text-white font-bold">"Agregar al inicio"</strong> o <strong className="text-white">"Add to Home Screen" ➕</strong>.</p>
+                        </div>
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">4</span>
+                          <p className="leading-relaxed">Presiona <strong className="text-amber-400 font-bold">Agregar</strong> en la parte superior derecha.</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {deviceOS === 'android' && (
+                    <>
+                      <p className="font-medium text-slate-200 leading-normal">
+                        Si tu dispositivo no inició la instalación automática, sigue estos pasos:
+                      </p>
+                      <div className="space-y-3 pl-1">
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">1</span>
+                          <p className="leading-relaxed">Toca los <strong className="text-white font-bold">tres puntos (Menú) ⁝</strong> en la esquina superior derecha del navegador Chrome o Edge.</p>
+                        </div>
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">2</span>
+                          <p className="leading-relaxed">Selecciona la opción <strong className="text-white">"Instalar aplicación"</strong> o <strong className="text-white font-bold">"Agregar a la pantalla principal"</strong>.</p>
+                        </div>
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">3</span>
+                          <p className="leading-relaxed">Confirma presionando <strong className="text-amber-400 font-bold">Instalar</strong> y ¡listo! Se agregará a tus aplicaciones.</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {deviceOS === 'desktop' && (
+                    <>
+                      <p className="font-medium text-slate-200 leading-normal">
+                        Para instalar AlmarGOOOL en tu computador de escritorio o laptop:
+                      </p>
+                      <div className="space-y-3 pl-1">
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">1</span>
+                          <p className="leading-relaxed">En <strong className="text-white">Google Chrome</strong> o <strong className="text-white">Microsoft Edge</strong>, mira a la derecha de la barra de direcciones superior.</p>
+                        </div>
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">2</span>
+                          <p className="leading-relaxed">Haz clic en el icono de <strong className="text-white font-bold">Instalar App</strong> (una pantallita con una flecha hacia abajo).</p>
+                        </div>
+                        <div className="flex gap-2.5">
+                          <span className="flex-none flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black border border-amber-500/20">3</span>
+                          <p className="leading-relaxed">Confirma la ventana emergente haciendo clic en <strong className="text-amber-400 font-bold">Instalar</strong>.</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Footer buttons */}
+                <div className="flex items-center gap-3 mt-6">
+                  {deferredPrompt && (
+                    <button
+                      onClick={() => {
+                        setShowInstallInstructions(false);
+                        handleInstallApp();
+                      }}
+                      className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2.5 px-4 rounded-xl text-xs transition duration-250 cursor-pointer text-center uppercase tracking-wider"
+                    >
+                      Instalar Ahora
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowInstallInstructions(false)}
+                    className="flex-1 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white font-semibold py-2.5 px-4 rounded-xl text-xs transition duration-250 cursor-pointer text-center"
+                  >
+                    Entendido
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
 
   // Sync predictions values to states
   useEffect(() => {
@@ -2319,6 +2558,7 @@ export default function App() {
           )}
 
         </div>
+        {renderInstallButtonAndModal()}
       </div>
     );
   }
@@ -6373,6 +6613,7 @@ export default function App() {
         </p>
       </footer>
 
+      {renderInstallButtonAndModal()}
     </div>
   );
 }
