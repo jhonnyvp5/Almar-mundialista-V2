@@ -177,7 +177,7 @@ export const getWeekName = (week: number | string): string => {
   switch (w) {
     case 1: return "Semana 1 (11 Jun - 14 Jun)";
     case 2: return "Semana 2 (15 Jun - 21 Jun)";
-    case 3: return "Semana 3 (22 Jun - 28 Jun)";
+    case 3: return "Semana 3 (22 Jun - 27 Jun)";
     case 4: return "Round 32";
     case 5: return "Round 1/8";
     case 6: return "Round 1/4";
@@ -1692,7 +1692,7 @@ export default function App() {
     // Fallback based on date
     if (matchDate <= '2026-06-14') return 1;
     if (matchDate <= '2026-06-21') return 2;
-    if (matchDate <= '2026-06-28') return 3;
+    if (matchDate <= '2026-06-27') return 3;
     if (matchDate <= '2026-07-03') return 4;
     if (matchDate <= '2026-07-07') return 5;
     if (matchDate <= '2026-07-11') return 6;
@@ -3461,8 +3461,8 @@ export default function App() {
                     <option value="all">Ver todas las Semanas</option>
                     <option value="1">Semana 1 (11 Jun - 14 Jun){unlockedWeek === 1 ? ' ⭐ (Semana Activa)' : ''}</option>
                     <option value="2">Semana 2 (15 Jun - 21 Jun){unlockedWeek === 2 ? ' ⭐ (Semana Activa)' : ''}</option>
-                    <option value="3">Semana 3 (22 Jun - 28 Jun){unlockedWeek === 3 ? ' ⭐ (Semana Activa)' : ''}</option>
-                    <option value="4">Round 32 (29 Jun - 05 Jul){unlockedWeek === 4 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="3">Semana 3 (22 Jun - 27 Jun){unlockedWeek === 3 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="4">Round 32 (28 Jun - 05 Jul){unlockedWeek === 4 ? ' ⭐ (Semana Activa)' : ''}</option>
                     <option value="5">Round 1/8 (06 Jul - 07 Jul){unlockedWeek === 5 ? ' ⭐ (Semana Activa)' : ''}</option>
                     <option value="6">Round 1/4 (09 Jul - 11 Jul){unlockedWeek === 6 ? ' ⭐ (Semana Activa)' : ''}</option>
                     <option value="7">Round 1/2 (14 Jul - 15 Jul){unlockedWeek === 7 ? ' ⭐ (Semana Activa)' : ''}</option>
@@ -6436,8 +6436,8 @@ export default function App() {
                     {[
                       { id: 1, label: "Semana 1", date: "(11 - 14 Jun)" },
                       { id: 2, label: "Semana 2", date: "(15 - 21 Jun)" },
-                      { id: 3, label: "Semana 3", date: "(22 - 28 Jun)" },
-                      { id: 4, label: "Round 32", date: "(29 Jun - 05 Jul)" },
+                      { id: 3, label: "Semana 3", date: "(22 - 27 Jun)" },
+                      { id: 4, label: "Round 32", date: "(28 Jun - 05 Jul)" },
                       { id: 5, label: "Round 1/8", date: "(06 - 07 Jul)" },
                       { id: 6, label: "Round 1/4", date: "(09 - 11 Jul)" },
                       { id: 7, label: "Round 1/2", date: "(14 - 15 Jul)" },

@@ -1112,7 +1112,7 @@ async function startServer() {
       }
       if (matchDate <= '2026-06-14') return 1;
       if (matchDate <= '2026-06-21') return 2;
-      if (matchDate <= '2026-06-28') return 3;
+      if (matchDate <= '2026-06-27') return 3;
       if (matchDate <= '2026-07-03') return 4;
       if (matchDate <= '2026-07-07') return 5;
       if (matchDate <= '2026-07-11') return 6;
@@ -1359,7 +1359,7 @@ async function startServer() {
               // Fallback based on date
               if (matchMeta.date <= '2026-06-14') matchWeek = 1;
               else if (matchMeta.date <= '2026-06-21') matchWeek = 2;
-              else if (matchMeta.date <= '2026-06-28') matchWeek = 3;
+              else if (matchMeta.date <= '2026-06-27') matchWeek = 3;
               else if (matchMeta.date <= '2026-07-03') matchWeek = 4;
               else if (matchMeta.date <= '2026-07-07') matchWeek = 5;
               else if (matchMeta.date <= '2026-07-11') matchWeek = 6;
