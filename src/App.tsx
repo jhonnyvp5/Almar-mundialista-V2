@@ -2651,7 +2651,8 @@ export default function App() {
               </button>
             )}
 
-            {currentUser?.role !== 'admin' && (
+            {/* Ocultado para que ningún usuario lo pueda ver */}
+            {false && (
               <button
                 onClick={() => setActiveTab('bracket')}
                 className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
@@ -2918,18 +2919,26 @@ export default function App() {
             
             {renderDeadlineBanner()}
 
-            <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col gap-4">
               <div className="space-y-1">
                 <h2 className="text-xl font-extrabold text-white uppercase tracking-tight flex items-center gap-2">
                   <TableIcon className="h-5 w-5 text-amber-500" />
                   Visualización y Clasificación de la Fase de Grupos
                 </h2>
-                <p className="text-xs text-slate-400 max-w-2xl">
+                <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
                   Visualiza los 12 grupos del Mundial 2026. Los puntos se calculan automáticamente de tus pronósticos. También puedes seleccionar manualmente a los clasificados a Dieciseisavos de Final.
                 </p>
               </div>
 
-
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-amber-300 text-xs flex items-start gap-2.5 max-w-3xl">
+                <span className="text-base shrink-0 leading-none">⚠️</span>
+                <div>
+                  <h4 className="font-bold uppercase tracking-wider mb-0.5 text-white text-[10px]">Aclaración importante para el registro:</h4>
+                  <p className="leading-relaxed">
+                    Si ya seleccionó los <strong className="text-amber-400 font-extrabold">8 mejores terceros lugares</strong>, recuerde que debe colocar <strong className="text-white">"❌ No aplica"</strong> en la opción de <strong>"3er Lugar"</strong> de los <strong className="text-white">demás grupos restantes</strong> para terminar de completar y guardar correctamente sus registros de posiciones de la fase de grupos.
+                  </p>
+                </div>
+              </div>
             </div>
 
             {/* Grid of 12 Groups */}
