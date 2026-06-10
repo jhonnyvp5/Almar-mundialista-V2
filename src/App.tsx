@@ -40,6 +40,7 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   Trash2
 } from 'lucide-react';
 import { Team, Match, Group, GroupStandings, StageType } from './types';
@@ -66,6 +67,14 @@ export function isEcuadorianCedulaValid(cedula: string): boolean {
 export function sanitizeText(str?: string): string {
   if (!str) return '';
   return str.replace(/[\uFFFD\u00A0]/g, 'Ñ');
+}
+
+export function normalizeSearchText(str?: string): string {
+  if (!str) return '';
+  return sanitizeText(str)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 export function formatPodiumName(fullName?: string): string {
@@ -211,9 +220,39 @@ export default function App() {
   // General States
   const [toast, setToast] = useState<string | null>(null);
   const [ranking, setRanking] = useState<any[]>([]);
+  const [rankingSearchText, setRankingSearchText] = useState('');
+  const [rankingCurrentPage, setRankingCurrentPage] = useState(1);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [adminStats, setAdminStats] = useState<any>(null);
   const [unlockedWeek, setUnlockedWeek] = useState<number>(1);
+
+  // Computations for ranking filtering and pagination
+  const rankingWithRanks = useMemo(() => {
+    return ranking.map((u, i) => ({
+      ...u,
+      originalRank: i + 1
+    }));
+  }, [ranking]);
+
+  const filteredRankings = useMemo(() => {
+    const query = normalizeSearchText(rankingSearchText);
+    if (!query) return rankingWithRanks;
+    return rankingWithRanks.filter(u => {
+      const nameMatch = normalizeSearchText(u.nombre).includes(query);
+      const companyMatch = normalizeSearchText(u.empresa).includes(query);
+      const locationMatch = normalizeSearchText(u.localidad).includes(query);
+      return nameMatch || companyMatch || locationMatch;
+    });
+  }, [rankingWithRanks, rankingSearchText]);
+
+  const itemsPerPage = 30;
+  const totalRankingPages = Math.max(1, Math.ceil(filteredRankings.length / itemsPerPage));
+  const clampRankingPage = rankingCurrentPage > totalRankingPages ? totalRankingPages : rankingCurrentPage;
+
+  const paginatedRankings = useMemo(() => {
+    const startIndex = (clampRankingPage - 1) * itemsPerPage;
+    return filteredRankings.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredRankings, clampRankingPage]);
 
   // System Config with Awards & Official Bracket
   const [systemConfig, setSystemConfig] = useState<any>({
@@ -3799,6 +3838,44 @@ export default function App() {
 
             {/* Ranking table */}
             <div className="bg-slate-900/30 border border-slate-900 rounded-2xl overflow-hidden shadow-xl max-w-4xl mx-auto">
+              {/* Search and filter bar */}
+              <div className="p-4 border-b border-slate-900 bg-slate-950/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="text-xs font-black text-slate-300 uppercase tracking-widest">
+                    Tabla de Posiciones
+                  </span>
+                </div>
+                
+                <div className="relative w-full sm:w-80">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                    <Search className="h-4 w-4" />
+                  </span>
+                  <input
+                    type="text"
+                    value={rankingSearchText}
+                    onChange={(e) => {
+                      setRankingSearchText(e.target.value);
+                      setRankingCurrentPage(1); // reset page to 1 on new search
+                    }}
+                    placeholder="Buscar por nombre, apellido o empresa..."
+                    className="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium text-slate-250 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition shadow-inner"
+                  />
+                  {rankingSearchText && (
+                    <button
+                      onClick={() => {
+                        setRankingSearchText('');
+                        setRankingCurrentPage(1);
+                      }}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-white cursor-pointer"
+                      title="Limpiar búsqueda"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
@@ -3813,11 +3890,15 @@ export default function App() {
                       <tr>
                         <td colSpan={3} className="p-8 text-center text-slate-500">Ningún usuario puntuado aún. Registre resultados oficiales en el panel administrativo.</td>
                       </tr>
+                    ) : filteredRankings.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="p-8 text-center text-slate-500 font-medium">No se encontraron participantes que coincidan con la búsqueda.</td>
+                      </tr>
                     ) : (
-                      ranking.map((u, index) => (
+                      paginatedRankings.map((u) => (
                         <tr key={u.id} className={`hover:bg-slate-900/10 transition-colors ${u.id === currentUser?.id ? 'bg-amber-500/5 border-l-2 border-l-amber-500' : ''}`}>
                           <td className="p-4 text-center font-bold font-mono">
-                            {index === 0 ? '🥇 1' : (index === 1 ? '🥈 2' : (index === 2 ? '🥉 3' : index + 1))}
+                            {u.originalRank === 1 ? '🥇 1' : (u.originalRank === 2 ? '🥈 2' : (u.originalRank === 3 ? '🥉 3' : u.originalRank))}
                           </td>
                           <td className="p-4 font-bold text-slate-250 text-sm">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
@@ -3839,6 +3920,67 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination bar */}
+              {filteredRankings.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-900 bg-slate-950/25">
+                  <div className="text-xs text-slate-400 font-semibold text-center sm:text-left">
+                    Mostrando <span className="font-bold text-slate-200">{(clampRankingPage - 1) * itemsPerPage + 1}-{Math.min(clampRankingPage * itemsPerPage, filteredRankings.length)}</span> de <span className="font-bold text-amber-400">{filteredRankings.length}</span> participantes
+                    {rankingSearchText && <span className="text-slate-500"> (filtrado)</span>}
+                  </div>
+                  <div className="flex items-center gap-1.5 justify-center">
+                    <button
+                      onClick={() => setRankingCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={clampRankingPage === 1}
+                      className="p-1.5 border border-slate-800 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition cursor-pointer"
+                      title="Página Anterior"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalRankingPages }).map((_, pIdx) => {
+                        const pageNum = pIdx + 1;
+                        const isNear = Math.abs(pageNum - clampRankingPage) <= 1;
+                        const isEdge = pageNum === 1 || pageNum === totalRankingPages;
+                        
+                        if (!isNear && !isEdge) {
+                          if (pageNum === 2 && clampRankingPage > 3) {
+                            return <span key="ellipsis-start" className="text-slate-600 px-1 font-bold">...</span>;
+                          }
+                          if (pageNum === totalRankingPages - 1 && clampRankingPage < totalRankingPages - 2) {
+                            return <span key="ellipsis-end" className="text-slate-600 px-1 font-bold">...</span>;
+                          }
+                          return null;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setRankingCurrentPage(pageNum)}
+                            className={`min-w-[32px] h-8 px-2 text-xs font-black rounded-lg cursor-pointer transition ${
+                              clampRankingPage === pageNum
+                                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/10'
+                                : 'border border-slate-850 hover:border-slate-700 bg-slate-950/40 text-slate-350 hover:text-white'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => setRankingCurrentPage(prev => Math.min(totalRankingPages, prev + 1))}
+                      disabled={clampRankingPage === totalRankingPages}
+                      className="p-1.5 border border-slate-800 rounded-xl hover:bg-slate-900 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed transition cursor-pointer"
+                      title="Siguiente Página"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* SINGLE MASTER ACCORDION FOR OFFICIAL SCORING SYSTEM (FROM IMAGE) */}
