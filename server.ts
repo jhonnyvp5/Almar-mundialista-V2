@@ -835,7 +835,7 @@ async function startServer() {
 
       const row = checkResult.rows[0];
       return res.json({
-        nombre: row.nombre_completo || row.nombre,
+        nombre: (row.nombre_completo || row.nombre || '').replace(/[\uFFFD\u00A0]/g, 'Ñ'),
         empresa: row.empresa,
         localidad: row.localidad,
         isAllowed: true
@@ -856,7 +856,7 @@ async function startServer() {
       }
 
       const cleanCedula = cedula.trim().replace(/\s+/g, '');
-      const cleanNombre = nombreCompleto.trim();
+      const cleanNombre = nombreCompleto.trim().replace(/[\uFFFD\u00A0]/g, 'Ñ');
       const cleanCorreo = correo.trim().toLowerCase();
 
       if (cleanNombre === '' || cleanCedula === '' || cleanCorreo === '') {
@@ -1513,7 +1513,7 @@ async function startServer() {
       
       const stats = fullRanking.map(r => ({
         id: r.userId,
-        nombre: r.nombreCompleto,
+        nombre: (r.nombreCompleto || '').replace(/[\uFFFD\u00A0]/g, 'Ñ'),
         empresa: r.empresa,
         localidad: r.localidad,
         cedula: r.cedula,

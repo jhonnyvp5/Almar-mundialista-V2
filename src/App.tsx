@@ -63,6 +63,24 @@ export function isEcuadorianCedulaValid(cedula: string): boolean {
   return /^\d+$/.test(cedula);
 }
 
+export function sanitizeText(str?: string): string {
+  if (!str) return '';
+  return str.replace(/[\uFFFD\u00A0]/g, 'Ñ');
+}
+
+export function formatPodiumName(fullName?: string): string {
+  if (!fullName) return '';
+  const cleaned = sanitizeText(fullName);
+  const parts = cleaned.trim().split(/\s+/);
+  const N = parts.length;
+  if (N >= 3) {
+    return `${parts[0]} ${parts[N - 2]}`;
+  } else if (N === 2) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+  return parts[0] || '';
+}
+
 export function getTeamFlagUrl(teamId: string): string {
   const mapping: Record<string, string> = {
     MEX: 'mx', RSA: 'za', KOR: 'kr', CZE: 'cz',
@@ -2288,7 +2306,7 @@ export default function App() {
                 </span>
               </div>
               <p className="text-[10px] text-slate-400">
-                Participante: <span className="font-bold text-amber-400">{currentUser.nombreCompleto}</span> ({currentUser.correo && `${currentUser.correo} • `}{currentUser.empresa} - {currentUser.localidad})
+                Participante: <span className="font-bold text-amber-400">{sanitizeText(currentUser.nombreCompleto)}</span> ({currentUser.correo && `${currentUser.correo} • `}{currentUser.empresa} - {currentUser.localidad})
               </p>
             </div>
           </div>
@@ -3615,8 +3633,8 @@ export default function App() {
                         <div className="relative mb-2 flex flex-col items-center text-center">
                           <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">🥈</span>
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-1">2° Lugar</span>
-                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={ranking[1].nombre}>
-                            {ranking[1].nombre}
+                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={sanitizeText(ranking[1].nombre)}>
+                            {formatPodiumName(ranking[1].nombre)}
                           </div>
                           <div className="text-[9px] text-slate-500 font-semibold truncate max-w-[85px] sm:max-w-[150px]">
                             {ranking[1].empresa || ranking[1].localidad || '-'}
@@ -3654,8 +3672,8 @@ export default function App() {
                         <div className="relative mb-2 flex flex-col items-center text-center">
                           <span className="text-4xl filter drop-shadow-[0_4px_6px_rgba(242,156,17,0.3)]">🥇</span>
                           <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider mt-1">Líder Absoluto</span>
-                          <div className="text-sm font-black text-white mt-0.5 truncate max-w-[100px] sm:max-w-[170px] px-1" title={ranking[0].nombre}>
-                            {ranking[0].nombre}
+                          <div className="text-sm font-black text-white mt-0.5 truncate max-w-[100px] sm:max-w-[170px] px-1" title={sanitizeText(ranking[0].nombre)}>
+                            {formatPodiumName(ranking[0].nombre)}
                           </div>
                           <div className="text-[9px] text-slate-400 font-semibold truncate max-w-[100px] sm:max-w-[170px]">
                             {ranking[0].empresa || ranking[0].localidad || '-'}
@@ -3691,8 +3709,8 @@ export default function App() {
                         <div className="relative mb-2 flex flex-col items-center text-center">
                           <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">🥉</span>
                           <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider mt-1">3° Lugar</span>
-                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={ranking[2].nombre}>
-                            {ranking[2].nombre}
+                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={sanitizeText(ranking[2].nombre)}>
+                            {formatPodiumName(ranking[2].nombre)}
                           </div>
                           <div className="text-[9px] text-slate-500 font-semibold truncate max-w-[85px] sm:max-w-[150px]">
                             {ranking[2].empresa || ranking[2].localidad || '-'}
@@ -3729,8 +3747,8 @@ export default function App() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="text-[10px] bg-slate-900 px-2.5 py-1.5 rounded-lg text-slate-400 font-black font-mono">4°</span>
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-slate-200 truncate" title={ranking[3].nombre}>
-                              {ranking[3].nombre}
+                            <div className="text-xs font-bold text-slate-200 truncate" title={sanitizeText(ranking[3].nombre)}>
+                              {formatPodiumName(ranking[3].nombre)}
                             </div>
                             <div className="text-[9px] text-slate-500 truncate font-semibold">
                               {ranking[3].empresa || ranking[3].localidad || '-'}
@@ -3755,8 +3773,8 @@ export default function App() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="text-[10px] bg-slate-900 px-2.5 py-1.5 rounded-lg text-slate-400 font-black font-mono">5°</span>
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-slate-200 truncate" title={ranking[4].nombre}>
-                              {ranking[4].nombre}
+                            <div className="text-xs font-bold text-slate-200 truncate" title={sanitizeText(ranking[4].nombre)}>
+                              {formatPodiumName(ranking[4].nombre)}
                             </div>
                             <div className="text-[9px] text-slate-500 truncate font-semibold">
                               {ranking[4].empresa || ranking[4].localidad || '-'}
@@ -3799,7 +3817,7 @@ export default function App() {
                           </td>
                           <td className="p-4 font-bold text-slate-250 text-sm">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
-                              <span>{u.nombre}</span>
+                              <span>{sanitizeText(u.nombre)}</span>
                               <span className="text-[10px] text-slate-500 font-medium font-sans">
                                 ({u.empresa || '-'} • {u.localidad || '-'})
                               </span>
@@ -4549,7 +4567,7 @@ export default function App() {
                       <Trophy className="h-3 w-3" />
                       <span>{currentUser.role === 'admin' ? 'Administrador' : 'Participante'}</span>
                     </div>
-                    <h2 className="text-2xl font-black text-white tracking-tight leading-none uppercase pt-1">{currentUser.nombreCompleto}</h2>
+                    <h2 className="text-2xl font-black text-white tracking-tight leading-none uppercase pt-1">{sanitizeText(currentUser.nombreCompleto)}</h2>
                     <p className="text-xs text-slate-400 font-medium font-mono">{currentUser.correo || 'Sin correo registrado'}</p>
                   </div>
                 </div>
@@ -5335,7 +5353,7 @@ export default function App() {
                       >
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="font-extrabold truncate text-white feel-medium flex items-center gap-1">
-                            <span>{usr.nombreCompleto}</span>
+                            <span>{sanitizeText(usr.nombreCompleto)}</span>
                             {usr.role === 'admin' && <span className="bg-rose-600 text-white text-[8px] font-bold px-1.5 rounded uppercase">Admin</span>}
                           </div>
                           <div className="text-[10px] font-mono text-slate-400">CI: {usr.cedula || 'N/D'}{usr.correo && ` • ${usr.correo}`}</div>
