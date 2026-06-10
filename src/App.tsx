@@ -2443,9 +2443,17 @@ export default function App() {
                 <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight uppercase leading-tight">
                   🌍⚽ ¡La fiesta mundialista llega a Almar! ⚽🌍
                 </h1>
-                <p className="text-sm sm:text-base text-slate-300 max-w-3xl font-medium leading-relaxed">
-                  🏆 Es tu momento de demostrar que sabes de fútbol. Predice los resultados de los partidos y si aciertas, ¡entras al sorteo de premios!
-                </p>
+                <div className="text-sm sm:text-base text-slate-300 max-w-2xl font-medium leading-relaxed space-y-3">
+                  <p className="font-black text-amber-400 text-base sm:text-lg">
+                    🏆 ¡Demuestra que eres el verdadero experto en fútbol!
+                  </p>
+                  <p className="text-slate-200">
+                    Pronostica los resultados de cada partido, suma puntos con tus aciertos y compite por el primer lugar. Si terminas como el número 1, ¡ganarás la camiseta oficial de la Selección del Ecuador! 🇪🇨⚽
+                  </p>
+                  <p className="text-xs sm:text-sm text-amber-400/80 font-bold tracking-wide">
+                    ¿Tienes lo necesario para convertirte en el campeón de la Polla Mundialista?
+                  </p>
+                </div>
                 {currentUser?.role !== 'admin' && (
                   <div className="pt-2">
                     <button
