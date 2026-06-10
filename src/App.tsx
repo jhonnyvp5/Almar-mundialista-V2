@@ -168,6 +168,7 @@ export default function App() {
   const [manualThirdPlaces, setManualThirdPlaces] = useState<string[]>([]); // array of teamIds (exactly 8)
   const [manualThirdsByGroup, setManualThirdsByGroup] = useState<Record<string, string>>({}); // group -> teamId or 'no_aplica'
   const [unlockedGroups, setUnlockedGroups] = useState<Record<string, boolean>>({}); // group -> boolean for manual lock bypass
+  const [editingWeeks, setEditingWeeks] = useState<Record<number, boolean>>({});
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'info' | 'groups' | 'calendar' | 'bracket' | 'ranking' | 'admin' | 'profile' | 'awards'>('info');
@@ -1012,7 +1013,8 @@ export default function App() {
     const isWeeklyLocked = isMatchWeeklyLocked(m.date);
     const hasOfficialResult = m.homeScore !== undefined;
     const isExpired = isPastDeadline();
-    const isLocked = isOfficial ? true : m.completed || isTimeLocked || isWeeklyLocked || hasOfficialResult || isExpired;
+    const isKnockoutEditable = currentUser?.role === 'user' && !isExpired;
+    const isLocked = isOfficial ? true : (m.completed && !isKnockoutEditable) || isTimeLocked || isWeeklyLocked || hasOfficialResult || isExpired;
 
     const isDisabled = isOfficial || isLocked || isHomePlaceholder || isAwayPlaceholder;
     const isTie = hScore !== '' && aScore !== '' && parseInt(hScore, 10) === parseInt(aScore, 10);
@@ -1400,11 +1402,96 @@ export default function App() {
         [matchId]: { ...prev[matchId], completed: true }
       }));
       const isGroupStage = matchId.startsWith('G-');
-      if (isGroupStage && currentUser.role === 'user' && !isPastDeadline()) {
+      const isKnockoutStage = matchId.startsWith('K');
+      if ((isGroupStage || isKnockoutStage) && currentUser.role === 'user' && !isPastDeadline()) {
         showToast('💾 ¡Pronóstico guardado con éxito! Podrás editarlo hasta el plazo límite.');
       } else {
         showToast('💾 ¡Pronóstico guardado y bloqueado con éxito!');
       }
+      fetchScoresAndPredictions(currentUser.id);
+    } catch (e) {
+      showToast('Error al conectar con el servidor.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveAllWeeklyPredictions = async (weekNumber: number, weekMatches: Match[]) => {
+    if (!currentUser) return;
+    if (isPastDeadline()) {
+      showToast('❌ El plazo de registro ha expirado.');
+      return;
+    }
+
+    // Find all matches of this week that have entered scores
+    const payload: Record<string, any> = {};
+    let hasPredictionsToSave = false;
+
+    for (const m of weekMatches) {
+      // Check if match is locked (kickoff rules, etc.)
+      const isTimeLocked = isMatchLockedForTime(m);
+      const isWeeklyLocked = isMatchWeeklyLocked(m.date);
+      const hasOfficialResult = m.homeScore !== undefined;
+      const isExpired = isPastDeadline();
+      
+      const isGroupEditable = m.stage === 'group' && currentUser?.role === 'user' && !isExpired;
+      const isKnockoutEditable = m.stage !== 'group' && currentUser?.role === 'user' && !isExpired;
+      
+      const isWeekEditingEnabled = editingWeeks[weekNumber];
+      const isCompleted = !!userPredictions[m.id]?.completed;
+      const isLocked = (isCompleted && !(isGroupEditable || isKnockoutEditable)) || 
+                       (isCompleted && !isWeekEditingEnabled) ||
+                       isTimeLocked || isWeeklyLocked || hasOfficialResult;
+
+      if (isLocked) continue;
+
+      const pred = userPredictions[m.id];
+      if (pred && pred.predictedHome !== '' && pred.predictedAway !== '') {
+        payload[m.id] = {
+          predictedHome: pred.predictedHome,
+          predictedAway: pred.predictedAway,
+          predictedWinnerId: pred.predictedWinnerId,
+          meta: { date: m.date, time: m.time }
+        };
+        hasPredictionsToSave = true;
+      }
+    }
+
+    if (!hasPredictionsToSave) {
+      showToast('⚠️ No hay pronósticos nuevos o válidos ingresados para guardar en esta semana.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/predictions/${currentUser.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ predictions: payload })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(`❌ Error: ${data.error}`);
+        return;
+      }
+
+      // Mark all of those matches as completed in local state, and close editing state
+      setUserPredictions(prev => {
+        const updated = { ...prev };
+        Object.keys(payload).forEach(mId => {
+          updated[mId] = { ...updated[mId], completed: true };
+        });
+        return updated;
+      });
+
+      // Turn off editing state for this week
+      setEditingWeeks(prev => ({
+        ...prev,
+        [weekNumber]: false
+      }));
+
+      showToast(`💾 ¡Todos los pronósticos de la Semana ${weekNumber} se guardaron con éxito!`);
       fetchScoresAndPredictions(currentUser.id);
     } catch (e) {
       showToast('Error al conectar con el servidor.');
@@ -2999,16 +3086,64 @@ export default function App() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {Array.from(new Set(filteredMatches.map(m => getMatchWeek(m.date)))).sort().map(weekNumber => {
+                  {Array.from(new Set(filteredMatches.map(m => getMatchWeek(m.date)))).sort().map(rawWeek => {
+                    const weekNumber = rawWeek as number;
                     const weekMatches = filteredMatches.filter(m => getMatchWeek(m.date) === weekNumber);
+                    const isWeekEditingEnabled = !!editingWeeks[weekNumber];
+                    
                     return (
                       <div key={weekNumber} className="col-span-1 md:col-span-2 space-y-4 mb-4">
-                        <div className="flex items-center gap-3">
-                          <h3 className="text-sm font-extrabold text-white uppercase tracking-widest bg-slate-800 px-4 py-2 rounded-lg shadow-md border border-slate-700 w-full flex justify-between">
-                            <span>Semana {weekNumber}</span>
-                            <span className="text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] rounded flex items-center">{weekMatches.length} partidos</span>
-                          </h3>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 p-3.5 rounded-2xl border border-slate-800/80 w-full">
+                          <div className="flex items-center gap-3">
+                            <h3 className="text-sm font-black text-white uppercase tracking-wider">
+                              Semana {weekNumber}
+                            </h3>
+                            <span className="text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] rounded font-bold font-sans">
+                              {weekMatches.length} partidos
+                            </span>
+                          </div>
+
+                          {/* Batch Action Buttons */}
+                          {currentUser && currentUser.role === 'user' && !isPastDeadline() && (
+                            <div className="flex items-center gap-2.5">
+                              {isWeekEditingEnabled ? (
+                                <>
+                                  <button
+                                    onClick={() => setEditingWeeks(prev => ({ ...prev, [weekNumber]: false }))}
+                                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-1.5 px-3 rounded-xl text-[11px] transition-all flex items-center gap-1 cursor-pointer border border-slate-700 font-sans"
+                                  >
+                                    <span>Cancelar</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleSaveAllWeeklyPredictions(weekNumber, weekMatches)}
+                                    className="bg-gradient-to-r from-emerald-600 to-teal-555 hover:from-emerald-700 hover:to-teal-600 text-white font-extrabold py-1.5 px-4 rounded-xl text-[11px] shadow-md transition-all flex items-center gap-1.5 cursor-pointer font-sans"
+                                  >
+                                    <Save className="h-3 w-3" />
+                                    <span>Guardar Semana {weekNumber}</span>
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => setEditingWeeks(prev => ({ ...prev, [weekNumber]: true }))}
+                                    className="bg-slate-800/80 hover:bg-slate-750 text-amber-400 font-extrabold py-1.5 px-3 rounded-xl text-[11px] transition-all flex items-center gap-1 cursor-pointer border border-amber-500/15 font-sans"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                    <span>Editar Pronósticos</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleSaveAllWeeklyPredictions(weekNumber, weekMatches)}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-1.5 px-3.5 rounded-xl text-[11px] shadow-sm transition-all flex items-center gap-1 cursor-pointer font-sans"
+                                  >
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    <span>Guardar Todo</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {weekMatches.map((m) => {
                             const homeRes = resolveTeamWithManualOverrides(m.homeTeamId);
@@ -3025,8 +3160,7 @@ export default function App() {
                             const isTimeLocked = isMatchLockedForTime(m);
                             const isWeeklyLocked = isMatchWeeklyLocked(m.date);
                             const hasOfficialResult = m.homeScore !== undefined;
-                            const isGroupEditable = m.stage === 'group' && currentUser?.role === 'user' && !isPastDeadline();
-                            const isLocked = (m.completed && !isGroupEditable) || isTimeLocked || isWeeklyLocked || hasOfficialResult;
+                            const isLocked = (m.completed && !isWeekEditingEnabled) || isTimeLocked || isWeeklyLocked || hasOfficialResult;
 
                             return (
                               <div 
@@ -4005,7 +4139,7 @@ export default function App() {
             userPredictions?.award_joven_torneo?.predictedWinnerId?.trim()
           );
           const isDeadlineExpired = isPastDeadline();
-          const isAwardsLocked = hasSavedAwards || isDeadlineExpired;
+          const isAwardsLocked = isDeadlineExpired;
 
           return (
             <div className="space-y-8 animate-fade-in max-w-6xl mx-auto">
@@ -4036,15 +4170,15 @@ export default function App() {
               {renderDeadlineBanner()}
 
               {/* Status Alert Banner */}
-              {hasSavedAwards ? (
+              {isAwardsLocked ? (
                 <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 flex items-start gap-3 shadow-md border-solid border">
                   <Lock className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-sm font-black text-amber-400 uppercase tracking-wide">
-                      🔒 Pronósticos de Premios Registrados
+                      🔒 Pronósticos de Premios Registrados y Bloqueados
                     </h4>
                     <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                      Has ingresado y guardado tus candidatos para los Premios FIFA. Como medida de seguridad y transparencia, <strong className="text-amber-400 font-bold">estos campos se han bloqueado definitivamente</strong> y no es posible editarlos ni realizar modificaciones adicionales.
+                      El plazo de registro ha expirado. Tus candidatos para los Premios FIFA se han guardado y bloqueado definitivamente.
                     </p>
                   </div>
                 </div>
@@ -4056,7 +4190,7 @@ export default function App() {
                       ⚡ Registro Abierto de Candidatos de Premios FIFA
                     </h4>
                     <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                      Ingresa tus candidatos en cada categoría y presiona el botón para guardarlos. <strong className="text-amber-400 font-bold">¡PRECAUCIÓN!</strong> Una vez guardados, no se te permitirá realizar ningún cambio. Asegúrate de verificar muy bien la ortografía y nombres antes de enviar.
+                      Ingresa tus candidatos en cada categoría y presiona el botón <strong className="text-amber-400 font-bold">💾 Guardar</strong>. Puedes editarlos y volver a guardarlos todas las veces que desees hasta la fecha límite.
                     </p>
                   </div>
                 </div>
@@ -4344,16 +4478,16 @@ export default function App() {
                 {!isAwardsLocked && (
                   <div className="pt-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <p className="text-[11px] text-slate-400 font-medium font-sans">
-                      ⚠️ Asegúrate de rellenar las categorías correctamente antes de continuar. No se podrán editar después.
+                      ⚠️ Se guardarán tus candidatos. Puedes editarlos y volver a guardarlos todas las veces que desees antes de la fecha límite.
                     </p>
                     
                     <button
                       type="button"
                       onClick={handleSaveAwardPredictions}
-                      className="px-6 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-600 hover:to-yellow-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl shadow-lg transition-all hover:scale-[1.02] cursor-pointer inline-flex items-center gap-2 w-full sm:w-auto justify-center font-sans font-extrabold"
+                      className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-650 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-lg transition-all hover:scale-[1.02] cursor-pointer inline-flex items-center gap-2 w-full sm:w-auto justify-center font-sans font-extrabold"
                     >
-                      <Save className="h-4 w-4 text-slate-950" />
-                      <span>Registrar Candidatos Definitivamente</span>
+                      <Save className="h-4 w-4 text-white" />
+                      <span>Guardar</span>
                     </button>
                   </div>
                 )}

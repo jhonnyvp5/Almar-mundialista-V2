@@ -1254,10 +1254,11 @@ async function startServer() {
 
       if (!isAward) {
         const isGroupStageItem = matchId.startsWith('G-') || matchId.startsWith('group_override_');
+        const isKnockoutStageItem = matchId.startsWith('K');
         const isBeforeDeadline = Date.now() <= deadlineMs;
-        const isUserGroupBypass = isGroupStageItem && isBeforeDeadline && user.role === 'user';
+        const isUserBypass = (isGroupStageItem || isKnockoutStageItem) && isBeforeDeadline && user.role === 'user';
 
-        if (!isUserGroupBypass) {
+        if (!isUserBypass) {
           // 1. Weekly lock check configured by admin
           if (matchMeta && matchMeta.date) {
             let matchWeek = 1;
