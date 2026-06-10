@@ -127,37 +127,82 @@ const CONFETTI_PARTICLES = Array.from({ length: 48 }).map((_, i) => {
   };
 });
 
-export const AWARDS_BALON_ORO = [
+const getLastNameForSorting = (fullName: string) => {
+  const parts = fullName.trim().split(/\s+/);
+  return parts[parts.length - 1] || fullName;
+};
+
+const sortPlayersByLastName = (players: string[]) => {
+  return [...players].sort((a, b) => {
+    const lastNameA = getLastNameForSorting(a);
+    const lastNameB = getLastNameForSorting(b);
+    return lastNameA.localeCompare(lastNameB, 'es', { sensitivity: 'base' });
+  });
+};
+
+export const AWARDS_BALON_ORO = sortPlayersByLastName([
   "Kylian Mbappé", "Lamine Yamal", "Jude Bellingham", "Vinícius Júnior", "Harry Kane",
   "Jamal Musiala", "Florian Wirtz", "Ousmane Dembélé", "Pedri", "Cole Palmer",
   "Bukayo Saka", "Lautaro Martínez", "Lionel Messi", "Julián Álvarez", "Bruno Fernandes",
   "Vitinha", "Luis Díaz", "Federico Valverde", "Nico Williams", "Mohamed Salah",
   "Erling Haaland", "Cristiano Ronaldo", "Santiago Giménez", "Moisés Caicedo", "Enner Valencia"
-].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+]);
 
-export const AWARDS_BOTA_ORO = [
+export const AWARDS_BOTA_ORO = sortPlayersByLastName([
   "Kylian Mbappé", "Harry Kane", "Erling Haaland", "Lautaro Martínez", "Julián Álvarez",
   "Vinícius Júnior", "Cristiano Ronaldo", "Mohamed Salah", "Victor Osimhen", "Luis Díaz",
   "Santiago Giménez", "Jonathan David", "Alexander Isak", "Gonçalo Ramos", "Patrik Schick",
   "Benjamin Šeško", "Enner Valencia", "Rodrygo", "Ousmane Dembélé", "Michael Olise",
   "Lamine Yamal", "Akram Afif", "Almoez Ali", "Mikel Oyarzabal", "Julián Quiñones", "Lionel Messi"
-].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+]);
 
-export const AWARDS_GUANTE_ORO = [
+export const AWARDS_GUANTE_ORO = sortPlayersByLastName([
   "Emiliano Martínez", "Alisson Becker", "Unai Simón", "Mike Maignan",
   "Thibaut Courtois", "Diogo Costa", "David Raya", "Gregor Kobel", "Jordan Pickford",
   "Ederson", "Yann Sommer", "Jan Oblak", "Bart Verbruggen", "Andriy Lunin",
   "Giorgi Mamardashvili", "André Onana", "Kevin Mier", "Camilo Vargas", "Guillermo Ochoa",
   "Hernán Galíndez", "Dominik Livaković", "Meshaal Barsham", "Zion Suzuki", "Matt Turner"
-].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+]);
 
-export const AWARDS_JOVEN_TORNEO = [
+export const AWARDS_JOVEN_TORNEO = sortPlayersByLastName([
   "Lamine Yamal", "Endrick", "Pau Cubarsí", "Warren Zaïre-Emery", "João Neves",
   "Désiré Doué", "Arda Güler", "Kendry Páez", "Gilberto Mora",
   "Geovany Quenda", "Jorrel Hato", "Ethan Nwaneri",
   "Mathys Tel", "Bilal El Khannouss", "Abdukodir Khusanov", "Yan Diomande", "Lennart Karl",
   "Nico O'Reilly", "Assane Diao", "Lucas Bergvall", "Finn Surman"
-].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+]);
+
+export const getWeekName = (week: number | string): string => {
+  const w = Number(week);
+  switch (w) {
+    case 1: return "Semana 1 (11 Jun - 14 Jun)";
+    case 2: return "Semana 2 (15 Jun - 21 Jun)";
+    case 3: return "Semana 3 (22 Jun - 28 Jun)";
+    case 4: return "Round 32";
+    case 5: return "Round 1/8";
+    case 6: return "Round 1/4";
+    case 7: return "Round 1/2";
+    case 8: return "Round 3er Puesto";
+    case 9: return "Gran final";
+    default: return `Semana ${week}`;
+  }
+};
+
+export const getWeekNameShort = (week: number | string): string => {
+  const w = Number(week);
+  switch (w) {
+    case 1: return "Semana 1";
+    case 2: return "Semana 2";
+    case 3: return "Semana 3";
+    case 4: return "Round 32";
+    case 5: return "Round 1/8";
+    case 6: return "Round 1/4";
+    case 7: return "Round 1/2";
+    case 8: return "Round 3er Puesto";
+    case 9: return "Gran final";
+    default: return `Semana ${week}`;
+  }
+};
 
 export default function App() {
   // Splash Screen State
@@ -1318,7 +1363,7 @@ export default function App() {
     }
 
     const isTimeLocked = isMatchLockedForTime(m);
-    const isWeeklyLocked = isMatchWeeklyLocked(m.date);
+    const isWeeklyLocked = isMatchWeeklyLocked(m.date, m.stage);
     const hasOfficialResult = m.homeScore !== undefined;
     const isExpired = isPastDeadline();
     const isKnockoutEditable = currentUser?.role === 'user' && !isExpired;
@@ -1623,18 +1668,41 @@ export default function App() {
     return (firstMatchTimeMs - serverTimeMs) <= 60 * 60 * 1000;
   };
 
-  const getMatchWeek = (matchDate: string): number => {
+  const getMatchWeek = (matchDate: string, stage?: StageType): number => {
     if (!matchDate) return 1;
+    if (stage) {
+      if (stage === 'group') {
+        if (matchDate <= '2026-06-14') return 1;
+        if (matchDate <= '2026-06-21') return 2;
+        return 3;
+      } else if (stage === '1/16') {
+        return 4; // Round 32
+      } else if (stage === '1/8') {
+        return 5; // Round 1/8
+      } else if (stage === '1/4') {
+        return 6; // Round 1/4
+      } else if (stage === '1/2') {
+        return 7; // Round 1/2
+      } else if (stage === 'third_place') {
+        return 8; // Round 3er Puesto
+      } else if (stage === 'final') {
+        return 9; // Gran final
+      }
+    }
+    // Fallback based on date
     if (matchDate <= '2026-06-14') return 1;
     if (matchDate <= '2026-06-21') return 2;
     if (matchDate <= '2026-06-28') return 3;
-    if (matchDate <= '2026-07-05') return 4;
-    if (matchDate <= '2026-07-12') return 5;
-    return 6;
+    if (matchDate <= '2026-07-03') return 4;
+    if (matchDate <= '2026-07-07') return 5;
+    if (matchDate <= '2026-07-11') return 6;
+    if (matchDate <= '2026-07-15') return 7;
+    if (matchDate <= '2026-07-18') return 8;
+    return 9;
   };
 
-  const isMatchWeeklyLocked = (matchDate: string): boolean => {
-    const matchWeek = getMatchWeek(matchDate);
+  const isMatchWeeklyLocked = (matchDate: string, stage?: StageType): boolean => {
+    const matchWeek = getMatchWeek(matchDate, stage);
     return matchWeek !== unlockedWeek;
   };
 
@@ -1738,7 +1806,7 @@ export default function App() {
     for (const m of weekMatches) {
       // Check if match is locked (kickoff rules, etc.)
       const isTimeLocked = isMatchLockedForTime(m);
-      const isWeeklyLocked = isMatchWeeklyLocked(m.date);
+      const isWeeklyLocked = isMatchWeeklyLocked(m.date, m.stage);
       const hasOfficialResult = m.homeScore !== undefined;
       const isExpired = isPastDeadline();
       
@@ -3394,9 +3462,12 @@ export default function App() {
                     <option value="1">Semana 1 (11 Jun - 14 Jun){unlockedWeek === 1 ? ' ⭐ (Semana Activa)' : ''}</option>
                     <option value="2">Semana 2 (15 Jun - 21 Jun){unlockedWeek === 2 ? ' ⭐ (Semana Activa)' : ''}</option>
                     <option value="3">Semana 3 (22 Jun - 28 Jun){unlockedWeek === 3 ? ' ⭐ (Semana Activa)' : ''}</option>
-                    <option value="4">Semana 4 (29 Jun - 05 Jul){unlockedWeek === 4 ? ' ⭐ (Semana Activa)' : ''}</option>
-                    <option value="5">Semana 5 (06 Jul - 12 Jul){unlockedWeek === 5 ? ' ⭐ (Semana Activa)' : ''}</option>
-                    <option value="6">Semana 6 (13 Jul - 19 Jul){unlockedWeek === 6 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="4">Round 32 (29 Jun - 05 Jul){unlockedWeek === 4 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="5">Round 1/8 (06 Jul - 07 Jul){unlockedWeek === 5 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="6">Round 1/4 (09 Jul - 11 Jul){unlockedWeek === 6 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="7">Round 1/2 (14 Jul - 15 Jul){unlockedWeek === 7 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="8">Round 3er Puesto (18 Jul){unlockedWeek === 8 ? ' ⭐ (Semana Activa)' : ''}</option>
+                    <option value="9">Gran final (19 Jul){unlockedWeek === 9 ? ' ⭐ (Semana Activa)' : ''}</option>
                   </select>
                 </div>
 
@@ -3513,7 +3584,7 @@ export default function App() {
 
                             // Match locked criteria (kickoff rules, weekly lock or completed)
                             const isTimeLocked = isMatchLockedForTime(m);
-                            const isWeeklyLocked = isMatchWeeklyLocked(m.date);
+                            const isWeeklyLocked = isMatchWeeklyLocked(m.date, m.stage);
                             const hasOfficialResult = m.homeScore !== undefined;
                             const isLocked = (m.completed && !isWeekEditingEnabled) || isTimeLocked || isWeeklyLocked || hasOfficialResult;
 
@@ -6020,9 +6091,12 @@ export default function App() {
                       <option value="1">Semana 1</option>
                       <option value="2">Semana 2</option>
                       <option value="3">Semana 3</option>
-                      <option value="4">Semana 4</option>
-                      <option value="5">Semana 5</option>
-                      <option value="6">Semana 6</option>
+                      <option value="4">Round 32</option>
+                      <option value="5">Round 1/8</option>
+                      <option value="6">Round 1/4</option>
+                      <option value="7">Round 1/2</option>
+                      <option value="8">Round 3er Puesto</option>
+                      <option value="9">Gran final</option>
                     </select>
                   </div>
 
@@ -6048,7 +6122,7 @@ export default function App() {
                 {(() => {
                   const items = initialMatches.filter(m => {
                     if (scheduleStageFilter !== 'all' && m.stage !== scheduleStageFilter) return false;
-                    const matchWeek = m.date ? getMatchWeek(m.date).toString() : '';
+                    const matchWeek = m.date ? getMatchWeek(m.date, m.stage).toString() : '';
                     if (scheduleWeekFilter !== 'all' && matchWeek !== scheduleWeekFilter) return false;
                     if (scheduleGroupFilter !== 'all' && m.group !== scheduleGroupFilter) return false;
                     return true;
@@ -6173,9 +6247,12 @@ export default function App() {
                       <option value="1">Semana 1</option>
                       <option value="2">Semana 2</option>
                       <option value="3">Semana 3</option>
-                      <option value="4">Semana 4</option>
-                      <option value="5">Semana 5</option>
-                      <option value="6">Semana 6</option>
+                      <option value="4">Round 32</option>
+                      <option value="5">Round 1/8</option>
+                      <option value="6">Round 1/4</option>
+                      <option value="7">Round 1/2</option>
+                      <option value="8">Round 3er Puesto</option>
+                      <option value="9">Gran final</option>
                     </select>
                   </div>
                 </div>
@@ -6183,7 +6260,7 @@ export default function App() {
                 <div className="overflow-y-auto max-h-[380px] space-y-3 pr-1">
                   {combinedMatches
                     .filter(m => selectedAdminMatchStage === 'all' || m.stage === selectedAdminMatchStage)
-                    .filter(m => selectedAdminMatchWeek === 'all' || getMatchWeek(m.date).toString() === selectedAdminMatchWeek)
+                    .filter(m => selectedAdminMatchWeek === 'all' || getMatchWeek(m.date, m.stage).toString() === selectedAdminMatchWeek)
                     .map((m) => {
                       const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, true);
                       const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, true);
@@ -6350,89 +6427,37 @@ export default function App() {
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-slate-400 font-bold uppercase mr-1">Activa:</span>
                       <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-lg border border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                        Semana {unlockedWeek}
+                        {getWeekNameShort(unlockedWeek)}
                       </span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateUnlockedWeek(1)}
-                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                        unlockedWeek === 1
-                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-[11px] font-black uppercase">Semana 1</span>
-                      <span className="text-[8px] font-bold opacity-60 font-mono">(11 - 14 Jun)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateUnlockedWeek(2)}
-                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                        unlockedWeek === 2
-                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-[11px] font-black uppercase">Semana 2</span>
-                      <span className="text-[8px] font-bold opacity-60 font-mono">(15 - 21 Jun)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateUnlockedWeek(3)}
-                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                        unlockedWeek === 3
-                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-[11px] font-black uppercase">Semana 3</span>
-                      <span className="text-[8px] font-bold opacity-60 font-mono">(22 - 28 Jun)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateUnlockedWeek(4)}
-                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                        unlockedWeek === 4
-                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-[11px] font-black uppercase">Semana 4</span>
-                      <span className="text-[8px] font-bold opacity-60 font-mono">(29 Jun - 05 Jul)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateUnlockedWeek(5)}
-                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                        unlockedWeek === 5
-                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-[11px] font-black uppercase">Semana 5</span>
-                      <span className="text-[8px] font-bold opacity-60 font-mono">(06 - 12 Jul)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateUnlockedWeek(6)}
-                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                        unlockedWeek === 6
-                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                      }`}
-                    >
-                      <span className="text-[11px] font-black uppercase">Semana 6</span>
-                      <span className="text-[8px] font-bold opacity-60 font-mono">(13 - 19 Jul)</span>
-                    </button>
+                    {[
+                      { id: 1, label: "Semana 1", date: "(11 - 14 Jun)" },
+                      { id: 2, label: "Semana 2", date: "(15 - 21 Jun)" },
+                      { id: 3, label: "Semana 3", date: "(22 - 28 Jun)" },
+                      { id: 4, label: "Round 32", date: "(29 Jun - 05 Jul)" },
+                      { id: 5, label: "Round 1/8", date: "(06 - 07 Jul)" },
+                      { id: 6, label: "Round 1/4", date: "(09 - 11 Jul)" },
+                      { id: 7, label: "Round 1/2", date: "(14 - 15 Jul)" },
+                      { id: 8, label: "3er Puesto", date: "(18 Jul)" },
+                      { id: 9, label: "Gran final", date: "(19 Jul)" }
+                    ].map(w => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        onClick={() => handleUpdateUnlockedWeek(w.id)}
+                        className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                          unlockedWeek === w.id
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                            : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-[11px] font-black uppercase">{w.label}</span>
+                        <span className="text-[8px] font-bold opacity-60 font-mono">{w.date}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
 

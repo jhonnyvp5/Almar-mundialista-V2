@@ -1089,14 +1089,36 @@ async function startServer() {
     // Build Ranking general stats first to export rich info
     const scores = calculateRankingStats(db);
     
-    const getMatchWeek = (matchDate: string): number => {
+    const getMatchWeek = (matchDate: string, matchStage?: string): number => {
       if (!matchDate) return 1;
+      if (matchStage) {
+        if (matchStage === 'group') {
+          if (matchDate <= '2026-06-14') return 1;
+          if (matchDate <= '2026-06-21') return 2;
+          return 3;
+        } else if (matchStage === '1/16') {
+          return 4;
+        } else if (matchStage === '1/8') {
+          return 5;
+        } else if (matchStage === '1/4') {
+          return 6;
+        } else if (matchStage === '1/2') {
+          return 7;
+        } else if (matchStage === 'third_place') {
+          return 8;
+        } else if (matchStage === 'final') {
+          return 9;
+        }
+      }
       if (matchDate <= '2026-06-14') return 1;
       if (matchDate <= '2026-06-21') return 2;
       if (matchDate <= '2026-06-28') return 3;
-      if (matchDate <= '2026-07-05') return 4;
-      if (matchDate <= '2026-07-12') return 5;
-      return 6;
+      if (matchDate <= '2026-07-03') return 4;
+      if (matchDate <= '2026-07-07') return 5;
+      if (matchDate <= '2026-07-11') return 6;
+      if (matchDate <= '2026-07-15') return 7;
+      if (matchDate <= '2026-07-18') return 8;
+      return 9;
     };
 
     const getTeamName = (teamId: string) => {
@@ -1106,7 +1128,7 @@ async function startServer() {
 
     const unlockedWeek = db.config?.unlockedWeek || 1;
     const allMatches = [...generateGroupStageMatches(), ...generateKnockoutMatches()];
-    const weekMatches = allMatches.filter(m => getMatchWeek(m.date) === unlockedWeek);
+    const weekMatches = allMatches.filter(m => getMatchWeek(m.date, m.stage) === unlockedWeek);
     const knockoutMatches = generateKnockoutMatches();
 
     // Sheet 1: Pronósticos Semana Activada
@@ -1314,23 +1336,52 @@ async function startServer() {
           // 1. Weekly lock check configured by admin
           if (matchMeta && matchMeta.date) {
             let matchWeek = 1;
-            if (matchMeta.date <= '2026-06-14') {
-              matchWeek = 1;
-            } else if (matchMeta.date <= '2026-06-21') {
-              matchWeek = 2;
-            } else if (matchMeta.date <= '2026-06-28') {
-              matchWeek = 3;
-            } else if (matchMeta.date <= '2026-07-05') {
-              matchWeek = 4;
-            } else if (matchMeta.date <= '2026-07-12') {
-              matchWeek = 5;
+            if (matchMeta.stage) {
+              const stage = matchMeta.stage;
+              if (stage === 'group') {
+                if (matchMeta.date <= '2026-06-14') matchWeek = 1;
+                else if (matchMeta.date <= '2026-06-21') matchWeek = 2;
+                else matchWeek = 3;
+              } else if (stage === '1/16') {
+                matchWeek = 4;
+              } else if (stage === '1/8') {
+                matchWeek = 5;
+              } else if (stage === '1/4') {
+                matchWeek = 6;
+              } else if (stage === '1/2') {
+                matchWeek = 7;
+              } else if (stage === 'third_place') {
+                matchWeek = 8;
+              } else if (stage === 'final') {
+                matchWeek = 9;
+              }
             } else {
-              matchWeek = 6;
+              // Fallback based on date
+              if (matchMeta.date <= '2026-06-14') matchWeek = 1;
+              else if (matchMeta.date <= '2026-06-21') matchWeek = 2;
+              else if (matchMeta.date <= '2026-06-28') matchWeek = 3;
+              else if (matchMeta.date <= '2026-07-03') matchWeek = 4;
+              else if (matchMeta.date <= '2026-07-07') matchWeek = 5;
+              else if (matchMeta.date <= '2026-07-11') matchWeek = 6;
+              else if (matchMeta.date <= '2026-07-15') matchWeek = 7;
+              else if (matchMeta.date <= '2026-07-18') matchWeek = 8;
+              else matchWeek = 9;
             }
 
             const unlockedWeek = db.config?.unlockedWeek || 1;
             if (matchWeek !== unlockedWeek) {
-              return res.status(400).json({ error: `La Semana ${matchWeek} está bloqueada. Actualmente la única semana habilitada es la Semana ${unlockedWeek}.` });
+              const getWeekLabel = (wk: number) => {
+                if (wk === 1) return "Semana 1";
+                if (wk === 2) return "Semana 2";
+                if (wk === 3) return "Semana 3";
+                if (wk === 4) return "Round 32";
+                if (wk === 5) return "Round 1/8";
+                if (wk === 6) return "Round 1/4";
+                if (wk === 7) return "Round 1/2";
+                if (wk === 8) return "Round 3er Puesto";
+                return "Gran final";
+              };
+              return res.status(400).json({ error: `${getWeekLabel(matchWeek)} está bloqueada. Actualmente la única habilitada es ${getWeekLabel(unlockedWeek)}.` });
             }
           }
 
@@ -1382,8 +1433,8 @@ async function startServer() {
     }
 
     const numWeek = parseInt(unlockedWeek, 10);
-    if (numWeek < 1 || numWeek > 6) {
-      return res.status(400).json({ error: 'Semana no válida. Debe ser del 1 al 6.' });
+    if (numWeek < 1 || numWeek > 9) {
+      return res.status(400).json({ error: 'Semana no válida. Debe ser del 1 al 9.' });
     }
 
     if (!db.config) {
