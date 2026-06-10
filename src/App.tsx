@@ -2041,6 +2041,10 @@ export default function App() {
           >
             Saltar Intro ➔
           </button>
+
+          <p className="text-[9.5px] text-slate-500 font-medium mt-5 text-center select-none opacity-80 max-w-[280px]">
+            Polla Mundialista 2026. Todos los derechos reservados. Desarrollado por Jhonny Vargas
+          </p>
         </div>
 
       </div>
