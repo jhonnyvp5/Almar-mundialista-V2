@@ -658,7 +658,7 @@ export default function App() {
       const s = seconds[gId];
       const t = thirds[gId];
       if (f && s && t) {
-        handleSaveGroupSelections(gId, f, s, t);
+        handleSaveGroupSelections(gId, f, s, t, true);
       }
     });
 
@@ -775,10 +775,10 @@ export default function App() {
   };
 
   // Save manual classification of completed group to DB
-  const handleSaveGroupSelections = async (gId: string, firstVal: string, secondVal: string, thirdVal: string) => {
+  const handleSaveGroupSelections = async (gId: string, firstVal: string, secondVal: string, thirdVal: string, silent = false) => {
     if (!currentUser) return;
     if (isPastDeadline()) {
-      showToast('❌ El plazo de registro ha expirado.');
+      if (!silent) showToast('❌ El plazo de registro ha expirado.');
       return;
     }
     
@@ -811,32 +811,23 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         setUserPredictions(prev => ({ ...prev, ...payload }));
-        showToast(`✅ ¡Grupo ${gId} guardado con éxito!`);
+        if (!silent) {
+          showToast(`✅ ¡Grupo ${gId} guardado con éxito!`);
+        }
       } else {
-        showToast(`❌ Error al guardar clasificación del Grupo ${gId}: ${data.error || 'Intente de nuevo'}`);
+        if (!silent) {
+          showToast(`❌ Error al guardar clasificación del Grupo ${gId}: ${data.error || 'Intente de nuevo'}`);
+        }
       }
     } catch (err) {
       console.error(err);
-      showToast(`❌ Error de conexión al guardar Grupo ${gId}`);
+      if (!silent) {
+        showToast(`❌ Error de conexión al guardar Grupo ${gId}`);
+      }
     }
   };
 
-  // Helper verifying if a group is fully selected and triggers saving
-  const checkAndSaveGroup = (gId: string, firstVal: string, secondVal: string, thirdVal: string) => {
-    if (firstVal && secondVal && thirdVal) {
-      // Check if they match current saved to avoid unnecessary API writes
-      const currentFirst = userPredictions[`group_override_first_${gId}`]?.predictedWinnerId;
-      const currentSecond = userPredictions[`group_override_second_${gId}`]?.predictedWinnerId;
-      const currentThird = userPredictions[`group_override_third_${gId}`]?.predictedWinnerId;
-      
-      if (currentFirst === firstVal && currentSecond === secondVal && currentThird === thirdVal) {
-        return;
-      }
-      
-      // Auto-save
-      handleSaveGroupSelections(gId, firstVal, secondVal, thirdVal);
-    }
-  };
+
 
   // Resolve team function that respects the Official Admin Bracket OR the user's manual selections
   const resolveTeamWithManualOverrides = (id: string, isOfficial: boolean = false): Team | { placeholder: string; text: string } => {
@@ -2581,9 +2572,8 @@ export default function App() {
                         userPredictions[`group_override_second_${gId}`]?.predictedWinnerId &&
                         userPredictions[`group_override_third_${gId}`]?.predictedWinnerId
                       );
-                      const isCompleted = isGroupOverriddenInDb || !!(manualFirstPlaces[gId] && manualSecondPlaces[gId] && manualThirdsByGroup[gId]);
                       const isGroupEditable = currentUser?.role === 'user' && !isGroupStageSelectionsLocked();
-                      const isLockedByAutoSave = isCompleted && (!unlockedGroups[gId] || (isGroupOverriddenInDb && !isGroupEditable));
+                      const isLockedByAutoSave = isGroupOverriddenInDb && !unlockedGroups[gId];
                       const isDisabled = isGroupStageSelectionsLocked() || isLockedByAutoSave;
 
                       return (
@@ -2593,20 +2583,31 @@ export default function App() {
                               {(isGroupStageSelectionsLocked() || isLockedByAutoSave) && <Lock className="h-3 w-3 text-red-400 shrink-0" />}
                               <span>{isGroupOverriddenInDb && !isGroupEditable ? '🔒 Registro Guardado en Base de Datos' : (isLockedByAutoSave ? '🔒 Posiciones Guardadas' : 'Selección Manual (Clasificados)')}</span>
                             </div>
-                            {isCompleted && !isGroupStageSelectionsLocked() && (!isGroupOverriddenInDb || isGroupEditable) && (
+                            {!isGroupStageSelectionsLocked() && (
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const currentVal = !unlockedGroups[gId];
-                                  setUnlockedGroups(prev => ({ ...prev, [gId]: currentVal }));
-                                  if (!currentVal) {
-                                    // Lock triggers saving
-                                    checkAndSaveGroup(gId, manualFirstPlaces[gId] || '', manualSecondPlaces[gId] || '', manualThirdsByGroup[gId] || '');
+                                  if (isLockedByAutoSave) {
+                                    // Unlock / Cambiar
+                                    setUnlockedGroups(prev => ({ ...prev, [gId]: true }));
+                                  } else {
+                                    // Save / Guardar
+                                    const firstVal = manualFirstPlaces[gId] || '';
+                                    const secondVal = manualSecondPlaces[gId] || '';
+                                    const thirdVal = manualThirdsByGroup[gId] || '';
+                                    
+                                    if (!firstVal || !secondVal || !thirdVal) {
+                                      showToast('⚠️ Por favor selecciona las posiciones del 1er, 2do y 3er lugar antes de guardar.');
+                                      return;
+                                    }
+                                    
+                                    handleSaveGroupSelections(gId, firstVal, secondVal, thirdVal);
+                                    setUnlockedGroups(prev => ({ ...prev, [gId]: false }));
                                   }
                                 }}
                                 className="text-[10px] text-amber-500 hover:text-amber-400 border border-amber-500/40 rounded-lg px-2 py-0.5 bg-amber-500/5 hover:bg-amber-500/15 cursor-pointer transition-all flex items-center gap-1 shadow-sm font-bold"
                               >
-                                {unlockedGroups[gId] ? '💾 Guardar' : '✏️ Cambiar'}
+                                {isLockedByAutoSave ? '✏️ Cambiar' : '💾 Guardar'}
                               </button>
                             )}
                           </div>
@@ -2629,11 +2630,7 @@ export default function App() {
                                     value={firstSelected}
                                     onChange={(e) => {
                                       const val = e.target.value;
-                                      setManualFirstPlaces(prev => {
-                                        const updated = { ...prev, [gId]: val };
-                                        checkAndSaveGroup(gId, val, secondSelected, thirdSelected);
-                                        return updated;
-                                      });
+                                      setManualFirstPlaces(prev => ({ ...prev, [gId]: val }));
                                     }}
                                     className={`bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-amber-400 font-bold focus:outline-none transition-opacity ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >
@@ -2649,11 +2646,7 @@ export default function App() {
                                     value={secondSelected}
                                     onChange={(e) => {
                                       const val = e.target.value;
-                                      setManualSecondPlaces(prev => {
-                                        const updated = { ...prev, [gId]: val };
-                                        checkAndSaveGroup(gId, firstSelected, val, thirdSelected);
-                                        return updated;
-                                      });
+                                      setManualSecondPlaces(prev => ({ ...prev, [gId]: val }));
                                     }}
                                     className={`bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-amber-400 font-bold focus:outline-none transition-opacity ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >
@@ -2675,15 +2668,12 @@ export default function App() {
                                       const val = e.target.value;
                                       const oldTeamId = thirdSelected;
                                       
-                                      let finalThirdVal = '';
                                       if (val === 'no_aplica') {
-                                        finalThirdVal = 'no_aplica';
                                         setManualThirdsByGroup(prev => ({ ...prev, [gId]: 'no_aplica' }));
                                         if (oldTeamId) {
                                           setManualThirdPlaces(prev => prev.filter(tid => tid !== oldTeamId));
                                         }
                                       } else if (!val) {
-                                        finalThirdVal = '';
                                         setManualThirdsByGroup(prev => ({ ...prev, [gId]: '' }));
                                         if (oldTeamId) {
                                           setManualThirdPlaces(prev => prev.filter(tid => tid !== oldTeamId));
@@ -2694,7 +2684,6 @@ export default function App() {
                                           showToast('⚠️ Solo se permiten 8 mejores terceros clasificados. Cambie otro grupo a "No aplica" o deselecciónelo antes.');
                                           return;
                                         }
-                                        finalThirdVal = val;
                                         setManualThirdsByGroup(prev => ({ ...prev, [gId]: val }));
                                         setManualThirdPlaces(prev => {
                                           const updated = prev.filter(tid => tid !== oldTeamId);
@@ -2704,8 +2693,6 @@ export default function App() {
                                           return updated;
                                         });
                                       }
-
-                                      checkAndSaveGroup(gId, firstSelected, secondSelected, finalThirdVal);
                                     }}
                                     className={`bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-amber-400 font-bold focus:outline-none transition-opacity ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >
