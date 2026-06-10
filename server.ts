@@ -1253,37 +1253,43 @@ async function startServer() {
       const isAward = matchId.startsWith('award_');
 
       if (!isAward) {
-        // 1. Weekly lock check configured by admin
-        if (matchMeta && matchMeta.date) {
-          let matchWeek = 1;
-          if (matchMeta.date <= '2026-06-14') {
-            matchWeek = 1;
-          } else if (matchMeta.date <= '2026-06-21') {
-            matchWeek = 2;
-          } else if (matchMeta.date <= '2026-06-28') {
-            matchWeek = 3;
-          } else if (matchMeta.date <= '2026-07-05') {
-            matchWeek = 4;
-          } else if (matchMeta.date <= '2026-07-12') {
-            matchWeek = 5;
-          } else {
-            matchWeek = 6;
+        const isGroupStageItem = matchId.startsWith('G-') || matchId.startsWith('group_override_');
+        const isBeforeDeadline = Date.now() <= deadlineMs;
+        const isUserGroupBypass = isGroupStageItem && isBeforeDeadline && user.role === 'user';
+
+        if (!isUserGroupBypass) {
+          // 1. Weekly lock check configured by admin
+          if (matchMeta && matchMeta.date) {
+            let matchWeek = 1;
+            if (matchMeta.date <= '2026-06-14') {
+              matchWeek = 1;
+            } else if (matchMeta.date <= '2026-06-21') {
+              matchWeek = 2;
+            } else if (matchMeta.date <= '2026-06-28') {
+              matchWeek = 3;
+            } else if (matchMeta.date <= '2026-07-05') {
+              matchWeek = 4;
+            } else if (matchMeta.date <= '2026-07-12') {
+              matchWeek = 5;
+            } else {
+              matchWeek = 6;
+            }
+
+            const unlockedWeek = db.config?.unlockedWeek || 1;
+            if (matchWeek !== unlockedWeek) {
+              return res.status(400).json({ error: `La Semana ${matchWeek} está bloqueada. Actualmente la única semana habilitada es la Semana ${unlockedWeek}.` });
+            }
           }
 
-          const unlockedWeek = db.config?.unlockedWeek || 1;
-          if (matchWeek !== unlockedWeek) {
-            return res.status(400).json({ error: `La Semana ${matchWeek} está bloqueada. Actualmente la única semana habilitada es la Semana ${unlockedWeek}.` });
+          // 2. Time Lock check (exactly 1 hour before kickoff)
+          if (matchMeta && !isBeforeMatchOneHour(matchMeta.date, matchMeta.time)) {
+            return res.status(400).json({ error: `El partido con ID ${matchId} ya está cerrado debido a que falta menos de 1 hora para su inicio.` });
           }
-        }
 
-        // 2. Time Lock check (exactly 1 hour before kickoff)
-        if (matchMeta && !isBeforeMatchOneHour(matchMeta.date, matchMeta.time)) {
-          return res.status(400).json({ error: `El partido con ID ${matchId} ya está cerrado debido a que falta menos de 1 hora para su inicio.` });
-        }
-
-        // 3. Already completed lock check
-        if (currentSaved[matchId] && currentSaved[matchId].completed) {
-          return res.status(400).json({ error: `El pronóstico para el partido ${matchId} ya fue registrado anteriormente y está bloqueado para edición.` });
+          // 3. Already completed lock check
+          if (currentSaved[matchId] && currentSaved[matchId].completed) {
+            return res.status(400).json({ error: `El pronóstico para el partido ${matchId} ya fue registrado anteriormente y está bloqueado para edición.` });
+          }
         }
       }
 

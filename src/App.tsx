@@ -1310,8 +1310,11 @@ export default function App() {
     return (matchTimeMs - serverTimeMs) <= 60 * 60 * 1000;
   };
 
-  // Check if group stage manual classification is locked (1 hour before first match start)
+  // Check if group stage manual classification is locked (1 hour before first match start, but allowed for standard user until deadline)
   const isGroupStageSelectionsLocked = (): boolean => {
+    if (currentUser?.role === 'user') {
+      return isPastDeadline();
+    }
     if (isPastDeadline()) return true;
     const serverTimeMs = Date.now();
     // First match starts on 2026-06-11 at 14:00. Note: month 5 is June (0-indexed)
@@ -1405,7 +1408,12 @@ export default function App() {
         ...prev,
         [matchId]: { ...prev[matchId], completed: true }
       }));
-      showToast('💾 ¡Pronóstico guardado y bloqueado con éxito!');
+      const isGroupStage = matchId.startsWith('G-');
+      if (isGroupStage && currentUser.role === 'user' && !isPastDeadline()) {
+        showToast('💾 ¡Pronóstico guardado con éxito! Podrás editarlo hasta el plazo límite.');
+      } else {
+        showToast('💾 ¡Pronóstico guardado y bloqueado con éxito!');
+      }
       fetchScoresAndPredictions(currentUser.id);
     } catch (e) {
       showToast('Error al conectar con el servidor.');
@@ -2574,7 +2582,8 @@ export default function App() {
                         userPredictions[`group_override_third_${gId}`]?.predictedWinnerId
                       );
                       const isCompleted = isGroupOverriddenInDb || !!(manualFirstPlaces[gId] && manualSecondPlaces[gId] && manualThirdsByGroup[gId]);
-                      const isLockedByAutoSave = isCompleted && (!unlockedGroups[gId] || isGroupOverriddenInDb);
+                      const isGroupEditable = currentUser?.role === 'user' && !isGroupStageSelectionsLocked();
+                      const isLockedByAutoSave = isCompleted && (!unlockedGroups[gId] || (isGroupOverriddenInDb && !isGroupEditable));
                       const isDisabled = isGroupStageSelectionsLocked() || isLockedByAutoSave;
 
                       return (
@@ -2582,9 +2591,9 @@ export default function App() {
                           <div className="font-bold text-slate-300 uppercase text-[9px] tracking-wider mb-1.5 flex items-center justify-between gap-1">
                             <div className="flex items-center gap-1">
                               {(isGroupStageSelectionsLocked() || isLockedByAutoSave) && <Lock className="h-3 w-3 text-red-400 shrink-0" />}
-                              <span>{isGroupOverriddenInDb ? '🔒 Registro Guardado en Base de Datos' : (isLockedByAutoSave ? '🔒 Gp. Guardado y Bloqueado' : 'Selección Manual (Clasificados)')}</span>
+                              <span>{isGroupOverriddenInDb && !isGroupEditable ? '🔒 Registro Guardado en Base de Datos' : (isLockedByAutoSave ? '🔒 Gp. Guardado y Bloqueado' : 'Selección Manual (Clasificados)')}</span>
                             </div>
-                            {isCompleted && !isGroupStageSelectionsLocked() && !isGroupOverriddenInDb && (
+                            {isCompleted && !isGroupStageSelectionsLocked() && (!isGroupOverriddenInDb || isGroupEditable) && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -3029,7 +3038,8 @@ export default function App() {
                             const isTimeLocked = isMatchLockedForTime(m);
                             const isWeeklyLocked = isMatchWeeklyLocked(m.date);
                             const hasOfficialResult = m.homeScore !== undefined;
-                            const isLocked = m.completed || isTimeLocked || isWeeklyLocked || hasOfficialResult;
+                            const isGroupEditable = m.stage === 'group' && currentUser?.role === 'user' && !isPastDeadline();
+                            const isLocked = (m.completed && !isGroupEditable) || isTimeLocked || isWeeklyLocked || hasOfficialResult;
 
                             return (
                               <div 
@@ -3165,7 +3175,7 @@ export default function App() {
                                   ) : (
                                     <div className="flex items-center gap-1 font-semibold text-amber-500 bg-amber-500/5 px-2 py-1 rounded-lg border border-amber-500/10">
                                       <Unlock className="h-3.5 w-3.5 shrink-0" />
-                                      <span>Editable</span>
+                                      <span>{m.completed ? 'Editable (Registrado)' : 'Editable'}</span>
                                     </div>
                                   )}
 
@@ -5025,23 +5035,24 @@ export default function App() {
                       );
                     })()}
                   </div>
+
+                      </div>
+                    );
+                  })()}
+
+                  {/* Accent copyright style line */}
+                  <div className="pt-2 text-center select-none border-t border-white/5">
+                    <div className="flex items-center justify-center gap-2 text-[9.5px] tracking-[0.22em] text-slate-400/80 font-bold uppercase">
+                      <span>En Almar vivimos el Mundial 2026</span>
+                      <span className="text-amber-500">|</span>
+                      <span>Bienestar Grupo Almar</span>
+                    </div>
+                  </div>
+
                 </div>
-              );
-            })()}
+              )}
 
-            {/* Accent copyright style line */}
-            <div className="pt-2 text-center select-none border-t border-white/5">
-              <div className="flex items-center justify-center gap-2 text-[9.5px] tracking-[0.22em] text-slate-400/80 font-bold uppercase">
-                <span>En Almar vivimos el Mundial 2026</span>
-                <span className="text-amber-500">|</span>
-                <span>Bienestar Grupo Almar</span>
-              </div>
-            </div>
-
-          </div>
-        )}
-
-        {/* ==================== TAB: ADMIN CONTROL ==================== */}
+         {/* ==================== TAB: ADMIN CONTROL ==================== */}
         {activeTab === 'admin' && currentUser?.role === 'admin' && (
           <div className="space-y-6">
             
@@ -5067,785 +5078,11 @@ export default function App() {
               </div>
             </div>
 
-            {/* General Admin Statistics Cards */}
-            {adminStats && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-900 space-y-1">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Total Usuarios registrados</span>
-                  <div className="text-xl font-black text-white">{adminStats.totalUsers}</div>
-                </div>
-                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-900 space-y-1">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Usuarios Activos</span>
-                  <div className="text-xl font-black text-emerald-400">{adminStats.activeUsers}</div>
-                </div>
-                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-900 space-y-1">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Usuarios Bloqueados</span>
-                  <div className="text-xl font-black text-rose-400">{adminStats.blockedUsers}</div>
-                </div>
-                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-900 space-y-1">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Total de Pronósticos guardados</span>
-                  <div className="text-xl font-black text-teal-400">{adminStats.totalPredictionsMade}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Control de Desbloqueo de Semanas de Partidos */}
-            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-3">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
-                    <Unlock className="h-4 w-4" />
-                    Habilitación de Pronósticos Semanales
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Controla qué semana de partidos está actualmente habilitada para que los participantes coloquen sus pronósticos. Las semanas superiores se mantendrán bloqueadas.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-bold uppercase mr-1">Semana Activa:</span>
-                  <span className="bg-amber-500 text-slate-950 font-black text-xs px-3 py-1.5 rounded-lg border border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                    Semana {unlockedWeek}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => handleUpdateUnlockedWeek(1)}
-                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                    unlockedWeek === 1
-                      ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                  }`}
-                >
-                  <span className="text-xs font-black uppercase">Semana 1</span>
-                  <span className="text-[9px] font-bold opacity-60 font-mono">(11 - 14 Jun)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleUpdateUnlockedWeek(2)}
-                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                    unlockedWeek === 2
-                      ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                  }`}
-                >
-                  <span className="text-xs font-black uppercase">Semana 2</span>
-                  <span className="text-[9px] font-bold opacity-60 font-mono">(15 - 21 Jun)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleUpdateUnlockedWeek(3)}
-                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                    unlockedWeek === 3
-                      ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                  }`}
-                >
-                  <span className="text-xs font-black uppercase">Semana 3</span>
-                  <span className="text-[9px] font-bold opacity-60 font-mono">(22 - 28 Jun)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleUpdateUnlockedWeek(4)}
-                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                    unlockedWeek === 4
-                      ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                  }`}
-                >
-                  <span className="text-xs font-black uppercase">Semana 4</span>
-                  <span className="text-[9px] font-bold opacity-60 font-mono">(29 Jun - 05 Jul)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleUpdateUnlockedWeek(5)}
-                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                    unlockedWeek === 5
-                      ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                  }`}
-                >
-                  <span className="text-xs font-black uppercase">Semana 5</span>
-                  <span className="text-[9px] font-bold opacity-60 font-mono">(06 - 12 Jul)</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleUpdateUnlockedWeek(6)}
-                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
-                    unlockedWeek === 6
-                      ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
-                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
-                  }`}
-                >
-                  <span className="text-xs font-black uppercase">Semana 6</span>
-                  <span className="text-[9px] font-bold opacity-60 font-mono">(13 - 19 Jul)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Control de Límite Global de Registro (Fase de Grupos, Llaves y Premios FIFA) */}
-            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
-              <div className="space-y-1">
-                <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
-                  <Clock className="h-4 w-4 text-amber-500" />
-                  Plazo Límite de Registro de Pronósticos
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Ajusta la fecha y hora límite para "Fase de grupos", "Llaves Eliminatorias Pronósticos" y "Premios FIFA". Pasada esta fecha, el sistema no permitirá guardar registros a usuarios comunes.
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-end gap-4 max-w-xl">
-                <div className="space-y-1 flex-1 w-full">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Fecha y Hora Límite (Formato local/ECU)</label>
-                  <input
-                    type="datetime-local"
-                    value={adminDeadline}
-                    onChange={(e) => setAdminDeadline(e.target.value)}
-                    className="bg-slate-950 text-slate-200 border border-slate-800 focus:outline-none focus:border-amber-500 rounded-xl px-3.5 py-2.5 text-xs font-bold w-full"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleUpdateDeadline}
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-sans font-black uppercase tracking-wider text-xs rounded-xl shadow-md transition-all hover:scale-[1.02] cursor-pointer inline-flex items-center gap-2 shrink-0 h-[40px] justify-center"
-                >
-                  <Save className="h-4 w-4 text-slate-950" />
-                  <span>Guardar Plazo Límite</span>
-                </button>
-              </div>
-            </div>
-
-            {/* ==================== APARTADO: PROGRAMACIÓN Y HORARIOS DE PARTIDOS ==================== */}
-            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
-              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center border-b border-slate-850 pb-3 gap-4">
-                <div className="space-y-1">
-                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-amber-400" />
-                    Programación y Horarios de Partidos
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Modifica la fecha y hora de inicio de los partidos. Presiona "Guardar Horarios" para actualizar el sistema.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-                  {/* Filtro por Fase / Fase de grupos */}
-                  <div className="flex flex-col gap-1 w-full sm:w-auto">
-                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Fase</span>
-                    <select
-                      value={scheduleStageFilter}
-                      onChange={(e) => setScheduleStageFilter(e.target.value)}
-                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1.5 text-xs border border-slate-800 focus:outline-none focus:border-amber-500 w-full xl:w-[150px]"
-                    >
-                      <option value="all">Todas las fases</option>
-                      <option value="group">Fase de Grupos</option>
-                      <option value="1/16">1/16 Final</option>
-                      <option value="1/8">1/8 Final</option>
-                      <option value="1/4">1/4 Final</option>
-                      <option value="1/2">Semifinales</option>
-                      <option value="third_place">Tercer Puesto</option>
-                      <option value="final">La Gran Final</option>
-                    </select>
-                  </div>
-
-                  {/* Filtro por Semana */}
-                  <div className="flex flex-col gap-1 w-full sm:w-auto">
-                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Semana</span>
-                    <select
-                      value={scheduleWeekFilter}
-                      onChange={(e) => setScheduleWeekFilter(e.target.value)}
-                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1.5 text-xs border border-slate-800 focus:outline-none focus:border-amber-500 w-full xl:w-[130px]"
-                    >
-                      <option value="all">Todas las semanas</option>
-                      <option value="1">Semana 1</option>
-                      <option value="2">Semana 2</option>
-                      <option value="3">Semana 3</option>
-                      <option value="4">Semana 4</option>
-                      <option value="5">Semana 5</option>
-                      <option value="6">Semana 6</option>
-                    </select>
-                  </div>
-
-                  {/* Filtro por Grupo */}
-                  <div className="flex flex-col gap-1 w-full sm:w-auto">
-                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Grupo</span>
-                    <select
-                      value={scheduleGroupFilter}
-                      onChange={(e) => setScheduleGroupFilter(e.target.value)}
-                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1.5 text-xs border border-slate-800 focus:outline-none focus:border-amber-500 w-full xl:w-[130px]"
-                    >
-                      <option value="all">Todos los grupos</option>
-                      {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(g => (
-                        <option key={g} value={g}>Grupo {g}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Grid content */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto max-h-[350px] pr-1.5">
-                {(() => {
-                  const items = initialMatches.filter(m => {
-                    if (scheduleStageFilter !== 'all' && m.stage !== scheduleStageFilter) return false;
-                    const matchWeek = m.date ? getMatchWeek(m.date).toString() : '';
-                    if (scheduleWeekFilter !== 'all' && matchWeek !== scheduleWeekFilter) return false;
-                    if (scheduleGroupFilter !== 'all' && m.group !== scheduleGroupFilter) return false;
-                    return true;
-                  });
-
-                  if (items.length === 0) {
-                    return (
-                      <div className="col-span-full py-8 text-center text-xs text-slate-500 font-medium">
-                        Ningún partido coincide con los filtros aplicados.
-                      </div>
-                    );
-                  }
-
-                  return items.map((m) => {
-                    const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, true);
-                    const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, true);
-
-                    const currentVal = scheduleOverrides[m.id] || { 
-                      date: systemConfig?.match_overrides?.[m.id]?.date || m.date || '', 
-                      time: systemConfig?.match_overrides?.[m.id]?.time || m.time || '' 
-                    };
-
-                    return (
-                      <div key={m.id} className="p-3 rounded-xl bg-slate-950 border border-slate-850 flex flex-col justify-between gap-3 hover:border-slate-800 transition">
-                        <div className="flex justify-between items-center text-[9px] text-slate-500 font-bold uppercase tracking-wider border-b border-slate-900 pb-1.5">
-                          <span className="text-amber-500">M-ID {m.id} • {m.stage === 'group' ? `Grupo ${m.group}` : m.stage}</span>
-                          <span className="text-slate-400">Original: {m.date} {m.time}</span>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-3 text-xs">
-                          {/* Teams description */}
-                          <div className="flex-1 truncate space-y-1">
-                            <div className="flex items-center gap-1.5 truncate">
-                              {'flag' in homeRes ? (
-                                <img src={getTeamFlagUrl((homeRes as any).id)} className="w-[15px] h-2.5 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
-                              ) : <span className="text-[10px] shrink-0">🏳️</span>}
-                              <span className="truncate font-bold text-slate-300">{'name' in homeRes ? homeRes.name : homeRes.text}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 truncate">
-                              {'flag' in awayRes ? (
-                                <img src={getTeamFlagUrl((awayRes as any).id)} className="w-[15px] h-2.5 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
-                              ) : <span className="text-[10px] shrink-0">🏳️</span>}
-                              <span className="truncate font-bold text-slate-300">{'name' in awayRes ? awayRes.name : awayRes.text}</span>
-                            </div>
-                          </div>
-
-                          {/* Date and Time selectors */}
-                          <div className="flex flex-col gap-1 w-[120px] shrink-0">
-                            <input
-                              type="text"
-                              value={currentVal.date}
-                              placeholder="AAAA-MM-DD"
-                              onChange={(e) => handleScheduleChange(m.id, 'date', e.target.value)}
-                              className="bg-slate-900 border border-slate-800 text-slate-200 text-[10px] font-bold py-1 px-1.5 rounded focus:outline-none focus:border-amber-500 text-center uppercase"
-                            />
-                            <input
-                              type="text"
-                              value={currentVal.time}
-                              placeholder="HH:MM"
-                              onChange={(e) => handleScheduleChange(m.id, 'time', e.target.value)}
-                              className="bg-slate-900 border border-slate-800 text-slate-200 text-[10px] font-bold py-1 px-1.5 rounded focus:outline-none focus:border-amber-500 text-center uppercase"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex justify-end gap-2.5 border-t border-slate-900 pt-3">
-                <button
-                  type="button"
-                  onClick={handleResetScheduleLocal}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[11px] font-black uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-700"
-                >
-                  Restablecer
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveMatchSchedule}
-                  className="px-6 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black uppercase tracking-widest rounded-xl transition cursor-pointer shadow-lg flex items-center gap-1.5"
-                >
-                  <Save className="h-4 w-4" />
-                  <span>GUARDAR HORARIOS</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Registro de Ganadores de Premios Oficiales FIFA */}
-            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
-              <div className="space-y-1">
-                <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
-                  <Award className="h-4 w-4 text-amber-400" />
-                  Registro de Ganadores Oficiales de Premios FIFA
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Registra los ganadores oficiales del torneo. Los puntos de los participantes se recalcularán automáticamente en tiempo real.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Balón de Oro</label>
-                  <select
-                    value={adminBalonOro}
-                    onChange={(e) => setAdminBalonOro(e.target.value)}
-                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
-                  >
-                    <option value="" className="text-slate-500 bg-[#020713]">Selecciona un jugador...</option>
-                    {AWARDS_BALON_ORO.map((p) => (
-                      <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Guante de Oro</label>
-                  <select
-                    value={adminGuanteOro}
-                    onChange={(e) => setAdminGuanteOro(e.target.value)}
-                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
-                  >
-                    <option value="" className="text-slate-500 bg-[#020713]">Selecciona un arquero...</option>
-                    {AWARDS_GUANTE_ORO.map((p) => (
-                      <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Bota de Oro</label>
-                  <select
-                    value={adminBotaOro}
-                    onChange={(e) => setAdminBotaOro(e.target.value)}
-                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
-                  >
-                    <option value="" className="text-slate-500 bg-[#020713]">Selecciona un goleador...</option>
-                    {AWARDS_BOTA_ORO.map((p) => (
-                      <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Jugador Joven del Torneo</label>
-                  <select
-                    value={adminJovenTorneo}
-                    onChange={(e) => setAdminJovenTorneo(e.target.value)}
-                    className="bg-[#020713] border border-slate-850 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
-                  >
-                    <option value="" className="text-slate-500 bg-[#020713]">Selecciona un jugador joven...</option>
-                    {AWARDS_JOVEN_TORNEO.map((p) => (
-                      <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 text-right">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setAdminBalonOro('');
-                    setAdminGuanteOro('');
-                    setAdminBotaOro('');
-                    setAdminJovenTorneo('');
-                    if (currentUser) {
-                      try {
-                        const res = await fetch('/api/admin/config/awards', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
-                          body: JSON.stringify({ official_balon_oro: '', official_guante_oro: '', official_bota_oro: '', official_joven_torneo: '' })
-                        });
-                        if (res.ok) { showToast("🗑️ Premios eliminados exitosamente."); }
-                      } catch { showToast("❌ Error al borrar premios"); }
-                    }
-                  }}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 border border-slate-700 hover:border-slate-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Limpiar</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveAdminAwards}
-                  className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-600 hover:to-teal-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl shadow-lg transition-all hover:scale-[1.02] cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Registrar Premios Oficiales</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Grid Split: Users Admin vs Score Registration */}
-            {/* Configuración Oficial de Llave Eliminatoria */}
-            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
-              <div className="space-y-1">
-                <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
-                  <Trophy className="h-4 w-4 text-amber-400" />
-                  Llave Eliminatoria Oficial (Equipos Clasificados)
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Calcula automáticamente los primeros y segundos lugares según los resultados oficiales registrados. 
-                  Selecciona exactamente los <strong>8 mejores terceros</strong> a continuación y guarda para oficializar el bracket eliminatorio.
-                </p>
-              </div>
-
-              {(() => {
-                // Compute temporary official standings from already saved matches
-                const offMatches = initialMatches.map(m => {
-                  const saved = officialResults[m.id] || {};
-                  return { 
-                    ...m, 
-                    predictedHome: saved.homeScore !== undefined ? String(saved.homeScore) : '', 
-                    predictedAway: saved.awayScore !== undefined ? String(saved.awayScore) : '' 
-                  };
-                });
-                const offStandings = computeAllStandings(offMatches);
-                const offFirsts: Record<string, string> = {};
-                const offSeconds: Record<string, string> = {};
-                GROUPS.forEach(g => {
-                   if (offStandings[g] && offStandings[g].length >= 2) {
-                     offFirsts[g] = offStandings[g][0].teamId;
-                     offSeconds[g] = offStandings[g][1].teamId;
-                   }
-                });
-
-                const computedThirds = getRankedThirdPlacedTeams(offStandings);
-
-                const handleSaveBracket = async () => {
-                   if (!currentUser) return;
-                   if (adminOfficialThirds.length !== 8) {
-                     showToast("⚠️ Debe seleccionar exactamente 8 mejores terceros."); 
-                     return;
-                   }
-                   try {
-                     const res = await fetch('/api/admin/config/bracket', {
-                       method: 'POST',
-                       headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
-                       body: JSON.stringify({ 
-                         official_firsts: offFirsts, 
-                         official_seconds: offSeconds, 
-                         official_thirds: adminOfficialThirds 
-                       })
-                     });
-                     if (res.ok) {
-                       showToast("✅ Llave Eliminatoria Oficial guardada con éxito.");
-                       fetchConfig(); // Resync state immediately
-                     }
-                   } catch {
-                     showToast("❌ Error al guardar datos en la DB");
-                   }
-                };
-
-                return (
-                  <div className="space-y-4">
-                     <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-850">
-                       <div className="flex justify-between items-center mb-3">
-                         <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                           1. Mejores Terceros Detectados (Selecciona 8)
-                         </h4>
-                         <button 
-                           onClick={() => setAdminOfficialThirds(computedThirds.slice(0, 8).map(t => t.id))}
-                           className="text-[10px] bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-2 py-1 rounded-md transition-colors"
-                         >
-                           Autocompletar Mejores 8
-                         </button>
-                       </div>
-                       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                          {computedThirds.map(t => {
-                            const isSelected = adminOfficialThirds.includes(t.id);
-                            return (
-                              <button
-                                key={t.id}
-                                onClick={() => {
-                                  let nt = [...adminOfficialThirds];
-                                  if (isSelected) {
-                                    nt = nt.filter(id => id !== t.id);
-                                  } else {
-                                    if (nt.length < 8) nt.push(t.id);
-                                  }
-                                  setAdminOfficialThirds(nt);
-                                }}
-                                className={`px-3 py-2 border rounded-xl flex items-center justify-between text-[11px] font-bold transition-all ${
-                                  isSelected 
-                                    ? 'border-amber-500 bg-amber-500/10 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.1)]' 
-                                    : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-600'
-                                } cursor-pointer`}
-                              >
-                                 <span className="truncate">{t.name} (G{t.group})</span>
-                                 {isSelected && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
-                              </button>
-                            );
-                          })}
-                          {computedThirds.length === 0 && (
-                            <div className="col-span-full text-xs text-slate-500 italic py-2">
-                              No hay datos de terceros aún. Ingrese marcadores en los partidos para calcularlos.
-                            </div>
-                          )}
-                       </div>
-                       <div className="text-right text-[10px] font-bold text-slate-400 mt-2">
-                         Seleccionados: {adminOfficialThirds.length} / 8
-                       </div>
-                     </div>
-
-                     <div className="flex justify-end gap-2 pt-1">
-                       <button
-                         onClick={async () => {
-                           if (!currentUser) return;
-                           try {
-                             const res = await fetch('/api/admin/config/bracket', {
-                               method: 'POST',
-                               headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
-                               body: JSON.stringify({ official_firsts: {}, official_seconds: {}, official_thirds: [] })
-                             });
-                             if (res.ok) {
-                               setAdminOfficialFirsts({});
-                               setAdminOfficialSeconds({});
-                               setAdminOfficialThirds([]);
-                               showToast("🗑️ Llave Eliminatoria eliminada con éxito.");
-                               fetchConfig();
-                             }
-                           } catch {
-                             showToast("❌ Error al borrar llave en la DB");
-                           }
-                         }}
-                         className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer inline-flex items-center gap-2 border border-slate-700 hover:border-slate-600"
-                       >
-                         <Trash2 className="h-4 w-4" />
-                         <span>ELIMINAR LLAVE</span>
-                       </button>
-                       <button 
-                         onClick={handleSaveBracket} 
-                         disabled={adminOfficialThirds.length !== 8}
-                         className="bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 px-6 py-2.5 font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                       >
-                         <Save className="h-4 w-4" />
-                         <span>OFICIALIZAR LLAVE ELIMINATORIA</span>
-                       </button>
-                     </div>
-                  </div>
-                )
-              })()}
-            </div>
-
+            {/* BLOCK 1: Manejo de Participantes & Estadísticas en 2x2 */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
-              {/* Left Column: Official Score Registration panel (7/12) */}
-              <div className="lg:col-span-7 bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-850 pb-2.5">
-                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Cargar Resultados Oficiales
-                  </h3>
-
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selectedAdminMatchStage}
-                      onChange={(e) => setSelectedAdminMatchStage(e.target.value as StageType | 'all')}
-                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1 text-xs border border-slate-850"
-                    >
-                      <option value="all">Fase torneo completo</option>
-                      <option value="group">Fase de Grupos</option>
-                      <option value="1/16">1/16 Final</option>
-                      <option value="1/8">1/8 Final</option>
-                      <option value="1/4">1/4 Final</option>
-                      <option value="1/2">Semifinales</option>
-                      <option value="final">Final</option>
-                    </select>
-                    <select
-                      value={selectedAdminMatchWeek}
-                      onChange={(e) => setSelectedAdminMatchWeek(e.target.value)}
-                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1 text-xs border border-slate-850"
-                    >
-                      <option value="all">Todas las semanas</option>
-                      <option value="1">Semana 1</option>
-                      <option value="2">Semana 2</option>
-                      <option value="3">Semana 3</option>
-                      <option value="4">Semana 4</option>
-                      <option value="5">Semana 5</option>
-                      <option value="6">Semana 6</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="overflow-y-auto max-h-[380px] space-y-3 pr-1">
-                  {combinedMatches
-                    .filter(m => selectedAdminMatchStage === 'all' || m.stage === selectedAdminMatchStage)
-                    .filter(m => selectedAdminMatchWeek === 'all' || getMatchWeek(m.date).toString() === selectedAdminMatchWeek)
-                    .map((m) => {
-                      const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, true);
-                      const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, true);
-
-                      const savedScore = officialResults[m.id] || {};
-                      
-                      const inputHome = adminScores[m.id]?.home !== undefined ? adminScores[m.id].home : (savedScore.homeScore !== undefined ? savedScore.homeScore.toString() : '');
-                      const inputAway = adminScores[m.id]?.away !== undefined ? adminScores[m.id].away : (savedScore.awayScore !== undefined ? savedScore.awayScore.toString() : '');
-                      const inputWinner = adminScores[m.id]?.winner !== undefined ? adminScores[m.id].winner : savedScore.winnerId;
-
-                      const isTie = inputHome !== '' && inputAway !== '' && parseInt(inputHome, 10) === parseInt(inputAway, 10);
-
-                      return (
-                        <div key={m.id} className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex flex-col gap-2">
-                          <div className="flex justify-between text-[9px] text-slate-500 border-b border-slate-900 pb-1.5">
-                            <span className="font-bold text-amber-500">M-ID: {m.id} ({m.stage})</span>
-                            <span>{m.date} | {m.time}</span>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2">
-                            {/* Home */}
-                            <div className="flex-1 truncate text-right font-semibold text-xs flex items-center justify-end gap-1.5">
-                              <span className="truncate">{'name' in homeRes ? homeRes.name : homeRes.text}</span>
-                              {'flag' in homeRes ? (
-                                <img src={getTeamFlagUrl((homeRes as any).id)} className="w-4 h-3 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
-                              ) : (
-                                <span className="text-xs shrink-0">🏳️</span>
-                              )}
-                            </div>
-
-                            {/* Inputs */}
-                            <div className="flex items-center gap-1 shrink-0">
-                              <input
-                                type="text"
-                                placeholder="-"
-                                value={inputHome}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val !== '' && !/^\d+$/.test(val)) return;
-                                  setAdminScores(prev => ({
-                                    ...prev,
-                                    [m.id]: { ...(prev[m.id] || { home: '', away: '' }), home: val }
-                                  }));
-                                }}
-                                className="w-8 py-0.5 text-center bg-slate-900 text-xs font-bold text-white border border-slate-805 rounded"
-                              />
-                              <span className="text-[10px] font-mono text-slate-600">:</span>
-                              <input
-                                type="text"
-                                placeholder="-"
-                                value={inputAway}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val !== '' && !/^\d+$/.test(val)) return;
-                                  setAdminScores(prev => ({
-                                    ...prev,
-                                    [m.id]: { ...(prev[m.id] || { home: '', away: '' }), away: val }
-                                  }));
-                                }}
-                                className="w-8 py-0.5 text-center bg-slate-900 text-xs font-bold text-white border border-slate-805 rounded"
-                              />
-                            </div>
-
-                            {/* Away */}
-                            <div className="flex-1 truncate font-semibold text-xs flex items-center gap-1.5">
-                              {'flag' in awayRes ? (
-                                <img src={getTeamFlagUrl((awayRes as any).id)} className="w-4 h-3 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
-                              ) : (
-                                <span className="text-xs shrink-0">🏳️</span>
-                              )}
-                              <span className="truncate">{'name' in awayRes ? awayRes.name : awayRes.text}</span>
-                            </div>
-                          </div>
-
-                          {/* Winner dropdown for ties & Delete action */}
-                          <div className={`flex items-center mt-1.5 ${isTie ? 'justify-between' : 'justify-start'}`}>
-                            {savedScore.homeScore !== undefined && (
-                              <button
-                                onClick={async () => {
-                                  if (!currentUser) return;
-                                  try {
-                                    const res = await fetch('/api/admin/results', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
-                                      body: JSON.stringify({ results: [{ matchId: m.id, homeScore: '', awayScore: '', winnerId: '' }] })
-                                    });
-                                    if (res.ok) {
-                                      showToast("🗑️ Marcador oficial eliminado.");
-                                      setOfficialResults(prev => {
-                                        const next = { ...prev };
-                                        delete next[m.id];
-                                        return next;
-                                      });
-                                      setAdminScores(prev => {
-                                        const next = { ...prev };
-                                        delete next[m.id];
-                                        return next;
-                                      });
-                                      fetchRankings();
-                                    }
-                                  } catch { showToast("❌ Error al borrar el marcador"); }
-                                }}
-                                className="flex items-center gap-1 text-[9px] text-rose-400 hover:text-rose-300 font-bold uppercase transition bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                                Eliminar
-                              </button>
-                            )}
-
-                            {isTie && (
-                              <div className={`flex items-center justify-end gap-1.5 text-[10px] text-slate-450 ${savedScore.homeScore === undefined ? 'w-full' : ''}`}>
-                                <span>Ganador penales:</span>
-                                <select
-                                  value={inputWinner || ''}
-                                  onChange={(e) => {
-                                    setAdminScores(prev => ({
-                                      ...prev,
-                                      [m.id]: { ...(prev[m.id] || { home: '', away: '' }), winner: e.target.value }
-                                    }));
-                                  }}
-                                  className="bg-slate-900 border border-slate-800 rounded text-[10px] p-0.5 text-amber-400 focus:outline-none"
-                                >
-                                  <option value="">-- Elige --</option>
-                                  <option value="no_aplica">No aplica</option>
-                                  <option value={'id' in homeRes ? homeRes.id : ''}>
-                                    {'flag' in homeRes ? `${homeRes.flag} ` : ''}{'name' in homeRes ? homeRes.name : 'Local'}
-                                  </option>
-                                  <option value={'id' in awayRes ? awayRes.id : ''}>
-                                    {'flag' in awayRes ? `${awayRes.flag} ` : ''}{'name' in awayRes ? awayRes.name : 'Visitante'}
-                                  </option>
-                                </select>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSaveOfficialAdminScores}
-                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition-colors mt-2"
-                >
-                  Confirmar y Guardar Marcadores Oficiales
-                </button>
-              </div>
-
-              {/* Right Column: User Management list (5/12) */}
-              <div className="lg:col-span-5 bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
+              {/* Left Column: User Management list (8/12) */}
+              <div className="lg:col-span-8 bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-850 pb-2.5">
                   <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
                     <User className="h-4 w-4" />
@@ -5959,7 +5196,7 @@ export default function App() {
                             className={`w-20 text-center text-[10px] font-black py-1 px-1.5 rounded-lg border transition-all cursor-pointer ${
                               usr.blocked 
                                 ? 'bg-rose-600/15 border-rose-500/30 text-rose-450 text-rose-400 hover:bg-rose-600 hover:text-white' 
-                                : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-rose-600 hover:text-white'
+                                : 'bg-slate-900 border-slate-880 text-slate-300 hover:bg-rose-600 hover:text-white'
                             }`}
                           >
                             {usr.blocked ? 'Habilitar' : 'Bloquear'}
@@ -5997,6 +5234,809 @@ export default function App() {
                       </div>
                     ))
                   )}
+                </div>
+              </div>
+
+              {/* Right Column: Estadísticas de contadores en formato 2x2 (4/12) */}
+              <div className="lg:col-span-4 bg-slate-900/40 p-5 rounded-2xl border border-slate-900 flex flex-col justify-between space-y-4">
+                <div className="space-y-1">
+                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <Sliders className="h-4 w-4 text-amber-500" />
+                    Estadísticas del Sistema
+                  </h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Resumen en vivo del estado de los participantes y las predicciones registradas en la polla.
+                  </p>
+                </div>
+
+                {adminStats ? (
+                  <div className="grid grid-cols-2 gap-4 flex-1 pt-2">
+                    <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-850 space-y-1 flex flex-col justify-center min-h-[90px]">
+                      <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider leading-tight">Total Usuarios</span>
+                      <div className="text-2xl font-black text-white">{adminStats.totalUsers}</div>
+                    </div>
+                    <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-855 space-y-1 flex flex-col justify-center min-h-[90px]">
+                      <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider leading-tight">Usuarios Activos</span>
+                      <div className="text-2xl font-black text-emerald-400">{adminStats.activeUsers}</div>
+                    </div>
+                    <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-855 space-y-1 flex flex-col justify-center min-h-[90px]">
+                      <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider leading-tight">Usuarios Bloqueados</span>
+                      <div className="text-2xl font-black text-rose-400">{adminStats.blockedUsers}</div>
+                    </div>
+                    <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-855 space-y-1 flex flex-col justify-center min-h-[90px]">
+                      <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider leading-tight">Total Pronósticos</span>
+                      <div className="text-2xl font-black text-teal-400">{adminStats.totalPredictionsMade}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-slate-500 text-xs italic">Cargando estadísticas...</div>
+                )}
+              </div>
+
+            </div>
+
+            {/* ==================== APARTADO: PROGRAMACIÓN Y HORARIOS DE PARTIDOS (FULL WIDTH AS ORIGINAL) ==================== */}
+            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
+              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center border-b border-slate-850 pb-3 gap-4">
+                <div className="space-y-1">
+                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-amber-400" />
+                    Programación y Horarios de Partidos
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Modifica la fecha y hora de inicio de los partidos. Presiona "Guardar Horarios" para actualizar el sistema.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+                  {/* Filtro por Fase / Fase de grupos */}
+                  <div className="flex flex-col gap-1 w-full sm:w-auto">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Fase</span>
+                    <select
+                      value={scheduleStageFilter}
+                      onChange={(e) => setScheduleStageFilter(e.target.value)}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1.5 text-xs border border-slate-800 focus:outline-none focus:border-amber-500 w-full xl:w-[150px]"
+                    >
+                      <option value="all">Todas las fases</option>
+                      <option value="group">Fase de Grupos</option>
+                      <option value="1/16">1/16 Final</option>
+                      <option value="1/8">1/8 Final</option>
+                      <option value="1/4">1/4 Final</option>
+                      <option value="1/2">Semifinales</option>
+                      <option value="third_place">Tercer Puesto</option>
+                      <option value="final">La Gran Final</option>
+                    </select>
+                  </div>
+
+                  {/* Filtro por Semana */}
+                  <div className="flex flex-col gap-1 w-full sm:w-auto">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Semana</span>
+                    <select
+                      value={scheduleWeekFilter}
+                      onChange={(e) => setScheduleWeekFilter(e.target.value)}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1.5 text-xs border border-slate-800 focus:outline-none focus:border-amber-500 w-full xl:w-[130px]"
+                    >
+                      <option value="all">Todas las semanas</option>
+                      <option value="1">Semana 1</option>
+                      <option value="2">Semana 2</option>
+                      <option value="3">Semana 3</option>
+                      <option value="4">Semana 4</option>
+                      <option value="5">Semana 5</option>
+                      <option value="6">Semana 6</option>
+                    </select>
+                  </div>
+
+                  {/* Filtro por Grupo */}
+                  <div className="flex flex-col gap-1 w-full sm:w-auto">
+                    <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Grupo</span>
+                    <select
+                      value={scheduleGroupFilter}
+                      onChange={(e) => setScheduleGroupFilter(e.target.value)}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1.5 text-xs border border-slate-800 focus:outline-none focus:border-amber-500 w-full xl:w-[130px]"
+                    >
+                      <option value="all">Todos los grupos</option>
+                      {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(g => (
+                        <option key={g} value={g}>Grupo {g}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid content */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto max-h-[350px] pr-1.5">
+                {(() => {
+                  const items = initialMatches.filter(m => {
+                    if (scheduleStageFilter !== 'all' && m.stage !== scheduleStageFilter) return false;
+                    const matchWeek = m.date ? getMatchWeek(m.date).toString() : '';
+                    if (scheduleWeekFilter !== 'all' && matchWeek !== scheduleWeekFilter) return false;
+                    if (scheduleGroupFilter !== 'all' && m.group !== scheduleGroupFilter) return false;
+                    return true;
+                  });
+
+                  if (items.length === 0) {
+                    return (
+                      <div className="col-span-full py-8 text-center text-xs text-slate-500 font-medium">
+                        Ningún partido coincide con los filtros aplicados.
+                      </div>
+                    );
+                  }
+
+                  return items.map((m) => {
+                    const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, true);
+                    const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, true);
+
+                    const currentVal = scheduleOverrides[m.id] || { 
+                      date: systemConfig?.match_overrides?.[m.id]?.date || m.date || '', 
+                      time: systemConfig?.match_overrides?.[m.id]?.time || m.time || '' 
+                    };
+
+                    return (
+                      <div key={m.id} className="p-3 rounded-xl bg-slate-950 border border-slate-855 flex flex-col justify-between gap-3 hover:border-slate-800 transition">
+                        <div className="flex justify-between items-center text-[9px] text-slate-500 font-bold uppercase tracking-wider border-b border-slate-900 pb-1.5">
+                          <span className="text-amber-500">M-ID {m.id} • {m.stage === 'group' ? `Grupo ${m.group}` : m.stage}</span>
+                          <span className="text-slate-400">Original: {m.date} {m.time}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 text-xs">
+                          {/* Teams description */}
+                          <div className="flex-1 truncate space-y-1">
+                            <div className="flex items-center gap-1.5 truncate">
+                              {'flag' in homeRes ? (
+                                <img src={getTeamFlagUrl((homeRes as any).id)} className="w-[15px] h-2.5 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
+                              ) : <span className="text-[10px] shrink-0">🏳️</span>}
+                              <span className="truncate font-bold text-slate-300">{'name' in homeRes ? homeRes.name : homeRes.text}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 truncate">
+                              {'flag' in awayRes ? (
+                                <img src={getTeamFlagUrl((awayRes as any).id)} className="w-[15px] h-2.5 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
+                              ) : <span className="text-[10px] shrink-0">🏳️</span>}
+                              <span className="truncate font-bold text-slate-300">{'name' in awayRes ? awayRes.name : awayRes.text}</span>
+                            </div>
+                          </div>
+
+                          {/* Date and Time selectors */}
+                          <div className="flex flex-col gap-1 w-[120px] shrink-0">
+                            <input
+                              type="text"
+                              value={currentVal.date}
+                              placeholder="AAAA-MM-DD"
+                              onChange={(e) => handleScheduleChange(m.id, 'date', e.target.value)}
+                              className="bg-slate-900 border border-slate-800 text-slate-200 text-[10px] font-bold py-1 px-1.5 rounded focus:outline-none focus:border-amber-500 text-center uppercase"
+                            />
+                            <input
+                              type="text"
+                              value={currentVal.time}
+                              placeholder="HH:MM"
+                              onChange={(e) => handleScheduleChange(m.id, 'time', e.target.value)}
+                              className="bg-slate-900 border border-slate-800 text-slate-200 text-[10px] font-bold py-1 px-1.5 rounded focus:outline-none focus:border-amber-500 text-center uppercase"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex justify-end gap-2.5 border-t border-slate-900 pt-3">
+                <button
+                  type="button"
+                  onClick={handleResetScheduleLocal}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-[11px] font-black uppercase tracking-wider rounded-xl transition cursor-pointer border border-slate-700"
+                >
+                  Restablecer
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveMatchSchedule}
+                  className="px-6 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-black uppercase tracking-widest rounded-xl transition cursor-pointer shadow-lg flex items-center gap-1.5"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>GUARDAR HORARIOS</span>
+                </button>
+              </div>
+            </div>
+
+            {/* BLOCK 2: Cargar Resultados Oficiales & Habilitación de Pronósticos Semanales */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+              {/* Left Column: Official Score Registration panel (7/12) */}
+              <div className="lg:col-span-7 bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-850 pb-2.5">
+                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Cargar Resultados Oficiales
+                  </h3>
+
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedAdminMatchStage}
+                      onChange={(e) => setSelectedAdminMatchStage(e.target.value as StageType | 'all')}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1 text-xs border border-slate-850"
+                    >
+                      <option value="all">Fase torneo completo</option>
+                      <option value="group">Fase de Grupos</option>
+                      <option value="1/16">1/16 Final</option>
+                      <option value="1/8">1/8 Final</option>
+                      <option value="1/4">1/4 Final</option>
+                      <option value="1/2">Semifinales</option>
+                      <option value="final">Final</option>
+                    </select>
+                    <select
+                      value={selectedAdminMatchWeek}
+                      onChange={(e) => setSelectedAdminMatchWeek(e.target.value)}
+                      className="bg-slate-950 text-slate-300 rounded px-2.5 py-1 text-xs border border-slate-850"
+                    >
+                      <option value="all">Todas las semanas</option>
+                      <option value="1">Semana 1</option>
+                      <option value="2">Semana 2</option>
+                      <option value="3">Semana 3</option>
+                      <option value="4">Semana 4</option>
+                      <option value="5">Semana 5</option>
+                      <option value="6">Semana 6</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-y-auto max-h-[380px] space-y-3 pr-1">
+                  {combinedMatches
+                    .filter(m => selectedAdminMatchStage === 'all' || m.stage === selectedAdminMatchStage)
+                    .filter(m => selectedAdminMatchWeek === 'all' || getMatchWeek(m.date).toString() === selectedAdminMatchWeek)
+                    .map((m) => {
+                      const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, true);
+                      const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, true);
+
+                      const savedScore = officialResults[m.id] || {};
+                      
+                      const inputHome = adminScores[m.id]?.home !== undefined ? adminScores[m.id].home : (savedScore.homeScore !== undefined ? savedScore.homeScore.toString() : '');
+                      const inputAway = adminScores[m.id]?.away !== undefined ? adminScores[m.id].away : (savedScore.awayScore !== undefined ? savedScore.awayScore.toString() : '');
+                      const inputWinner = adminScores[m.id]?.winner !== undefined ? adminScores[m.id].winner : savedScore.winnerId;
+
+                      const isTie = inputHome !== '' && inputAway !== '' && parseInt(inputHome, 10) === parseInt(inputAway, 10);
+
+                      return (
+                        <div key={m.id} className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex flex-col gap-2">
+                          <div className="flex justify-between text-[9px] text-slate-500 border-b border-slate-900 pb-1.5">
+                            <span className="font-bold text-amber-500">M-ID: {m.id} ({m.stage})</span>
+                            <span>{m.date} | {m.time}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2">
+                            {/* Home */}
+                            <div className="flex-1 truncate text-right font-semibold text-xs flex items-center justify-end gap-1.5">
+                              <span className="truncate">{'name' in homeRes ? homeRes.name : homeRes.text}</span>
+                              {'flag' in homeRes ? (
+                                <img src={getTeamFlagUrl((homeRes as any).id)} className="w-4 h-3 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
+                              ) : (
+                                <span className="text-xs shrink-0">🏳️</span>
+                              )}
+                            </div>
+
+                            {/* Inputs */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <input
+                                type="text"
+                                placeholder="-"
+                                value={inputHome}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val !== '' && !/^\d+$/.test(val)) return;
+                                  setAdminScores(prev => ({
+                                    ...prev,
+                                    [m.id]: { ...(prev[m.id] || { home: '', away: '' }), home: val }
+                                  }));
+                                }}
+                                className="w-8 py-0.5 text-center bg-slate-900 text-xs font-bold text-white border border-slate-805 rounded"
+                              />
+                              <span className="text-[10px] font-mono text-slate-600">:</span>
+                              <input
+                                type="text"
+                                placeholder="-"
+                                value={inputAway}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val !== '' && !/^\d+$/.test(val)) return;
+                                  setAdminScores(prev => ({
+                                    ...prev,
+                                    [m.id]: { ...(prev[m.id] || { home: '', away: '' }), away: val }
+                                  }));
+                                }}
+                                className="w-8 py-0.5 text-center bg-slate-900 text-xs font-bold text-white border border-slate-810 rounded"
+                              />
+                            </div>
+
+                            {/* Away */}
+                            <div className="flex-1 truncate font-semibold text-xs flex items-center gap-1.5">
+                              {'flag' in awayRes ? (
+                                <img src={getTeamFlagUrl((awayRes as any).id)} className="w-4 h-3 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
+                              ) : (
+                                <span className="text-xs shrink-0">🏳️</span>
+                              )}
+                              <span className="truncate">{'name' in awayRes ? awayRes.name : awayRes.text}</span>
+                            </div>
+                          </div>
+
+                          {/* Winner dropdown for ties & Delete action */}
+                          <div className={`flex items-center mt-1.5 ${isTie ? 'justify-between' : 'justify-start'}`}>
+                            {savedScore.homeScore !== undefined && (
+                              <button
+                                onClick={async () => {
+                                  if (!currentUser) return;
+                                  try {
+                                    const res = await fetch('/api/admin/results', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
+                                      body: JSON.stringify({ results: [{ matchId: m.id, homeScore: '', awayScore: '', winnerId: '' }] })
+                                    });
+                                    if (res.ok) {
+                                      showToast("🗑️ Marcador oficial eliminado.");
+                                      setOfficialResults(prev => {
+                                        const next = { ...prev };
+                                        delete next[m.id];
+                                        return next;
+                                      });
+                                      setAdminScores(prev => {
+                                        const next = { ...prev };
+                                        delete next[m.id];
+                                        return next;
+                                      });
+                                      fetchRankings();
+                                    }
+                                  } catch { showToast("❌ Error al borrar el marcador"); }
+                                }}
+                                className="flex items-center gap-1 text-[9px] text-rose-400 hover:text-rose-300 font-bold uppercase transition bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                Eliminar
+                              </button>
+                            )}
+
+                            {isTie && (
+                              <div className={`flex items-center justify-end gap-1.5 text-[10px] text-slate-450 ${savedScore.homeScore === undefined ? 'w-full' : ''}`}>
+                                <span>Ganador penales:</span>
+                                <select
+                                  value={inputWinner || ''}
+                                  onChange={(e) => {
+                                    setAdminScores(prev => ({
+                                      ...prev,
+                                      [m.id]: { ...(prev[m.id] || { home: '', away: '' }), winner: e.target.value }
+                                    }));
+                                  }}
+                                  className="bg-slate-900 border border-slate-800 rounded text-[10px] p-0.5 text-amber-400 focus:outline-none"
+                                >
+                                  <option value="">-- Elige --</option>
+                                  <option value="no_aplica">No aplica</option>
+                                  <option value={'id' in homeRes ? homeRes.id : ''}>
+                                    {'flag' in homeRes ? `${homeRes.flag} ` : ''}{'name' in homeRes ? homeRes.name : 'Local'}
+                                  </option>
+                                  <option value={'id' in awayRes ? awayRes.id : ''}>
+                                    {'flag' in awayRes ? `${awayRes.flag} ` : ''}{'name' in awayRes ? awayRes.name : 'Visitante'}
+                                  </option>
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveOfficialAdminScores}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition-colors mt-2"
+                >
+                  Confirmar y Guardar Marcadores Oficiales
+                </button>
+              </div>
+
+              {/* Right Column: Habilitación de Pronósticos Semanales + Límite de Horas (5/12) */}
+              <div className="lg:col-span-5 space-y-6">
+
+                {/* Control de Desbloqueo de Semanas de Partidos */}
+                <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                        <Unlock className="h-4 w-4" />
+                        Habilitación de Pronósticos Semanales
+                      </h3>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        Controla qué semana de partidos está actualmente habilitada para que los participantes coloquen sus pronósticos.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-slate-400 font-bold uppercase mr-1">Activa:</span>
+                      <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-lg border border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                        Semana {unlockedWeek}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateUnlockedWeek(1)}
+                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                        unlockedWeek === 1
+                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[11px] font-black uppercase">Semana 1</span>
+                      <span className="text-[8px] font-bold opacity-60 font-mono">(11 - 14 Jun)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateUnlockedWeek(2)}
+                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                        unlockedWeek === 2
+                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[11px] font-black uppercase">Semana 2</span>
+                      <span className="text-[8px] font-bold opacity-60 font-mono">(15 - 21 Jun)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateUnlockedWeek(3)}
+                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                        unlockedWeek === 3
+                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[11px] font-black uppercase">Semana 3</span>
+                      <span className="text-[8px] font-bold opacity-60 font-mono">(22 - 28 Jun)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateUnlockedWeek(4)}
+                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                        unlockedWeek === 4
+                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[11px] font-black uppercase">Semana 4</span>
+                      <span className="text-[8px] font-bold opacity-60 font-mono">(29 Jun - 05 Jul)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateUnlockedWeek(5)}
+                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                        unlockedWeek === 5
+                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[11px] font-black uppercase">Semana 5</span>
+                      <span className="text-[8px] font-bold opacity-60 font-mono">(06 - 12 Jul)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateUnlockedWeek(6)}
+                      className={`p-2 rounded-xl border flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                        unlockedWeek === 6
+                          ? 'bg-amber-500/10 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                          : 'bg-slate-950 border-slate-850 text-slate-400 hover:border-slate-700 hover:text-white'
+                      }`}
+                    >
+                      <span className="text-[11px] font-black uppercase">Semana 6</span>
+                      <span className="text-[8px] font-bold opacity-60 font-mono">(13 - 19 Jul)</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Control de Límite Global de Registro */}
+                <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                      <Clock className="h-4 w-4 text-amber-500" />
+                      Límite Global de Pronósticos
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Pasada esta fecha límite, el sistema no permitirá guardar registros a usuarios comunes en grupos, llaves y premios.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-3 py-1">
+                    <div className="space-y-1 w-full">
+                      <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">Fecha y Hora Límite (ECU/Local)</label>
+                      <input
+                        type="datetime-local"
+                        value={adminDeadline}
+                        onChange={(e) => setAdminDeadline(e.target.value)}
+                        className="bg-slate-950 text-slate-200 border border-slate-800 focus:outline-none focus:border-amber-500 rounded-xl px-3 py-2 text-xs font-bold w-full"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleUpdateDeadline}
+                      className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-sans font-black uppercase tracking-wider text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer h-10"
+                    >
+                      <Save className="h-4 w-4 text-slate-950" />
+                      <span>Guardar Plazo Límite</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            {/* BLOCK 3: Llave Eliminatoria Oficial & Premios FIFA Oficiales */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+              {/* Left Column: Llave Eliminatoria Oficial (7/12) */}
+              <div className="lg:col-span-12 xl:col-span-7 bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
+                <div className="space-y-1 pb-1">
+                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <Trophy className="h-4 w-4 text-amber-400" />
+                    Llave Eliminatoria Oficial (Equipos Clasificados)
+                  </h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Calcula automáticamente los primeros y segundos lugares según los resultados oficiales registrados. 
+                    Selecciona exactamente los <strong>8 mejores terceros</strong> a continuación y guarda para oficializar el bracket eliminatorio.
+                  </p>
+                </div>
+
+                {(() => {
+                  // Compute temporary official standings from already saved matches
+                  const offMatches = initialMatches.map(m => {
+                    const saved = officialResults[m.id] || {};
+                    return { 
+                      ...m, 
+                      predictedHome: saved.homeScore !== undefined ? String(saved.homeScore) : '', 
+                      predictedAway: saved.awayScore !== undefined ? String(saved.awayScore) : '' 
+                    };
+                  });
+                  const offStandings = computeAllStandings(offMatches);
+                  const offFirsts: Record<string, string> = {};
+                  const offSeconds: Record<string, string> = {};
+                  GROUPS.forEach(g => {
+                     if (offStandings[g] && offStandings[g].length >= 2) {
+                       offFirsts[g] = offStandings[g][0].teamId;
+                       offSeconds[g] = offStandings[g][1].teamId;
+                     }
+                  });
+
+                  const computedThirds = getRankedThirdPlacedTeams(offStandings);
+
+                  const handleSaveBracket = async () => {
+                     if (!currentUser) return;
+                     if (adminOfficialThirds.length !== 8) {
+                       showToast("⚠️ Debe seleccionar exactamente 8 mejores terceros."); 
+                       return;
+                     }
+                     try {
+                       const res = await fetch('/api/admin/config/bracket', {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
+                         body: JSON.stringify({ 
+                           official_firsts: offFirsts, 
+                           official_seconds: offSeconds, 
+                           official_thirds: adminOfficialThirds 
+                         })
+                       });
+                       if (res.ok) {
+                         showToast("✅ Llave Eliminatoria Oficial guardada con éxito.");
+                         fetchConfig(); // Resync state immediately
+                       }
+                     } catch {
+                       showToast("❌ Error al guardar datos en la DB");
+                     }
+                  };
+
+                  return (
+                    <div className="space-y-4">
+                       <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-850">
+                         <div className="flex justify-between items-center mb-3">
+                           <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                             Mejores Terceros Detectados (Selecciona 8)
+                           </h4>
+                           <button 
+                             onClick={() => setAdminOfficialThirds(computedThirds.slice(0, 8).map(t => t.id))}
+                             className="text-[10px] bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 px-2 py-1 rounded-md transition-colors"
+                           >
+                             Autocompletar Mejores 8
+                           </button>
+                         </div>
+                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {computedThirds.map(t => {
+                              const isSelected = adminOfficialThirds.includes(t.id);
+                              return (
+                                <button
+                                  key={t.id}
+                                  onClick={() => {
+                                    let nt = [...adminOfficialThirds];
+                                    if (isSelected) {
+                                      nt = nt.filter(id => id !== t.id);
+                                    } else {
+                                      if (nt.length < 8) nt.push(t.id);
+                                    }
+                                    setAdminOfficialThirds(nt);
+                                  }}
+                                  className={`px-3 py-2 border rounded-xl flex items-center justify-between text-[11px] font-bold transition-all ${
+                                    isSelected 
+                                      ? 'border-amber-500 bg-amber-500/10 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.1)]' 
+                                      : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-600'
+                                  } cursor-pointer`}
+                                >
+                                   <span className="truncate">{t.name} (G{t.group})</span>
+                                   {isSelected && <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />}
+                                </button>
+                              );
+                            })}
+                            {computedThirds.length === 0 && (
+                              <div className="col-span-full text-xs text-slate-500 italic py-2">
+                                No hay datos de terceros aún. Ingrese marcadores en los partidos para calcularlos.
+                              </div>
+                            )}
+                         </div>
+                         <div className="text-right text-[10px] font-bold text-slate-400 mt-2">
+                           Seleccionados: {adminOfficialThirds.length} / 8
+                         </div>
+                       </div>
+
+                       <div className="flex justify-end gap-2 pt-1">
+                         <button
+                           onClick={async () => {
+                             if (!currentUser) return;
+                             try {
+                               const res = await fetch('/api/admin/config/bracket', {
+                                 method: 'POST',
+                                 headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
+                                 body: JSON.stringify({ official_firsts: {}, official_seconds: {}, official_thirds: [] })
+                               });
+                               if (res.ok) {
+                                 setAdminOfficialFirsts({});
+                                 setAdminOfficialSeconds({});
+                                 setAdminOfficialThirds([]);
+                                 showToast("🗑️ Llave Eliminatoria eliminada con éxito.");
+                                 fetchConfig();
+                               }
+                             } catch {
+                               showToast("❌ Error al borrar llave en la DB");
+                             }
+                           }}
+                           className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer inline-flex items-center gap-2 border border-slate-700 hover:border-slate-600"
+                         >
+                           <Trash2 className="h-4 w-4" />
+                           <span>ELIMINAR LLAVE</span>
+                         </button>
+                         <button 
+                           onClick={handleSaveBracket} 
+                           disabled={adminOfficialThirds.length !== 8}
+                           className="bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 px-5 py-2.5 font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                         >
+                           <Save className="h-4 w-4" />
+                           <span>OFICIALIZAR LLAVE</span>
+                         </button>
+                       </div>
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {/* Right Column: Registro de Ganadores Oficiales de Premios FIFA (5/12) */}
+              <div className="lg:col-span-12 xl:col-span-5 bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4 flex flex-col justify-between">
+                <div className="space-y-1">
+                  <h3 className="font-bold text-sm uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                    <Award className="h-4 w-4 text-amber-400" />
+                    Registro de Premios FIFA
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Los puntos de los participantes se recalcularán automáticamente en tiempo real.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3.5 py-1">
+                  <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Balón de Oro</label>
+                    <select
+                      value={adminBalonOro}
+                      onChange={(e) => setAdminBalonOro(e.target.value)}
+                      className="bg-[#020713] border border-slate-850 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                    >
+                      <option value="" className="text-slate-500 bg-[#020713]">-- Selecciona --</option>
+                      {AWARDS_BALON_ORO.map((p) => (
+                        <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Guante de Oro</label>
+                    <select
+                      value={adminGuanteOro}
+                      onChange={(e) => setAdminGuanteOro(e.target.value)}
+                      className="bg-[#020713] border border-slate-850 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                    >
+                      <option value="" className="text-slate-500 bg-[#020713]">-- Selecciona --</option>
+                      {AWARDS_GUANTE_ORO.map((p) => (
+                        <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Bota de Oro</label>
+                    <select
+                      value={adminBotaOro}
+                      onChange={(e) => setAdminBotaOro(e.target.value)}
+                      className="bg-[#020713] border border-slate-850 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                    >
+                      <option value="" className="text-slate-500 bg-[#020713]">-- Selecciona --</option>
+                      {AWARDS_BOTA_ORO.map((p) => (
+                        <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Jugador Joven</label>
+                    <select
+                      value={adminJovenTorneo}
+                      onChange={(e) => setAdminJovenTorneo(e.target.value)}
+                      className="bg-[#020713] border border-slate-850 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                    >
+                      <option value="" className="text-slate-500 bg-[#020713]">-- Selecciona --</option>
+                      {AWARDS_JOVEN_TORNEO.map((p) => (
+                        <option key={p} value={p} className="text-slate-200 bg-[#020713] font-sans">
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 text-right pt-2 border-t border-slate-850/60 mt-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setAdminBalonOro('');
+                      setAdminGuanteOro('');
+                      setAdminBotaOro('');
+                      setAdminJovenTorneo('');
+                      if (currentUser) {
+                        try {
+                          const res = await fetch('/api/admin/config/awards', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
+                            body: JSON.stringify({ official_balon_oro: '', official_guante_oro: '', official_bota_oro: '', official_joven_torneo: '' })
+                          });
+                          if (res.ok) { showToast("🗑️ Premios eliminados exitosamente."); }
+                        } catch { showToast("❌ Error al borrar premios"); }
+                      }
+                    }}
+                    className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-rose-450 text-rose-400 text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5 border border-slate-705"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Limpiar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveAdminAwards}
+                    className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-600 hover:to-teal-500 text-slate-950 text-xs font-black uppercase tracking-wider rounded-xl shadow-lg transition-all hover:scale-[1.02] cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Guardar Premios</span>
+                  </button>
                 </div>
               </div>
 
