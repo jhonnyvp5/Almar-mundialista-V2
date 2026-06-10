@@ -1537,16 +1537,22 @@ async function startServer() {
         puntosJovenTorneo: Number(r.puntosJovenTorneo),
       }));
 
-      // Helper function to extract last name from "nombreCompleto"
-      const getLastName = (fullName?: string): string => {
+      // Helper function to extract first last name (primer apellido) from "nombreCompleto"
+      const getFirstLastName = (fullName?: string): string => {
         if (!fullName) return '';
         const parts = fullName.trim().split(/\s+/);
-        return parts[parts.length - 1] || '';
+        const N = parts.length;
+        if (N >= 3) {
+          return parts[N - 2] || '';
+        } else if (N === 2) {
+          return parts[1] || '';
+        }
+        return parts[0] || '';
       };
 
       // Custom Sorting:
-      // - Users with puntos > 0 go at the top, sorted by puntos (DESC), then within same points, sorted by last name (ASC).
-      // - Users with points = 0 are sorted entirely alphabetically by last name (ASC) at the bottom.
+      // - Users with puntos > 0 go at the top, sorted by puntos (DESC), then within same points, sorted by first last name (ASC).
+      // - Users with points = 0 are sorted entirely alphabetically by first last name (ASC) at the bottom.
       stats.sort((a, b) => {
         const pA = a.puntos || 0;
         const pB = b.puntos || 0;
@@ -1554,18 +1560,18 @@ async function startServer() {
         if (pA > 0 && pB > 0) {
           // Both have points -> Highest points first
           if (pB !== pA) return pB - pA;
-          // Tie-breaker -> Alphabetical by last name
-          const lnA = getLastName(a.nombre);
-          const lnB = getLastName(b.nombre);
+          // Tie-breaker -> Alphabetical by first last name (primer apellido)
+          const lnA = getFirstLastName(a.nombre);
+          const lnB = getFirstLastName(b.nombre);
           return lnA.localeCompare(lnB, 'es', { sensitivity: 'base' });
         } else if (pA > 0 && pB === 0) {
           return -1; // user a has points, goes above
         } else if (pA === 0 && pB > 0) {
           return 1; // user b has points, goes above
         } else {
-          // Both have 0 points -> Alphabetical by last name
-          const lnA = getLastName(a.nombre);
-          const lnB = getLastName(b.nombre);
+          // Both have 0 points -> Alphabetical by first last name (primer apellido)
+          const lnA = getFirstLastName(a.nombre);
+          const lnB = getFirstLastName(b.nombre);
           return lnA.localeCompare(lnB, 'es', { sensitivity: 'base' });
         }
       });
