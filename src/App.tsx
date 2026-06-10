@@ -5586,9 +5586,12 @@ export default function App() {
                           <option value="1">Semana 1{unlockedWeek === 1 ? ' ⭐ (Semana Activa)' : ''}</option>
                           <option value="2">Semana 2{unlockedWeek === 2 ? ' ⭐ (Semana Activa)' : ''}</option>
                           <option value="3">Semana 3{unlockedWeek === 3 ? ' ⭐ (Semana Activa)' : ''}</option>
-                          <option value="4">Semana 4{unlockedWeek === 4 ? ' ⭐ (Semana Activa)' : ''}</option>
-                          <option value="5">Semana 5{unlockedWeek === 5 ? ' ⭐ (Semana Activa)' : ''}</option>
-                          <option value="6">Semana 6{unlockedWeek === 6 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="4">Round 32{unlockedWeek === 4 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="5">Round 1/8{unlockedWeek === 5 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="6">Round 1/4{unlockedWeek === 6 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="7">Round 1/2{unlockedWeek === 7 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="8">Round 3er Puesto{unlockedWeek === 8 ? ' ⭐ (Semana Activa)' : ''}</option>
+                          <option value="9">Gran final{unlockedWeek === 9 ? ' ⭐ (Semana Activa)' : ''}</option>
                         </select>
 
                         {/* Group Selection Filter */}
@@ -5666,7 +5669,7 @@ export default function App() {
                         const awayName = 'name' in awayRes ? awayRes.name : awayRes.text;
 
                         if (profileSearchWeek !== 'all') {
-                          if (getMatchWeek(m.date).toString() !== profileSearchWeek) {
+                          if (getMatchWeek(m.date, m.stage).toString() !== profileSearchWeek) {
                             return false;
                           }
                         }
