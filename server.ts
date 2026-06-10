@@ -53,6 +53,7 @@ interface DatabaseSchema {
     official_guante_oro?: string;
     official_bota_oro?: string;
     official_joven_torneo?: string;
+    official_campeon?: string;
     official_firsts?: Record<string, string>;
     official_seconds?: Record<string, string>;
     official_thirds?: string[];
@@ -94,6 +95,7 @@ async function loadDatabase(): Promise<DatabaseSchema> {
         official_guante_oro: conf[0].official_guante_oro || '',
         official_bota_oro: conf[0].official_bota_oro || '',
         official_joven_torneo: conf[0].official_joven_torneo || '',
+        official_campeon: conf[0].official_campeon || '',
         official_firsts: typeof conf[0].official_firsts === 'string' ? JSON.parse(conf[0].official_firsts) : conf[0].official_firsts || {},
         official_seconds: typeof conf[0].official_seconds === 'string' ? JSON.parse(conf[0].official_seconds) : conf[0].official_seconds || {},
         official_thirds: typeof conf[0].official_thirds === 'string' ? JSON.parse(conf[0].official_thirds) : conf[0].official_thirds || [],
@@ -105,6 +107,7 @@ async function loadDatabase(): Promise<DatabaseSchema> {
         official_guante_oro: '',
         official_bota_oro: '',
         official_joven_torneo: '',
+        official_campeon: '',
         official_firsts: {},
         official_seconds: {},
         official_thirds: [],
@@ -194,14 +197,15 @@ async function saveDatabase(db: DatabaseSchema) {
 
     if (db.config) {
       await client.query(`
-        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_firsts, official_seconds, official_thirds, match_overrides, deadline)
-        VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_campeon, official_firsts, official_seconds, official_thirds, match_overrides, deadline)
+        VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         ON CONFLICT (id) DO UPDATE SET
           "unlockedWeek" = EXCLUDED."unlockedWeek",
           official_balon_oro = EXCLUDED.official_balon_oro,
           official_guante_oro = EXCLUDED.official_guante_oro,
           official_bota_oro = EXCLUDED.official_bota_oro,
           official_joven_torneo = EXCLUDED.official_joven_torneo,
+          official_campeon = EXCLUDED.official_campeon,
           official_firsts = EXCLUDED.official_firsts,
           official_seconds = EXCLUDED.official_seconds,
           official_thirds = EXCLUDED.official_thirds,
@@ -213,6 +217,7 @@ async function saveDatabase(db: DatabaseSchema) {
         db.config.official_guante_oro, 
         db.config.official_bota_oro, 
         db.config.official_joven_torneo,
+        db.config.official_campeon || '',
         JSON.stringify(db.config.official_firsts || {}),
         JSON.stringify(db.config.official_seconds || {}),
         JSON.stringify(db.config.official_thirds || []),
@@ -806,6 +811,12 @@ async function startServer() {
     console.warn('Could not run ALTER TABLE config to add deadline:', err);
   }
 
+  try {
+    await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS official_campeon TEXT DEFAULT ''`);
+  } catch (err) {
+    console.warn('Could not run ALTER TABLE config to add official_campeon:', err);
+  }
+
   app.use(express.json());
 
   // API - Auth Check Cedula
@@ -1140,7 +1151,8 @@ async function startServer() {
       'award_balon_oro': 'Balón de Oro',
       'award_guante_oro': 'Guante de Oro',
       'award_bota_oro': 'Bota de Oro',
-      'award_joven_torneo': 'Jugador Joven'
+      'award_joven_torneo': 'Jugador Joven',
+      'award_campeon': 'Al Campeón'
     };
 
     const sheet4Data = scores.map((u, i) => {
@@ -1391,7 +1403,7 @@ async function startServer() {
   // API - Update awards in config (Admin only)
   app.post('/api/admin/config/awards', async (req, res) => {
     const requesterId = req.headers['x-user-id'] as string;
-    const { official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo } = req.body;
+    const { official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_campeon } = req.body;
 
     const db = await loadDatabase();
     const requester = db.users.find(u => u.id === requesterId);
@@ -1408,6 +1420,7 @@ async function startServer() {
     db.config.official_guante_oro = official_guante_oro ?? '';
     db.config.official_bota_oro = official_bota_oro ?? '';
     db.config.official_joven_torneo = official_joven_torneo ?? '';
+    db.config.official_campeon = official_campeon ?? '';
 
     await saveDatabase(db);
     res.json({ success: true, config: db.config });

@@ -287,12 +287,14 @@ export default function App() {
   const [predGuanteOro, setPredGuanteOro] = useState('');
   const [predBotaOro, setPredBotaOro] = useState('');
   const [predJovenTorneo, setPredJovenTorneo] = useState('');
+  const [predCampeon, setPredCampeon] = useState('');
 
   // Admin states for FIFA Awards Config
   const [adminBalonOro, setAdminBalonOro] = useState('');
   const [adminGuanteOro, setAdminGuanteOro] = useState('');
   const [adminBotaOro, setAdminBotaOro] = useState('');
   const [adminJovenTorneo, setAdminJovenTorneo] = useState('');
+  const [adminCampeon, setAdminCampeon] = useState('');
   const [adminDeadline, setAdminDeadline] = useState('2026-06-14T23:59:00');
   
   // Admin Participant Filters & Search & Deletion States
@@ -839,6 +841,7 @@ export default function App() {
       setPredGuanteOro(userPredictions['award_guante_oro']?.predictedWinnerId || '');
       setPredBotaOro(userPredictions['award_bota_oro']?.predictedWinnerId || '');
       setPredJovenTorneo(userPredictions['award_joven_torneo']?.predictedWinnerId || '');
+      setPredCampeon(userPredictions['award_campeon']?.predictedWinnerId || '');
     }
   }, [userPredictions]);
 
@@ -849,6 +852,7 @@ export default function App() {
       setAdminGuanteOro(systemConfig.official_guante_oro || '');
       setAdminBotaOro(systemConfig.official_bota_oro || '');
       setAdminJovenTorneo(systemConfig.official_joven_torneo || '');
+      setAdminCampeon(systemConfig.official_campeon || '');
       setAdminOfficialFirsts(systemConfig.official_firsts || {});
       setAdminOfficialSeconds(systemConfig.official_seconds || {});
       setAdminOfficialThirds(systemConfig.official_thirds || []);
@@ -1019,6 +1023,12 @@ export default function App() {
         predictedAway: '0',
         predictedWinnerId: predJovenTorneo,
         completed: false
+      },
+      award_campeon: {
+        predictedHome: '0',
+        predictedAway: '0',
+        predictedWinnerId: predCampeon,
+        completed: false
       }
     };
 
@@ -1055,7 +1065,8 @@ export default function App() {
           official_balon_oro: adminBalonOro,
           official_guante_oro: adminGuanteOro,
           official_bota_oro: adminBotaOro,
-          official_joven_torneo: adminJovenTorneo
+          official_joven_torneo: adminJovenTorneo,
+          official_campeon: adminCampeon
         })
       });
       const data = await res.json();
@@ -4643,9 +4654,9 @@ export default function App() {
                 </div>
               )}
 
-              {/* Form Body layout */}
+               {/* Form Body layout */}
               <div className="bg-slate-900/30 border border-slate-900 rounded-3xl p-6 sm:p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                   {/* BALÓN DE ORO */}
                   <div className={`relative transition-all duration-305 rounded-2xl p-5 border ${
                     isAwardsLocked ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
@@ -4919,6 +4930,75 @@ export default function App() {
                       )}
                     </div>
                   </div>
+
+                  {/* AL CAMPEÓN */}
+                  <div className={`relative transition-all duration-305 rounded-2xl p-5 border ${
+                    isAwardsLocked ? 'bg-slate-950/20 border-slate-900/60 opacity-80' : 'bg-[#020713]/60 border-slate-850 hover:border-amber-500/20'
+                  }`}>
+                    <div className="space-y-1.5 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1 font-sans">
+                          <Trophy className="h-4 w-4 text-amber-500" /> Al Campeón
+                        </span>
+                        <span className="text-[10px] font-black font-mono bg-amber-500/10 px-2 py-0.5 rounded-md text-amber-400">12 pts</span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-normal">
+                        Pronostica la selección que levantará la Copa del Mundo 2026.
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <select
+                        disabled={isAwardsLocked}
+                        value={predCampeon}
+                        onChange={(e) => setPredCampeon(e.target.value)}
+                        className="bg-[#020713] border border-slate-800 disabled:opacity-60 disabled:cursor-not-allowed px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                      >
+                        <option value="" className="text-slate-500 bg-[#020713]">Selecciona el Campeón...</option>
+                        {[...TEAMS].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })).map((team) => (
+                          <option key={team.id} value={team.id} className="text-slate-200 bg-[#020713]">
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                      {isAwardsLocked && (
+                        <div className="space-y-2 font-sans">
+                          <div className="text-[10px] uppercase font-black tracking-wider text-amber-500/80 flex items-center gap-1">
+                            <Lock className="h-3 w-3 text-amber-500" /> Candidato Bloqueado
+                          </div>
+                          {(() => {
+                            const official = systemConfig.official_campeon?.trim();
+                            const userVal = predCampeon?.trim();
+                            if (official) {
+                              const officialName = TEAMS.find(t => t.id === official)?.name || official;
+                              if (userVal === official) {
+                                return (
+                                  <div className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/25 text-center uppercase tracking-wide">
+                                    ✔️ ¡Acertado! (+12 pts)
+                                  </div>
+                                );
+                              } else {
+                                return (
+                                  <div className="space-y-1">
+                                    <div className="text-[10px] font-black text-rose-400 bg-rose-500/10 px-2 py-1 rounded-lg border border-rose-500/25 text-center uppercase tracking-wide">
+                                      ❌ No Acertado
+                                    </div>
+                                    <span className="text-[8.5px] font-bold text-slate-500 block text-center truncate">Ganador: {officialName}</span>
+                                  </div>
+                                );
+                              }
+                            } else {
+                              return (
+                                <div className="text-[9px] font-black text-slate-400 bg-slate-900/60 px-2 py-1 rounded-lg text-center uppercase tracking-wide">
+                                  ⏳ Por definir oficial
+                                </div>
+                              );
+                            }
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Submitting actions */}
@@ -5148,7 +5228,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                       {/* BALON DE ORO */}
                       <div className="bg-slate-950/40 border border-slate-900 p-4 rounded-xl flex flex-col justify-between space-y-3">
                         <div className="space-y-1">
@@ -5342,11 +5422,63 @@ export default function App() {
                               );
                             }
                             return (
-                              <div className="space-y-1">
+                              <div className="space-y-1 font-sans">
                                 <span className="text-[9px] font-black text-rose-400 bg-rose-500/10 px-2 py-1 rounded-md block text-center uppercase tracking-wide border border-rose-500/25">
                                   ❌ Fallado
                                 </span>
                                 <span className="text-[8.5px] font-black text-slate-500 block text-center truncate">Oficial: {official}</span>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* AL CAMPEÓN */}
+                      <div className="bg-slate-950/40 border border-slate-900 p-4 rounded-xl flex flex-col justify-between space-y-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1 font-sans">
+                              <Trophy className="h-3.5 w-3.5 text-amber-500" /> Al Campeón
+                            </span>
+                            <span className="text-[9px] font-black font-mono text-slate-500 font-sans">12 pts</span>
+                          </div>
+                          <p className="text-[9.5px] text-slate-400 font-semibold font-sans">Selección que ganará el torneo</p>
+                        </div>
+                        
+                        <input
+                          type="text"
+                          value={TEAMS.find(t => t.id === predCampeon)?.name || "No ingresado"}
+                          disabled={true}
+                          placeholder="No ingresado"
+                          className="bg-[#020713]/40 border border-slate-900 px-3 py-1.5 rounded-lg text-xs text-slate-400 focus:outline-none w-full font-bold cursor-not-allowed font-sans"
+                        />
+
+                        {/* RESULT STATUS */}
+                        <div className="pt-1">
+                          {(() => {
+                            const official = systemConfig.official_campeon?.trim();
+                            const userVal = predCampeon?.trim();
+                            if (!official) {
+                              return (
+                                <span className="text-[9px] font-black text-slate-400 bg-slate-900/80 px-2 py-1 rounded-md block text-center uppercase tracking-wide font-sans">
+                                  ⏳ Por definir
+                                </span>
+                              );
+                            }
+                            if (userVal === official) {
+                              return (
+                                <span className="text-[9px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md block text-center uppercase tracking-wide border border-emerald-500/25 font-sans">
+                                  ✔️ ¡Acertado! (+12)
+                                </span>
+                              );
+                            }
+                            const officialName = TEAMS.find(t => t.id === official)?.name || official;
+                            return (
+                              <div className="space-y-1 font-sans">
+                                <span className="text-[9px] font-black text-rose-400 bg-rose-500/10 px-2 py-1 rounded-md block text-center uppercase tracking-wide border border-rose-500/25">
+                                  ❌ Fallado
+                                </span>
+                                <span className="text-[8.5px] font-black text-slate-500 block text-center truncate">Oficial: {officialName}</span>
                               </div>
                             );
                           })()}
@@ -6571,6 +6703,22 @@ export default function App() {
                       ))}
                     </select>
                   </div>
+
+                  <div className="bg-slate-950/40 border border-slate-900 p-3 rounded-xl space-y-1 col-span-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block font-sans">Campeón</label>
+                    <select
+                      value={adminCampeon}
+                      onChange={(e) => setAdminCampeon(e.target.value)}
+                      className="bg-[#020713] border border-slate-850 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-200 focus:outline-none focus:border-amber-500/50 w-full font-sans"
+                    >
+                      <option value="" className="text-slate-500 bg-[#020713]">-- Selecciona --</option>
+                      {[...TEAMS].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })).map((t) => (
+                        <option key={t.id} value={t.id} className="text-slate-200 bg-[#020713] font-sans">
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 text-right pt-2 border-t border-slate-850/60 mt-2">
@@ -6581,12 +6729,13 @@ export default function App() {
                       setAdminGuanteOro('');
                       setAdminBotaOro('');
                       setAdminJovenTorneo('');
+                      setAdminCampeon('');
                       if (currentUser) {
                         try {
                           const res = await fetch('/api/admin/config/awards', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
-                            body: JSON.stringify({ official_balon_oro: '', official_guante_oro: '', official_bota_oro: '', official_joven_torneo: '' })
+                            body: JSON.stringify({ official_balon_oro: '', official_guante_oro: '', official_bota_oro: '', official_joven_torneo: '', official_campeon: '' })
                           });
                           if (res.ok) { showToast("🗑️ Premios eliminados exitosamente."); }
                         } catch { showToast("❌ Error al borrar premios"); }
