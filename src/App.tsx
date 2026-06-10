@@ -1955,8 +1955,8 @@ export default function App() {
           <div className="relative mb-5 scale-110">
             {/* Glowing arena ring in the center */}
             <div className="absolute -inset-4 rounded-full bg-teal-500/15 blur-xl opacity-90 animate-pulse" />
-            <div className="relative h-20 w-20 rounded-full border-2 border-teal-500/35 shadow-[0_0_25px_rgba(20,184,166,0.5)] bg-[#030a16]/90 flex items-center justify-center overflow-hidden">
-              <AlmarLogo iconOnly className="h-12 w-auto" />
+            <div className="relative flex items-center justify-center">
+              <AlmarLogo className="h-20 w-auto max-w-full drop-shadow-[0_4px_12px_rgba(20,184,166,0.25)]" />
             </div>
           </div>
 
@@ -2041,9 +2041,7 @@ export default function App() {
         <div className="max-w-md w-full bg-slate-900/80 border border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8 relative z-10 backdrop-blur-md">
           {/* Header Title */}
           <div className="text-center mb-6 flex flex-col items-center">
-            <div className="mb-4 bg-slate-950/60 p-3 rounded-2xl border border-slate-850 shadow-xl inline-block">
-              <AlmarLogo className="h-12 w-auto" />
-            </div>
+            <AlmarLogo className="h-24 w-auto object-contain mb-4 select-none" />
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white uppercase mt-1">
               Polla Mundialista 2026
             </h1>
@@ -2279,9 +2277,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
           
           <div className="flex items-center gap-3">
-            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-850 shadow-md">
-              <AlmarLogo iconOnly className="h-7 w-auto" />
-            </div>
+            <AlmarLogo className="h-14 w-auto object-contain select-none" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-extrabold tracking-tight text-white uppercase">
