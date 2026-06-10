@@ -811,7 +811,7 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         setUserPredictions(prev => ({ ...prev, ...payload }));
-        showToast(`✅ ¡Grupo ${gId} guardado con éxito! Las opciones han sido bloqueadas.`);
+        showToast(`✅ ¡Grupo ${gId} guardado con éxito!`);
       } else {
         showToast(`❌ Error al guardar clasificación del Grupo ${gId}: ${data.error || 'Intente de nuevo'}`);
       }
@@ -2591,7 +2591,7 @@ export default function App() {
                           <div className="font-bold text-slate-300 uppercase text-[9px] tracking-wider mb-1.5 flex items-center justify-between gap-1">
                             <div className="flex items-center gap-1">
                               {(isGroupStageSelectionsLocked() || isLockedByAutoSave) && <Lock className="h-3 w-3 text-red-400 shrink-0" />}
-                              <span>{isGroupOverriddenInDb && !isGroupEditable ? '🔒 Registro Guardado en Base de Datos' : (isLockedByAutoSave ? '🔒 Gp. Guardado y Bloqueado' : 'Selección Manual (Clasificados)')}</span>
+                              <span>{isGroupOverriddenInDb && !isGroupEditable ? '🔒 Registro Guardado en Base de Datos' : (isLockedByAutoSave ? '🔒 Posiciones Guardadas' : 'Selección Manual (Clasificados)')}</span>
                             </div>
                             {isCompleted && !isGroupStageSelectionsLocked() && (!isGroupOverriddenInDb || isGroupEditable) && (
                               <button
@@ -2604,9 +2604,9 @@ export default function App() {
                                     checkAndSaveGroup(gId, manualFirstPlaces[gId] || '', manualSecondPlaces[gId] || '', manualThirdsByGroup[gId] || '');
                                   }
                                 }}
-                                className="text-[9px] text-amber-500 hover:text-amber-400 font-bold underline cursor-pointer bg-transparent border-none p-0"
+                                className="text-[10px] text-amber-500 hover:text-amber-400 border border-amber-500/40 rounded-lg px-2 py-0.5 bg-amber-500/5 hover:bg-amber-500/15 cursor-pointer transition-all flex items-center gap-1 shadow-sm font-bold"
                               >
-                                {unlockedGroups[gId] ? '💾 Bloquear' : '✏️ Cambiar'}
+                                {unlockedGroups[gId] ? '💾 Guardar' : '✏️ Cambiar'}
                               </button>
                             )}
                           </div>
