@@ -175,150 +175,186 @@ async function loadDatabase(): Promise<DatabaseSchema> {
 }
 
 
-async function saveDatabase(db: DatabaseSchema) {
+async function saveDatabase(db: DatabaseSchema, options?: {
+  singleUserId?: string;
+  singleUserPredictionsId?: string;
+  configOnly?: boolean;
+  matchesOnly?: boolean;
+  recalculateRankings?: boolean;
+}) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // Save users
-    for (const u of db.users) {
-      await client.query(`
-        INSERT INTO users (id, "nombreCompleto", cedula, correo, empresa, localidad, "fechaHoraRegistro", role, blocked)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        ON CONFLICT (cedula) DO UPDATE SET
-          "nombreCompleto" = EXCLUDED."nombreCompleto",
-          correo = EXCLUDED.correo,
-          empresa = EXCLUDED.empresa,
-          localidad = EXCLUDED.localidad,
-          role = EXCLUDED.role,
-          blocked = EXCLUDED.blocked
-      `, [u.id, u.nombreCompleto, u.cedula, u.correo || null, u.empresa, u.localidad, u.fechaHoraRegistro ? new Date(u.fechaHoraRegistro) : null, u.role, u.blocked ? true : false]);
+    const saveAll = !options || Object.keys(options).length === 0;
+
+    // 1. Save users
+    if (saveAll || (options && options.singleUserId)) {
+      const usersToSave = options?.singleUserId 
+        ? db.users.filter(u => u.id === options.singleUserId)
+        : db.users;
+
+      for (const u of usersToSave) {
+        await client.query(`
+          INSERT INTO users (id, "nombreCompleto", cedula, correo, empresa, localidad, "fechaHoraRegistro", role, blocked)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          ON CONFLICT (cedula) DO UPDATE SET
+            "nombreCompleto" = EXCLUDED."nombreCompleto",
+            correo = EXCLUDED.correo,
+            empresa = EXCLUDED.empresa,
+            localidad = EXCLUDED.localidad,
+            role = EXCLUDED.role,
+            blocked = EXCLUDED.blocked
+        `, [u.id, u.nombreCompleto, u.cedula, u.correo || null, u.empresa, u.localidad, u.fechaHoraRegistro ? new Date(u.fechaHoraRegistro) : null, u.role, u.blocked ? true : false]);
+      }
     }
 
-    if (db.config) {
-      await client.query(`
-        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_campeon, official_firsts, official_seconds, official_thirds, match_overrides, deadline)
-        VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        ON CONFLICT (id) DO UPDATE SET
-          "unlockedWeek" = EXCLUDED."unlockedWeek",
-          official_balon_oro = EXCLUDED.official_balon_oro,
-          official_guante_oro = EXCLUDED.official_guante_oro,
-          official_bota_oro = EXCLUDED.official_bota_oro,
-          official_joven_torneo = EXCLUDED.official_joven_torneo,
-          official_campeon = EXCLUDED.official_campeon,
-          official_firsts = EXCLUDED.official_firsts,
-          official_seconds = EXCLUDED.official_seconds,
-          official_thirds = EXCLUDED.official_thirds,
-          match_overrides = EXCLUDED.match_overrides,
-          deadline = EXCLUDED.deadline
-      `, [
-        db.config.unlockedWeek, 
-        db.config.official_balon_oro, 
-        db.config.official_guante_oro, 
-        db.config.official_bota_oro, 
-        db.config.official_joven_torneo,
-        db.config.official_campeon || '',
-        JSON.stringify(db.config.official_firsts || {}),
-        JSON.stringify(db.config.official_seconds || {}),
-        JSON.stringify(db.config.official_thirds || []),
-        JSON.stringify(db.config.match_overrides || {}),
-        db.config.deadline || '2026-06-14T23:59:00'
-      ]);
+    // 2. Save Config
+    if (saveAll || (options && options.configOnly)) {
+      if (db.config) {
+        await client.query(`
+          INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_campeon, official_firsts, official_seconds, official_thirds, match_overrides, deadline)
+          VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          ON CONFLICT (id) DO UPDATE SET
+            "unlockedWeek" = EXCLUDED."unlockedWeek",
+            official_balon_oro = EXCLUDED.official_balon_oro,
+            official_guante_oro = EXCLUDED.official_guante_oro,
+            official_bota_oro = EXCLUDED.official_bota_oro,
+            official_joven_torneo = EXCLUDED.official_joven_torneo,
+            official_campeon = EXCLUDED.official_campeon,
+            official_firsts = EXCLUDED.official_firsts,
+            official_seconds = EXCLUDED.official_seconds,
+            official_thirds = EXCLUDED.official_thirds,
+            match_overrides = EXCLUDED.match_overrides,
+            deadline = EXCLUDED.deadline
+        `, [
+          db.config.unlockedWeek, 
+          db.config.official_balon_oro, 
+          db.config.official_guante_oro, 
+          db.config.official_bota_oro, 
+          db.config.official_joven_torneo,
+          db.config.official_campeon || '',
+          JSON.stringify(db.config.official_firsts || {}),
+          JSON.stringify(db.config.official_seconds || {}),
+          JSON.stringify(db.config.official_thirds || []),
+          JSON.stringify(db.config.match_overrides || {}),
+          db.config.deadline || '2026-06-14T23:59:00'
+        ]);
+      }
     }
 
-    for (const m of db.matches) {
-       await client.query(`
-         INSERT INTO matches (id, "matchId", "homeScore", "awayScore", "winnerId")
-         VALUES ($1, $1, $2, $3, $4)
-         ON CONFLICT ("matchId") DO UPDATE SET
-           "homeScore" = EXCLUDED."homeScore",
-           "awayScore" = EXCLUDED."awayScore",
-           "winnerId" = EXCLUDED."winnerId"
-       `, [m.matchId, m.homeScore, m.awayScore, m.winnerId]);
+    // 3. Save Matches
+    if (saveAll || (options && options.matchesOnly)) {
+      for (const m of db.matches) {
+         await client.query(`
+           INSERT INTO matches (id, "matchId", "homeScore", "awayScore", "winnerId")
+           VALUES ($1, $1, $2, $3, $4)
+           ON CONFLICT ("matchId") DO UPDATE SET
+             "homeScore" = EXCLUDED."homeScore",
+             "awayScore" = EXCLUDED."awayScore",
+             "winnerId" = EXCLUDED."winnerId"
+         `, [m.matchId, m.homeScore, m.awayScore, m.winnerId]);
+      }
     }
 
-    // Split predictions into 4 tables
-    for (const userId of Object.keys(db.predictions)) {
-      const preds = db.predictions[userId];
+    // 4. Save Predictions
+    const hasSinglePred = options && options.singleUserPredictionsId;
+    if (saveAll || hasSinglePred) {
+      const userIds = hasSinglePred ? [options.singleUserPredictionsId!] : Object.keys(db.predictions);
       
-      // Temporary object to group standings predictions by Group ID
-      const groupStandings: Record<string, any> = {};
-
-      for (const matchId of Object.keys(preds)) {
-        const p = preds[matchId];
+      for (const userId of userIds) {
+        const preds = db.predictions[userId];
+        if (!preds) continue;
         
-        if (matchId.startsWith('group_override_')) {
-           const parts = matchId.split('_');
-           const grp = parts[parts.length - 1]; // e.g. 'A'
-           if (!groupStandings[grp]) groupStandings[grp] = { first: null, second: null, third: null };
-           if (matchId.includes('_first_')) groupStandings[grp].first = p.predictedWinnerId;
-           if (matchId.includes('_second_')) groupStandings[grp].second = p.predictedWinnerId;
-           if (matchId.includes('_third_')) groupStandings[grp].third = p.predictedWinnerId;
-        } else if (matchId.startsWith('award_')) {
+        // Temporary object to group standings predictions by Group ID
+        const groupStandings: Record<string, any> = {};
+
+        for (const matchId of Object.keys(preds)) {
+          const p = preds[matchId];
+          
+          if (matchId.startsWith('group_override_')) {
+             const parts = matchId.split('_');
+             const grp = parts[parts.length - 1]; // e.g. 'A'
+             if (!groupStandings[grp]) groupStandings[grp] = { first: null, second: null, third: null };
+             if (matchId.includes('_first_')) groupStandings[grp].first = p.predictedWinnerId;
+             if (matchId.includes('_second_')) groupStandings[grp].second = p.predictedWinnerId;
+             if (matchId.includes('_third_')) groupStandings[grp].third = p.predictedWinnerId;
+          } else if (matchId.startsWith('award_')) {
+             await client.query(`
+               INSERT INTO fifa_awards_predictions (id, "userId", "awardId", "predictedWinnerId")
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT ("userId", "awardId") DO UPDATE SET
+                 "predictedWinnerId" = EXCLUDED."predictedWinnerId"
+             `, [`${userId}_${matchId}`, userId, matchId, p.predictedWinnerId]);
+          } else if (matchId.startsWith('K') || matchId.startsWith('O')) { // Knockouts
+             await client.query(`
+               INSERT INTO knockout_predictions (id, "userId", "matchId", "predictedHome", "predictedAway", "predictedWinnerId", completed)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)
+               ON CONFLICT ("userId", "matchId") DO UPDATE SET
+                 "predictedHome" = EXCLUDED."predictedHome",
+                 "predictedAway" = EXCLUDED."predictedAway",
+                 "predictedWinnerId" = EXCLUDED."predictedWinnerId",
+                 completed = EXCLUDED.completed
+             `, [`${userId}_${matchId}`, userId, matchId, p.predictedHome, p.predictedAway, p.predictedWinnerId, p.completed ? true : false]);
+          } else { // Standard matches
+             await client.query(`
+               INSERT INTO match_predictions (id, "userId", "matchId", "predictedHome", "predictedAway", completed)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               ON CONFLICT ("userId", "matchId") DO UPDATE SET
+                 "predictedHome" = EXCLUDED."predictedHome",
+                 "predictedAway" = EXCLUDED."predictedAway",
+                 completed = EXCLUDED.completed
+             `, [`${userId}_${matchId}`, userId, matchId, p.predictedHome, p.predictedAway, p.completed ? true : false]);
+          }
+        }
+
+        // Persist gathered group standings
+        for (const grp of Object.keys(groupStandings)) {
            await client.query(`
-             INSERT INTO fifa_awards_predictions (id, "userId", "awardId", "predictedWinnerId")
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT ("userId", "awardId") DO UPDATE SET
-               "predictedWinnerId" = EXCLUDED."predictedWinnerId"
-           `, [`${userId}_${matchId}`, userId, matchId, p.predictedWinnerId]);
-        } else if (matchId.startsWith('K') || matchId.startsWith('O')) { // Knockouts
-           await client.query(`
-             INSERT INTO knockout_predictions (id, "userId", "matchId", "predictedHome", "predictedAway", "predictedWinnerId", completed)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
-             ON CONFLICT ("userId", "matchId") DO UPDATE SET
-               "predictedHome" = EXCLUDED."predictedHome",
-               "predictedAway" = EXCLUDED."predictedAway",
-               "predictedWinnerId" = EXCLUDED."predictedWinnerId",
-               completed = EXCLUDED.completed
-           `, [`${userId}_${matchId}`, userId, matchId, p.predictedHome, p.predictedAway, p.predictedWinnerId, p.completed ? true : false]);
-        } else { // Standard matches
-           await client.query(`
-             INSERT INTO match_predictions (id, "userId", "matchId", "predictedHome", "predictedAway", completed)
+             INSERT INTO group_standings_predictions (id, "userId", "groupId", "firstPlaceId", "secondPlaceId", "thirdPlaceId")
              VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT ("userId", "matchId") DO UPDATE SET
-               "predictedHome" = EXCLUDED."predictedHome",
-               "predictedAway" = EXCLUDED."predictedAway",
-               completed = EXCLUDED.completed
-           `, [`${userId}_${matchId}`, userId, matchId, p.predictedHome, p.predictedAway, p.completed ? true : false]);
+             ON CONFLICT ("userId", "groupId") DO UPDATE SET
+               "firstPlaceId" = EXCLUDED."firstPlaceId",
+               "secondPlaceId" = EXCLUDED."secondPlaceId",
+               "thirdPlaceId" = EXCLUDED."thirdPlaceId"
+           `, [`${userId}_${grp}`, userId, grp, groupStandings[grp].first, groupStandings[grp].second, groupStandings[grp].third]);
         }
       }
-
-      // Persist gathered group standings
-      for (const grp of Object.keys(groupStandings)) {
-         await client.query(`
-           INSERT INTO group_standings_predictions (id, "userId", "groupId", "firstPlaceId", "secondPlaceId", "thirdPlaceId")
-           VALUES ($1, $2, $3, $4, $5, $6)
-           ON CONFLICT ("userId", "groupId") DO UPDATE SET
-             "firstPlaceId" = EXCLUDED."firstPlaceId",
-             "secondPlaceId" = EXCLUDED."secondPlaceId",
-             "thirdPlaceId" = EXCLUDED."thirdPlaceId"
-         `, [`${userId}_${grp}`, userId, grp, groupStandings[grp].first, groupStandings[grp].second, groupStandings[grp].third]);
-      }
     }
 
-    // Now recalculate and save User Rankings explicitly to user_rankings table
-    const rankings = calculateRankingStats(db);
-    for (const r of rankings) {
-       await client.query(`
+    // 5. Recalculate Rankings
+    // ONLY do this if requested or if doing a full save
+    if (saveAll || (options && options.recalculateRankings)) {
+      const rankings = calculateRankingStats(db);
+      for (const r of rankings) {
+         await client.query(`
+           INSERT INTO user_rankings ("userId", "puntos", "puntosFaseGrupos", "puntosCampeon", "aciertosExactos", "aciertosGanador", "aciertosGolesEquipo", "aciertosDiferenciaGol", "aciertosPrimeros", "aciertosSegundos", "aciertosTerceros", "puntosBalonOro", "puntosGuanteOro", "puntosBotaOro", "puntosJovenTorneo", updated)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
+           ON CONFLICT ("userId") DO UPDATE SET
+             "puntos" = EXCLUDED."puntos",
+             "puntosFaseGrupos" = EXCLUDED."puntosFaseGrupos",
+             "puntosCampeon" = EXCLUDED."puntosCampeon",
+             "aciertosExactos" = EXCLUDED."aciertosExactos",
+             "aciertosGanador" = EXCLUDED."aciertosGanador",
+             "aciertosGolesEquipo" = EXCLUDED."aciertosGolesEquipo",
+             "aciertosDiferenciaGol" = EXCLUDED."aciertosDiferenciaGol",
+             "aciertosPrimeros" = EXCLUDED."aciertosPrimeros",
+             "aciertosSegundos" = EXCLUDED."aciertosSegundos",
+             "aciertosTerceros" = EXCLUDED."aciertosTerceros",
+             "puntosBalonOro" = EXCLUDED."puntosBalonOro",
+             "puntosGuanteOro" = EXCLUDED."puntosGuanteOro",
+             "puntosBotaOro" = EXCLUDED."puntosBotaOro",
+             "puntosJovenTorneo" = EXCLUDED."puntosJovenTorneo",
+             updated = CURRENT_TIMESTAMP
+         `, [r.id, r.puntos, r.puntosFaseGrupos, r.puntosCampeon, r.aciertosExactos, r.aciertosGanador, r.aciertosGolesEquipo, r.aciertosDiferenciaGol, r.aciertosPrimeros, r.aciertosSegundos, r.aciertosTerceros, r.puntosBalonOro, r.puntosGuanteOro, r.puntosBotaOro, r.puntosJovenTorneo]);
+      }
+    } else if (options && options.singleUserId) {
+      // Ensure the registered/modified user has a ranking row initialized if it doesn't exist
+      await client.query(`
          INSERT INTO user_rankings ("userId", "puntos", "puntosFaseGrupos", "puntosCampeon", "aciertosExactos", "aciertosGanador", "aciertosGolesEquipo", "aciertosDiferenciaGol", "aciertosPrimeros", "aciertosSegundos", "aciertosTerceros", "puntosBalonOro", "puntosGuanteOro", "puntosBotaOro", "puntosJovenTorneo", updated)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
-         ON CONFLICT ("userId") DO UPDATE SET
-           "puntos" = EXCLUDED."puntos",
-           "puntosFaseGrupos" = EXCLUDED."puntosFaseGrupos",
-           "puntosCampeon" = EXCLUDED."puntosCampeon",
-           "aciertosExactos" = EXCLUDED."aciertosExactos",
-           "aciertosGanador" = EXCLUDED."aciertosGanador",
-           "aciertosGolesEquipo" = EXCLUDED."aciertosGolesEquipo",
-           "aciertosDiferenciaGol" = EXCLUDED."aciertosDiferenciaGol",
-           "aciertosPrimeros" = EXCLUDED."aciertosPrimeros",
-           "aciertosSegundos" = EXCLUDED."aciertosSegundos",
-           "aciertosTerceros" = EXCLUDED."aciertosTerceros",
-           "puntosBalonOro" = EXCLUDED."puntosBalonOro",
-           "puntosGuanteOro" = EXCLUDED."puntosGuanteOro",
-           "puntosBotaOro" = EXCLUDED."puntosBotaOro",
-           "puntosJovenTorneo" = EXCLUDED."puntosJovenTorneo",
-           updated = CURRENT_TIMESTAMP
-       `, [r.id, r.puntos, r.puntosFaseGrupos, r.puntosCampeon, r.aciertosExactos, r.aciertosGanador, r.aciertosGolesEquipo, r.aciertosDiferenciaGol, r.aciertosPrimeros, r.aciertosSegundos, r.aciertosTerceros, r.puntosBalonOro, r.puntosGuanteOro, r.puntosBotaOro, r.puntosJovenTorneo]);
+         VALUES ($1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CURRENT_TIMESTAMP)
+         ON CONFLICT ("userId") DO NOTHING
+      `, [options.singleUserId]);
     }
 
     await client.query('COMMIT');
@@ -919,7 +955,7 @@ async function startServer() {
       };
 
       db.users.push(newUser);
-      await saveDatabase(db);
+      await saveDatabase(db, { singleUserId: newUser.id });
 
       res.json({ user: newUser });
     } catch (error: any) {
@@ -996,7 +1032,7 @@ async function startServer() {
     }
 
     targetUser.blocked = !!blocked;
-    await saveDatabase(db);
+    await saveDatabase(db, { singleUserId: id });
 
     res.json({ success: true, user: targetUser });
   });
@@ -1026,13 +1062,17 @@ async function startServer() {
     // Remove user from list
     db.users.splice(targetUserIndex, 1);
     await pool.query('DELETE FROM users WHERE id = $1', [targetUser.id]);
+    await pool.query('DELETE FROM user_rankings WHERE "userId" = $1', [id]);
+    await pool.query('DELETE FROM match_predictions WHERE "userId" = $1', [id]);
+    await pool.query('DELETE FROM knockout_predictions WHERE "userId" = $1', [id]);
+    await pool.query('DELETE FROM group_standings_predictions WHERE "userId" = $1', [id]);
+    await pool.query('DELETE FROM fifa_awards_predictions WHERE "userId" = $1', [id]);
 
     // Clean up their predictions from database structure if any
     if (db.predictions && db.predictions[id]) {
       delete db.predictions[id];
     }
 
-    await saveDatabase(db);
     res.json({ success: true, message: 'Usuario y pronósticos eliminados correctamente.' });
   });
 
@@ -1316,7 +1356,7 @@ async function startServer() {
       };
     }
 
-    await saveDatabase(db);
+    await saveDatabase(db, { singleUserPredictionsId: userId });
     res.json({ success: true, predictions: db.predictions[userId] });
   });
 
@@ -1351,7 +1391,7 @@ async function startServer() {
     }
 
     db.config.unlockedWeek = numWeek;
-    await saveDatabase(db);
+    await saveDatabase(db, { configOnly: true });
     res.json({ success: true, config: db.config });
   });
 
@@ -1372,7 +1412,7 @@ async function startServer() {
     }
 
     db.config.deadline = deadline || '2026-06-14T23:59:00';
-    await saveDatabase(db);
+    await saveDatabase(db, { configOnly: true });
     res.json({ success: true, config: db.config });
   });
 
@@ -1396,7 +1436,7 @@ async function startServer() {
     db.config.official_seconds = official_seconds;
     db.config.official_thirds = official_thirds;
 
-    await saveDatabase(db);
+    await saveDatabase(db, { configOnly: true, recalculateRankings: true });
     res.json({ success: true, config: db.config });
   });
 
@@ -1422,7 +1462,7 @@ async function startServer() {
     db.config.official_joven_torneo = official_joven_torneo ?? '';
     db.config.official_campeon = official_campeon ?? '';
 
-    await saveDatabase(db);
+    await saveDatabase(db, { configOnly: true, recalculateRankings: true });
     res.json({ success: true, config: db.config });
   });
 
@@ -1443,7 +1483,7 @@ async function startServer() {
     }
 
     db.config.match_overrides = match_overrides || {};
-    await saveDatabase(db);
+    await saveDatabase(db, { configOnly: true });
     res.json({ success: true, config: db.config });
   });
 
@@ -1479,7 +1519,7 @@ async function startServer() {
       }
     });
 
-    await saveDatabase(db);
+    await saveDatabase(db, { matchesOnly: true, recalculateRankings: true });
     res.json({ success: true, matches: db.matches });
   });
 
