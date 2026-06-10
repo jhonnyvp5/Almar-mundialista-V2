@@ -650,24 +650,23 @@ export default function App() {
   }, []);
 
   const handleInstallApp = async () => {
+    // Show the step-by-step guidance modal immediately
+    setShowInstallInstructions(true);
+
     if (deferredPrompt) {
       try {
-        // Show the install prompt
+        // Automatically trigger the native browser installation prompt right away
         deferredPrompt.prompt();
-        // Wait for the user to respond to the prompt
+        // Wait for the user's choice
         const { outcome } = await deferredPrompt.userChoice;
         console.log(`User response to the install prompt: ${outcome}`);
         if (outcome === 'accepted') {
-          // We've used the prompt, and can't use it again
           setDeferredPrompt(null);
+          setShowInstallInstructions(false); // Close instructions if already installed
         }
       } catch (err) {
         console.error('Error triggering PWA install prompt:', err);
-        setShowInstallInstructions(true);
       }
-    } else {
-      // No prompt available (e.g. iOS or manually triggered), show the modal of instructions
-      setShowInstallInstructions(true);
     }
   };
 
