@@ -63,16 +63,30 @@ interface DatabaseSchema {
 }
 
 
-async function loadDatabase(): Promise<DatabaseSchema> {
+async function loadDatabase(userId?: string): Promise<DatabaseSchema> {
   try {
-    const { rows: users } = await pool.query('SELECT * FROM users');
+    const { rows: users } = userId 
+      ? await pool.query('SELECT * FROM users WHERE id = $1', [userId])
+      : await pool.query('SELECT * FROM users');
+
     const { rows: matches } = await pool.query('SELECT * FROM matches');
     
     // Read from the 4 new prediction tables
-    const { rows: pMatches } = await pool.query('SELECT * FROM match_predictions');
-    const { rows: pKnockouts } = await pool.query('SELECT * FROM knockout_predictions');
-    const { rows: pGroups } = await pool.query('SELECT * FROM group_standings_predictions');
-    const { rows: pAwards } = await pool.query('SELECT * FROM fifa_awards_predictions');
+    const { rows: pMatches } = userId
+      ? await pool.query('SELECT * FROM match_predictions WHERE "userId" = $1', [userId])
+      : await pool.query('SELECT * FROM match_predictions');
+
+    const { rows: pKnockouts } = userId
+      ? await pool.query('SELECT * FROM knockout_predictions WHERE "userId" = $1', [userId])
+      : await pool.query('SELECT * FROM knockout_predictions');
+
+    const { rows: pGroups } = userId
+      ? await pool.query('SELECT * FROM group_standings_predictions WHERE "userId" = $1', [userId])
+      : await pool.query('SELECT * FROM group_standings_predictions');
+
+    const { rows: pAwards } = userId
+      ? await pool.query('SELECT * FROM fifa_awards_predictions WHERE "userId" = $1', [userId])
+      : await pool.query('SELECT * FROM fifa_awards_predictions');
 
     const { rows: conf } = await pool.query("SELECT * FROM config WHERE id = 'system_config'");
 
@@ -928,21 +942,19 @@ async function startServer() {
         }
       }
 
-      const db = await loadDatabase();
-
       // Cédula duplicate check
-      const existing = db.users.find(u => u.cedula === cleanCedula);
-      if (existing) {
+      const dupCedulaCheck = await pool.query('SELECT * FROM users WHERE cedula = $1', [cleanCedula]);
+      if (dupCedulaCheck.rows.length > 0) {
         return res.status(400).json({ error: 'Ya existe un usuario registrado con esta cédula.' });
       }
 
       // Email duplicate check
-      const existingEmail = db.users.find(u => u.correo && u.correo.toLowerCase().trim() === cleanCorreo);
-      if (existingEmail) {
+      const dupEmailCheck = await pool.query('SELECT * FROM users WHERE LOWER(correo) = $1', [cleanCorreo]);
+      if (dupEmailCheck.rows.length > 0) {
         return res.status(400).json({ error: 'Ya existe un usuario registrado con este correo.' });
       }
 
-      const newUser: UserRecord = {
+      const newUser = {
         id: 'usr_' + Math.random().toString(36).substring(2, 9),
         nombreCompleto: cleanNombre,
         cedula: cleanCedula,
@@ -954,8 +966,17 @@ async function startServer() {
         blocked: false
       };
 
-      db.users.push(newUser);
-      await saveDatabase(db, { singleUserId: newUser.id });
+      // Direct Database inserts
+      await pool.query(`
+        INSERT INTO users (id, "nombreCompleto", cedula, correo, empresa, localidad, "fechaHoraRegistro", role, blocked)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `, [newUser.id, newUser.nombreCompleto, newUser.cedula, newUser.correo || null, newUser.empresa, newUser.localidad, newUser.fechaHoraRegistro ? new Date(newUser.fechaHoraRegistro) : null, newUser.role, newUser.blocked]);
+
+      await pool.query(`
+         INSERT INTO user_rankings ("userId", "puntos", "puntosFaseGrupos", "puntosCampeon", "aciertosExactos", "aciertosGanador", "aciertosGolesEquipo", "aciertosDiferenciaGol", "aciertosPrimeros", "aciertosSegundos", "aciertosTerceros", "puntosBalonOro", "puntosGuanteOro", "puntosBotaOro", "puntosJovenTorneo", updated)
+         VALUES ($1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CURRENT_TIMESTAMP)
+         ON CONFLICT ("userId") DO NOTHING
+      `, [newUser.id]);
 
       res.json({ user: newUser });
     } catch (error: any) {
@@ -973,27 +994,40 @@ async function startServer() {
       }
 
       const cleanCedula = cedula.trim();
-      const db = await loadDatabase();
 
       let user;
       if (correo && correo.trim() !== '') {
         const cleanCorreo = correo.trim().toLowerCase();
-        user = db.users.find(u => u.cedula === cleanCedula && u.correo && u.correo.trim().toLowerCase() === cleanCorreo);
-        if (!user) {
+        const userRes = await pool.query('SELECT * FROM users WHERE cedula = $1 AND LOWER(correo) = $2', [cleanCedula, cleanCorreo]);
+        if (userRes.rows.length === 0) {
           return res.status(400).json({ error: 'No se encontró ningún usuario registrado que coincida con este correo y cédula.' });
         }
+        user = userRes.rows[0];
       } else {
-        user = db.users.find(u => u.cedula === cleanCedula);
-        if (!user) {
+        const userRes = await pool.query('SELECT * FROM users WHERE cedula = $1', [cleanCedula]);
+        if (userRes.rows.length === 0) {
           return res.status(400).json({ error: 'No se encontró ningún usuario registrado con esta cédula.' });
         }
+        user = userRes.rows[0];
       }
 
-      if (user.blocked) {
+      const mappedUser = {
+        id: user.id || '',
+        nombreCompleto: user.nombreCompleto || '',
+        cedula: user.cedula || '',
+        correo: user.correo || '',
+        empresa: user.empresa || '',
+        localidad: user.localidad || '',
+        fechaHoraRegistro: user.fechaHoraRegistro ? new Date(user.fechaHoraRegistro).toISOString() : '',
+        role: user.role || 'user',
+        blocked: !!user.blocked
+      };
+
+      if (mappedUser.blocked) {
         return res.status(403).json({ error: 'Tu cuenta ha sido bloqueada por el administrador.' });
       }
 
-      res.json({ user });
+      res.json({ user: mappedUser });
     } catch (error: any) {
       console.error('Login error:', error);
       res.status(500).json({ error: 'Error interno del servidor. Por favor intenta de nuevo.' });
@@ -1269,7 +1303,7 @@ async function startServer() {
   // API - Get predictions of a user
   app.get('/api/predictions/:userId', async (req, res) => {
     const { userId } = req.params;
-    const db = await loadDatabase();
+    const db = await loadDatabase(userId);
     const userPredictions = db.predictions[userId] || {};
     res.json(userPredictions);
   });
@@ -1283,7 +1317,7 @@ async function startServer() {
       return res.status(400).json({ error: 'No se enviaron predicciones para guardar.' });
     }
 
-    const db = await loadDatabase();
+    const db = await loadDatabase(userId);
     
     // Check user block status
     const user = db.users.find(u => u.id === userId);
@@ -1413,11 +1447,41 @@ async function startServer() {
 
   // API - Get current Configuration
   app.get('/api/config', async (req, res) => {
-    const db = await loadDatabase();
-    if (!db.config) {
-      db.config = { unlockedWeek: 1 };
+    try {
+      const { rows: conf } = await pool.query("SELECT * FROM config WHERE id = 'system_config'");
+      if (conf.length === 0) {
+        return res.json({
+          unlockedWeek: 1,
+          official_balon_oro: '',
+          official_guante_oro: '',
+          official_bota_oro: '',
+          official_joven_torneo: '',
+          official_campeon: '',
+          official_firsts: {},
+          official_seconds: {},
+          official_thirds: [],
+          match_overrides: {},
+          deadline: '2026-06-14T23:59:00'
+        });
+      }
+      const systemConfig = {
+        unlockedWeek: conf[0].unlockedWeek || 1,
+        official_balon_oro: conf[0].official_balon_oro || '',
+        official_guante_oro: conf[0].official_guante_oro || '',
+        official_bota_oro: conf[0].official_bota_oro || '',
+        official_joven_torneo: conf[0].official_joven_torneo || '',
+        official_campeon: conf[0].official_campeon || '',
+        official_firsts: typeof conf[0].official_firsts === 'string' ? JSON.parse(conf[0].official_firsts) : conf[0].official_firsts || {},
+        official_seconds: typeof conf[0].official_seconds === 'string' ? JSON.parse(conf[0].official_seconds) : conf[0].official_seconds || {},
+        official_thirds: typeof conf[0].official_thirds === 'string' ? JSON.parse(conf[0].official_thirds) : conf[0].official_thirds || [],
+        match_overrides: typeof conf[0].match_overrides === 'string' ? JSON.parse(conf[0].match_overrides) : conf[0].match_overrides || {},
+        deadline: conf[0].deadline || '2026-06-14T23:59:00'
+      };
+      res.json(systemConfig);
+    } catch (error) {
+      console.error('Get config error:', error);
+      res.status(500).json({ error: 'Error interno del servidor al obtener la configuración.' });
     }
-    res.json(db.config);
   });
 
   // API - Update unlocked week (Admin only)
