@@ -26,13 +26,13 @@ export default defineConfig(() => {
           orientation: 'portrait',
           icons: [
             {
-              src: 'world_cup_trophy.svg',
+              src: 'world_cup_ball.svg',
               sizes: '192x192 256x256 384x384 512x512',
               type: 'image/svg+xml',
               purpose: 'any'
             },
             {
-              src: 'world_cup_trophy.svg',
+              src: 'world_cup_ball.svg',
               sizes: '192x192 256x256 384x384 512x512',
               type: 'image/svg+xml',
               purpose: 'maskable'
