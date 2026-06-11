@@ -26,6 +26,18 @@ export default defineConfig(() => {
           orientation: 'portrait',
           icons: [
             {
+              src: 'world_cup_trophy.svg',
+              sizes: '192x192 256x256 384x384 512x512',
+              type: 'image/svg+xml',
+              purpose: 'any'
+            },
+            {
+              src: 'world_cup_trophy.svg',
+              sizes: '192x192 256x256 384x384 512x512',
+              type: 'image/svg+xml',
+              purpose: 'maskable'
+            },
+            {
               src: 'pwa-192x192.png',
               sizes: '192x192',
               type: 'image/png'

@@ -37,9 +37,11 @@
     </linearGradient>
   </defs>
 
-  <!-- Clear canvas container with transparent/no background so it fits browser tab/favicon context flawlessly -->
+  <!-- Deep black background to provide high contrast in both dark and light browser tabs -->
+  <rect width="512" height="512" fill="#000000" />
 
-  <g id="official-wc-26-logo">
+  <!-- Main logo group scaled up for maximum tab/favicon visibility -->
+  <g id="official-wc-26-logo" transform="translate(256, 251) scale(1.15) translate(-256, -251)">
     <!-- The vertical "2" (top) and "6" (bottom) Capsule shaped base in Solid Black -->
     <g id="black-capsule-base">
       <!-- Standardized geometric blocks matching the official 2026 emblem layout exactly -->
