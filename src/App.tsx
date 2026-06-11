@@ -935,6 +935,19 @@ export default function App() {
   const standings = useMemo(() => computeAllStandings(combinedMatches), [combinedMatches]);
   const rankedThirds = useMemo(() => getRankedThirdPlacedTeams(standings), [standings]);
 
+  // Compute official standings in real time ONLY from official results (ignores user predictions)
+  const officialStandings = useMemo(() => {
+    const pureOfficialMatches = combinedMatches.map(m => {
+      const hasOfficial = m.homeScore !== undefined && m.homeScore !== null && String(m.homeScore).trim() !== '';
+      return {
+        ...m,
+        predictedHome: hasOfficial ? String(m.homeScore) : '',
+        predictedAway: hasOfficial ? String(m.awayScore) : '',
+      };
+    });
+    return computeAllStandings(pureOfficialMatches);
+  }, [combinedMatches]);
+
   // Check if group stage predictions and selections have been completed (Deprecated for users, but left just in case)
   const isGroupStageSelectionsCompleted = useMemo(() => {
     const hasAllFirst = GROUPS.every(g => manualFirstPlaces[g] && manualFirstPlaces[g].trim() !== '');
@@ -3005,7 +3018,7 @@ export default function App() {
                   Visualización y Clasificación de la Fase de Grupos
                 </h2>
                 <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-                  Visualiza los 12 grupos del Mundial 2026. Los puntos se calculan automáticamente de tus pronósticos. También puedes seleccionar manualmente a los clasificados a Dieciseisavos de Final.
+                  Visualiza los 12 grupos del Mundial 2026. Los puntos y posiciones se calculan únicamente en base a los resultados oficiales publicados por la administración. También puedes seleccionar manualmente a tus clasificados a Dieciseisavos de Final.
                 </p>
               </div>
 
@@ -3024,7 +3037,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {GROUPS.map((gId) => {
                 const groupTeams = TEAMS.filter((t) => t.group === gId);
-                const groupStandings = standings[gId] || [];
+                const groupStandings = officialStandings[gId] || [];
 
                 return (
                   <div key={gId} className="bg-slate-900/60 border border-slate-900 rounded-2xl p-5 space-y-4">
@@ -3260,7 +3273,7 @@ export default function App() {
                         const { gId, team, thirdTeamId } = item;
                         const isSelected = manualThirdPlaces.includes(team.id);
 
-                        const groupStandings = standings[gId];
+                        const groupStandings = officialStandings[gId];
                         const teamStanding = groupStandings?.find(s => s.teamId === thirdTeamId);
                         const points = teamStanding ? teamStanding.points : 0;
                         const goalDifference = teamStanding ? teamStanding.goalDifference : 0;
