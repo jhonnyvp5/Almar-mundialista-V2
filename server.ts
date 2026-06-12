@@ -59,9 +59,23 @@ interface DatabaseSchema {
     official_thirds?: string[];
     match_overrides?: Record<string, { date: string; time: string }>;
     deadline?: string;
+    maintenance_mode?: boolean;
   };
 }
 
+
+function getValueCaseInsensitive(obj: any, key: string): any {
+  if (!obj) return undefined;
+  if (obj[key] !== undefined) return obj[key];
+  const lowerKey = key.toLowerCase();
+  if (obj[lowerKey] !== undefined) return obj[lowerKey];
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase() === lowerKey) {
+      return obj[k];
+    }
+  }
+  return undefined;
+}
 
 async function loadDatabase(userId?: string): Promise<DatabaseSchema> {
   try {
@@ -91,11 +105,39 @@ async function loadDatabase(userId?: string): Promise<DatabaseSchema> {
     const { rows: conf } = await pool.query("SELECT * FROM config WHERE id = 'system_config'");
 
     const db: DatabaseSchema = {
-      users: users.map(u => ({
-        ...u,
-        blocked: !!u.blocked,
-        fechaHoraRegistro: u.fechaHoraRegistro ? new Date(u.fechaHoraRegistro).toISOString() : ''
-      })),
+      users: users.map(u => {
+        const idVal = getValueCaseInsensitive(u, 'id') || '';
+        const nameVal = getValueCaseInsensitive(u, 'nombreCompleto') || '';
+        const cedulaVal = getValueCaseInsensitive(u, 'cedula') || '';
+        const correoVal = getValueCaseInsensitive(u, 'correo') || '';
+        const empresaVal = getValueCaseInsensitive(u, 'empresa') || '';
+        const localidadVal = getValueCaseInsensitive(u, 'localidad') || '';
+        const dateVal = getValueCaseInsensitive(u, 'fechaHoraRegistro');
+        const roleVal = getValueCaseInsensitive(u, 'role') || 'user';
+        const blockedVal = getValueCaseInsensitive(u, 'blocked');
+
+        let formattedDate = '';
+        if (dateVal) {
+          try {
+            const d = new Date(dateVal);
+            if (!isNaN(d.getTime())) {
+              formattedDate = d.toISOString();
+            }
+          } catch (e) {}
+        }
+
+        return {
+          id: idVal,
+          nombreCompleto: nameVal,
+          cedula: cedulaVal,
+          correo: correoVal,
+          empresa: empresaVal,
+          localidad: localidadVal,
+          fechaHoraRegistro: formattedDate,
+          role: roleVal as 'user' | 'admin',
+          blocked: typeof blockedVal === 'boolean' ? blockedVal : (blockedVal === 'true' || blockedVal === 1)
+        };
+      }),
       predictions: {},
       matches: matches.map(m => ({
         matchId: m.matchId,
@@ -114,7 +156,8 @@ async function loadDatabase(userId?: string): Promise<DatabaseSchema> {
         official_seconds: typeof conf[0].official_seconds === 'string' ? JSON.parse(conf[0].official_seconds) : conf[0].official_seconds || {},
         official_thirds: typeof conf[0].official_thirds === 'string' ? JSON.parse(conf[0].official_thirds) : conf[0].official_thirds || [],
         match_overrides: typeof conf[0].match_overrides === 'string' ? JSON.parse(conf[0].match_overrides) : conf[0].match_overrides || {},
-        deadline: conf[0].deadline || '2026-06-14T23:59:00'
+        deadline: conf[0].deadline || '2026-06-14T23:59:00',
+        maintenance_mode: typeof conf[0].maintenance_mode === 'boolean' ? conf[0].maintenance_mode : (conf[0].maintenance_mode === 'true' || conf[0].maintenance_mode === 1 || conf[0].maintenance_mode === true)
       } : {
         unlockedWeek: 1,
         official_balon_oro: '',
@@ -126,7 +169,8 @@ async function loadDatabase(userId?: string): Promise<DatabaseSchema> {
         official_seconds: {},
         official_thirds: [],
         match_overrides: {},
-        deadline: '2026-06-14T23:59:00'
+        deadline: '2026-06-14T23:59:00',
+        maintenance_mode: false
       }
     };
 
@@ -227,8 +271,8 @@ async function saveDatabase(db: DatabaseSchema, options?: {
     if (saveAll || (options && options.configOnly)) {
       if (db.config) {
         await client.query(`
-          INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_campeon, official_firsts, official_seconds, official_thirds, match_overrides, deadline)
-          VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_campeon, official_firsts, official_seconds, official_thirds, match_overrides, deadline, maintenance_mode)
+          VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           ON CONFLICT (id) DO UPDATE SET
             "unlockedWeek" = EXCLUDED."unlockedWeek",
             official_balon_oro = EXCLUDED.official_balon_oro,
@@ -240,7 +284,8 @@ async function saveDatabase(db: DatabaseSchema, options?: {
             official_seconds = EXCLUDED.official_seconds,
             official_thirds = EXCLUDED.official_thirds,
             match_overrides = EXCLUDED.match_overrides,
-            deadline = EXCLUDED.deadline
+            deadline = EXCLUDED.deadline,
+            maintenance_mode = EXCLUDED.maintenance_mode
         `, [
           db.config.unlockedWeek, 
           db.config.official_balon_oro, 
@@ -252,7 +297,8 @@ async function saveDatabase(db: DatabaseSchema, options?: {
           JSON.stringify(db.config.official_seconds || {}),
           JSON.stringify(db.config.official_thirds || []),
           JSON.stringify(db.config.match_overrides || {}),
-          db.config.deadline || '2026-06-14T23:59:00'
+          db.config.deadline || '2026-06-14T23:59:00',
+          db.config.maintenance_mode ? true : false
         ]);
       }
     }
@@ -867,6 +913,12 @@ async function startServer() {
     console.warn('Could not run ALTER TABLE config to add official_campeon:', err);
   }
 
+  try {
+    await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS maintenance_mode BOOLEAN DEFAULT FALSE`);
+  } catch (err) {
+    console.warn('Could not run ALTER TABLE config to add maintenance_mode:', err);
+  }
+
   app.use(express.json());
 
   // API - Auth Check Cedula
@@ -1011,16 +1063,38 @@ async function startServer() {
         user = userRes.rows[0];
       }
 
+      const userIdVal = getValueCaseInsensitive(user, 'id') || '';
+      const nombreCompletoVal = getValueCaseInsensitive(user, 'nombreCompleto') || '';
+      const cedulaVal = getValueCaseInsensitive(user, 'cedula') || '';
+      const correoVal = getValueCaseInsensitive(user, 'correo') || '';
+      const empresaVal = getValueCaseInsensitive(user, 'empresa') || '';
+      const localidadVal = getValueCaseInsensitive(user, 'localidad') || '';
+      const fechaHoraRegistroVal = getValueCaseInsensitive(user, 'fechaHoraRegistro');
+      const roleVal = getValueCaseInsensitive(user, 'role') || 'user';
+      const blockedVal = getValueCaseInsensitive(user, 'blocked');
+
+      let formattedDate = '';
+      if (fechaHoraRegistroVal) {
+        try {
+          const d = new Date(fechaHoraRegistroVal);
+          if (!isNaN(d.getTime())) {
+            formattedDate = d.toISOString();
+          }
+        } catch (e) {
+          console.error('Error parsing fechaHoraRegistro:', e);
+        }
+      }
+
       const mappedUser = {
-        id: user.id || '',
-        nombreCompleto: user.nombreCompleto || '',
-        cedula: user.cedula || '',
-        correo: user.correo || '',
-        empresa: user.empresa || '',
-        localidad: user.localidad || '',
-        fechaHoraRegistro: user.fechaHoraRegistro ? new Date(user.fechaHoraRegistro).toISOString() : '',
-        role: user.role || 'user',
-        blocked: !!user.blocked
+        id: userIdVal,
+        nombreCompleto: nombreCompletoVal,
+        cedula: cedulaVal,
+        correo: correoVal,
+        empresa: empresaVal,
+        localidad: localidadVal,
+        fechaHoraRegistro: formattedDate,
+        role: roleVal,
+        blocked: typeof blockedVal === 'boolean' ? blockedVal : (blockedVal === 'true' || blockedVal === 1)
       };
 
       if (mappedUser.blocked) {
@@ -1029,7 +1103,7 @@ async function startServer() {
 
       res.json({ user: mappedUser });
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('Login error details:', error);
       res.status(500).json({ error: 'Error interno del servidor. Por favor intenta de nuevo.' });
     }
   });
@@ -1461,7 +1535,8 @@ async function startServer() {
           official_seconds: {},
           official_thirds: [],
           match_overrides: {},
-          deadline: '2026-06-14T23:59:00'
+          deadline: '2026-06-14T23:59:00',
+          maintenance_mode: false
         });
       }
       const systemConfig = {
@@ -1475,12 +1550,39 @@ async function startServer() {
         official_seconds: typeof conf[0].official_seconds === 'string' ? JSON.parse(conf[0].official_seconds) : conf[0].official_seconds || {},
         official_thirds: typeof conf[0].official_thirds === 'string' ? JSON.parse(conf[0].official_thirds) : conf[0].official_thirds || [],
         match_overrides: typeof conf[0].match_overrides === 'string' ? JSON.parse(conf[0].match_overrides) : conf[0].match_overrides || {},
-        deadline: conf[0].deadline || '2026-06-14T23:59:00'
+        deadline: conf[0].deadline || '2026-06-14T23:59:00',
+        maintenance_mode: typeof conf[0].maintenance_mode === 'boolean' ? conf[0].maintenance_mode : (conf[0].maintenance_mode === 'true' || conf[0].maintenance_mode === 1 || conf[0].maintenance_mode === true)
       };
       res.json(systemConfig);
     } catch (error) {
       console.error('Get config error:', error);
       res.status(500).json({ error: 'Error interno del servidor al obtener la configuración.' });
+    }
+  });
+
+  // API - Toggle Maintenance Mode (Admin only)
+  app.post('/api/admin/config/maintenance', async (req, res) => {
+    try {
+      const requesterId = req.headers['x-user-id'] as string;
+      const { maintenanceMode } = req.body;
+
+      const db = await loadDatabase();
+      const requester = db.users.find(u => u.id === requesterId);
+
+      if (!requester || requester.role !== 'admin') {
+        return res.status(403).json({ error: 'Acceso denegado. Se requiere ser Administrador.' });
+      }
+
+      if (!db.config) {
+        db.config = { unlockedWeek: 1 };
+      }
+
+      db.config.maintenance_mode = !!maintenanceMode;
+      await saveDatabase(db, { configOnly: true });
+      res.json({ success: true, config: db.config });
+    } catch (error) {
+      console.error('Toggle maintenance error:', error);
+      res.status(500).json({ error: 'Error interno del servidor al cambiar el estado de mantenimiento.' });
     }
   });
 
