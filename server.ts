@@ -254,15 +254,20 @@ async function saveDatabase(db: DatabaseSchema, options?: {
 
       for (const u of usersToSave) {
         await client.query(`
-          INSERT INTO users (id, "nombreCompleto", cedula, correo, empresa, localidad, "fechaHoraRegistro", role, blocked)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          ON CONFLICT (cedula) DO UPDATE SET
-            "nombreCompleto" = EXCLUDED."nombreCompleto",
-            correo = EXCLUDED.correo,
-            empresa = EXCLUDED.empresa,
-            localidad = EXCLUDED.localidad,
-            role = EXCLUDED.role,
-            blocked = EXCLUDED.blocked
+          MERGE INTO users WITH (HOLDLOCK) AS target
+          USING (SELECT $1 AS id, $2 AS nombreCompleto, $3 AS cedula, $4 AS correo, $5 AS empresa, $6 AS localidad, $7 AS fechaHoraRegistro, $8 AS role, $9 AS blocked) AS source
+          ON target.cedula = source.cedula
+          WHEN MATCHED THEN
+            UPDATE SET 
+              nombreCompleto = source.nombreCompleto,
+              correo = source.correo,
+              empresa = source.empresa,
+              localidad = source.localidad,
+              role = source.role,
+              blocked = source.blocked
+          WHEN NOT MATCHED THEN
+            INSERT (id, nombreCompleto, cedula, correo, empresa, localidad, fechaHoraRegistro, role, blocked)
+            VALUES (source.id, source.nombreCompleto, source.cedula, source.correo, source.empresa, source.localidad, source.fechaHoraRegistro, source.role, source.blocked);
         `, [u.id, u.nombreCompleto, u.cedula, u.correo || null, u.empresa, u.localidad, u.fechaHoraRegistro ? new Date(u.fechaHoraRegistro) : null, u.role, u.blocked ? true : false]);
       }
     }
@@ -271,21 +276,26 @@ async function saveDatabase(db: DatabaseSchema, options?: {
     if (saveAll || (options && options.configOnly)) {
       if (db.config) {
         await client.query(`
-          INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_campeon, official_firsts, official_seconds, official_thirds, match_overrides, deadline, maintenance_mode)
-          VALUES ('system_config', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-          ON CONFLICT (id) DO UPDATE SET
-            "unlockedWeek" = EXCLUDED."unlockedWeek",
-            official_balon_oro = EXCLUDED.official_balon_oro,
-            official_guante_oro = EXCLUDED.official_guante_oro,
-            official_bota_oro = EXCLUDED.official_bota_oro,
-            official_joven_torneo = EXCLUDED.official_joven_torneo,
-            official_campeon = EXCLUDED.official_campeon,
-            official_firsts = EXCLUDED.official_firsts,
-            official_seconds = EXCLUDED.official_seconds,
-            official_thirds = EXCLUDED.official_thirds,
-            match_overrides = EXCLUDED.match_overrides,
-            deadline = EXCLUDED.deadline,
-            maintenance_mode = EXCLUDED.maintenance_mode
+          MERGE INTO config WITH (HOLDLOCK) AS target
+          USING (SELECT 'system_config' AS id, $1 AS unlockedWeek, $2 AS official_balon_oro, $3 AS official_guante_oro, $4 AS official_bota_oro, $5 AS official_joven_torneo, $6 AS official_campeon, $7 AS official_firsts, $8 AS official_seconds, $9 AS official_thirds, $10 AS match_overrides, $11 AS deadline, $12 AS maintenance_mode) AS source
+          ON target.id = source.id
+          WHEN MATCHED THEN
+            UPDATE SET
+              unlockedWeek = source.unlockedWeek,
+              official_balon_oro = source.official_balon_oro,
+              official_guante_oro = source.official_guante_oro,
+              official_bota_oro = source.official_bota_oro,
+              official_joven_torneo = source.official_joven_torneo,
+              official_campeon = source.official_campeon,
+              official_firsts = source.official_firsts,
+              official_seconds = source.official_seconds,
+              official_thirds = source.official_thirds,
+              match_overrides = source.match_overrides,
+              deadline = source.deadline,
+              maintenance_mode = source.maintenance_mode
+          WHEN NOT MATCHED THEN
+            INSERT (id, unlockedWeek, official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_campeon, official_firsts, official_seconds, official_thirds, match_overrides, deadline, maintenance_mode)
+            VALUES (source.id, source.unlockedWeek, source.official_balon_oro, source.official_guante_oro, source.official_bota_oro, source.official_joven_torneo, source.official_campeon, source.official_firsts, source.official_seconds, source.official_thirds, source.match_overrides, source.deadline, source.maintenance_mode);
         `, [
           db.config.unlockedWeek, 
           db.config.official_balon_oro, 
@@ -307,12 +317,17 @@ async function saveDatabase(db: DatabaseSchema, options?: {
     if (saveAll || (options && options.matchesOnly)) {
       for (const m of db.matches) {
          await client.query(`
-           INSERT INTO matches (id, "matchId", "homeScore", "awayScore", "winnerId")
-           VALUES ($1, $1, $2, $3, $4)
-           ON CONFLICT ("matchId") DO UPDATE SET
-             "homeScore" = EXCLUDED."homeScore",
-             "awayScore" = EXCLUDED."awayScore",
-             "winnerId" = EXCLUDED."winnerId"
+           MERGE INTO matches WITH (HOLDLOCK) AS target
+           USING (SELECT $1 AS matchId, $2 AS homeScore, $3 AS awayScore, $4 AS winnerId) AS source
+           ON target.matchId = source.matchId
+           WHEN MATCHED THEN
+             UPDATE SET
+               homeScore = source.homeScore,
+               awayScore = source.awayScore,
+               winnerId = source.winnerId
+           WHEN NOT MATCHED THEN
+             INSERT (id, matchId, homeScore, awayScore, winnerId)
+             VALUES (source.matchId, source.matchId, source.homeScore, source.awayScore, source.winnerId);
          `, [m.matchId, m.homeScore, m.awayScore, m.winnerId]);
       }
     }
@@ -341,29 +356,43 @@ async function saveDatabase(db: DatabaseSchema, options?: {
              if (matchId.includes('_third_')) groupStandings[grp].third = p.predictedWinnerId;
           } else if (matchId.startsWith('award_')) {
              await client.query(`
-               INSERT INTO fifa_awards_predictions (id, "userId", "awardId", "predictedWinnerId")
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT ("userId", "awardId") DO UPDATE SET
-                 "predictedWinnerId" = EXCLUDED."predictedWinnerId"
+               MERGE INTO fifa_awards_predictions WITH (HOLDLOCK) AS target
+               USING (SELECT $1 AS id, $2 AS userId, $3 AS awardId, $4 AS predictedWinnerId) AS source
+               ON target.userId = source.userId AND target.awardId = source.awardId
+               WHEN MATCHED THEN
+                 UPDATE SET predictedWinnerId = source.predictedWinnerId
+               WHEN NOT MATCHED THEN
+                 INSERT (id, userId, awardId, predictedWinnerId)
+                 VALUES (source.id, source.userId, source.awardId, source.predictedWinnerId);
              `, [`${userId}_${matchId}`, userId, matchId, p.predictedWinnerId]);
           } else if (matchId.startsWith('K') || matchId.startsWith('O')) { // Knockouts
              await client.query(`
-               INSERT INTO knockout_predictions (id, "userId", "matchId", "predictedHome", "predictedAway", "predictedWinnerId", completed)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
-               ON CONFLICT ("userId", "matchId") DO UPDATE SET
-                 "predictedHome" = EXCLUDED."predictedHome",
-                 "predictedAway" = EXCLUDED."predictedAway",
-                 "predictedWinnerId" = EXCLUDED."predictedWinnerId",
-                 completed = EXCLUDED.completed
+               MERGE INTO knockout_predictions WITH (HOLDLOCK) AS target
+               USING (SELECT $1 AS id, $2 AS userId, $3 AS matchId, $4 AS predictedHome, $5 AS predictedAway, $6 AS predictedWinnerId, $7 AS completed) AS source
+               ON target.userId = source.userId AND target.matchId = source.matchId
+               WHEN MATCHED THEN
+                 UPDATE SET
+                   predictedHome = source.predictedHome,
+                   predictedAway = source.predictedAway,
+                   predictedWinnerId = source.predictedWinnerId,
+                   completed = source.completed
+               WHEN NOT MATCHED THEN
+                 INSERT (id, userId, matchId, predictedHome, predictedAway, predictedWinnerId, completed)
+                 VALUES (source.id, source.userId, source.matchId, source.predictedHome, source.predictedAway, source.predictedWinnerId, source.completed);
              `, [`${userId}_${matchId}`, userId, matchId, p.predictedHome, p.predictedAway, p.predictedWinnerId, p.completed ? true : false]);
           } else { // Standard matches
              await client.query(`
-               INSERT INTO match_predictions (id, "userId", "matchId", "predictedHome", "predictedAway", completed)
-               VALUES ($1, $2, $3, $4, $5, $6)
-               ON CONFLICT ("userId", "matchId") DO UPDATE SET
-                 "predictedHome" = EXCLUDED."predictedHome",
-                 "predictedAway" = EXCLUDED."predictedAway",
-                 completed = EXCLUDED.completed
+               MERGE INTO match_predictions WITH (HOLDLOCK) AS target
+               USING (SELECT $1 AS id, $2 AS userId, $3 AS matchId, $4 AS predictedHome, $5 AS predictedAway, $6 AS completed) AS source
+               ON target.userId = source.userId AND target.matchId = source.matchId
+               WHEN MATCHED THEN
+                 UPDATE SET
+                   predictedHome = source.predictedHome,
+                   predictedAway = source.predictedAway,
+                   completed = source.completed
+               WHEN NOT MATCHED THEN
+                 INSERT (id, userId, matchId, predictedHome, predictedAway, completed)
+                 VALUES (source.id, source.userId, source.matchId, source.predictedHome, source.predictedAway, source.completed);
              `, [`${userId}_${matchId}`, userId, matchId, p.predictedHome, p.predictedAway, p.completed ? true : false]);
           }
         }
@@ -371,12 +400,17 @@ async function saveDatabase(db: DatabaseSchema, options?: {
         // Persist gathered group standings
         for (const grp of Object.keys(groupStandings)) {
            await client.query(`
-             INSERT INTO group_standings_predictions (id, "userId", "groupId", "firstPlaceId", "secondPlaceId", "thirdPlaceId")
-             VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT ("userId", "groupId") DO UPDATE SET
-               "firstPlaceId" = EXCLUDED."firstPlaceId",
-               "secondPlaceId" = EXCLUDED."secondPlaceId",
-               "thirdPlaceId" = EXCLUDED."thirdPlaceId"
+             MERGE INTO group_standings_predictions WITH (HOLDLOCK) AS target
+             USING (SELECT $1 AS id, $2 AS userId, $3 AS groupId, $4 AS firstPlaceId, $5 AS secondPlaceId, $6 AS thirdPlaceId) AS source
+             ON target.userId = source.userId AND target.groupId = source.groupId
+             WHEN MATCHED THEN
+               UPDATE SET
+                 firstPlaceId = source.firstPlaceId,
+                 secondPlaceId = source.secondPlaceId,
+                 thirdPlaceId = source.thirdPlaceId
+             WHEN NOT MATCHED THEN
+               INSERT (id, userId, groupId, firstPlaceId, secondPlaceId, thirdPlaceId)
+               VALUES (source.id, source.userId, source.groupId, source.firstPlaceId, source.secondPlaceId, source.thirdPlaceId);
            `, [`${userId}_${grp}`, userId, grp, groupStandings[grp].first, groupStandings[grp].second, groupStandings[grp].third]);
         }
       }
@@ -388,32 +422,40 @@ async function saveDatabase(db: DatabaseSchema, options?: {
       const rankings = calculateRankingStats(db);
       for (const r of rankings) {
          await client.query(`
-           INSERT INTO user_rankings ("userId", "puntos", "puntosFaseGrupos", "puntosCampeon", "aciertosExactos", "aciertosGanador", "aciertosGolesEquipo", "aciertosDiferenciaGol", "aciertosPrimeros", "aciertosSegundos", "aciertosTerceros", "puntosBalonOro", "puntosGuanteOro", "puntosBotaOro", "puntosJovenTorneo", updated)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
-           ON CONFLICT ("userId") DO UPDATE SET
-             "puntos" = EXCLUDED."puntos",
-             "puntosFaseGrupos" = EXCLUDED."puntosFaseGrupos",
-             "puntosCampeon" = EXCLUDED."puntosCampeon",
-             "aciertosExactos" = EXCLUDED."aciertosExactos",
-             "aciertosGanador" = EXCLUDED."aciertosGanador",
-             "aciertosGolesEquipo" = EXCLUDED."aciertosGolesEquipo",
-             "aciertosDiferenciaGol" = EXCLUDED."aciertosDiferenciaGol",
-             "aciertosPrimeros" = EXCLUDED."aciertosPrimeros",
-             "aciertosSegundos" = EXCLUDED."aciertosSegundos",
-             "aciertosTerceros" = EXCLUDED."aciertosTerceros",
-             "puntosBalonOro" = EXCLUDED."puntosBalonOro",
-             "puntosGuanteOro" = EXCLUDED."puntosGuanteOro",
-             "puntosBotaOro" = EXCLUDED."puntosBotaOro",
-             "puntosJovenTorneo" = EXCLUDED."puntosJovenTorneo",
-             updated = CURRENT_TIMESTAMP
+           MERGE INTO user_rankings WITH (HOLDLOCK) AS target
+           USING (SELECT $1 AS userId, $2 AS puntos, $3 AS puntosFaseGrupos, $4 AS puntosCampeon, $5 AS aciertosExactos, $6 AS aciertosGanador, $7 AS aciertosGolesEquipo, $8 AS aciertosDiferenciaGol, $9 AS aciertosPrimeros, $10 AS aciertosSegundos, $11 AS aciertosTerceros, $12 AS puntosBalonOro, $13 AS puntosGuanteOro, $14 AS puntosBotaOro, $15 AS puntosJovenTorneo) AS source
+           ON target.userId = source.userId
+           WHEN MATCHED THEN
+             UPDATE SET
+               puntos = source.puntos,
+               puntosFaseGrupos = source.puntosFaseGrupos,
+               puntosCampeon = source.puntosCampeon,
+               aciertosExactos = source.aciertosExactos,
+               aciertosGanador = source.aciertosGanador,
+               aciertosGolesEquipo = source.aciertosGolesEquipo,
+               aciertosDiferenciaGol = source.aciertosDiferenciaGol,
+               aciertosPrimeros = source.aciertosPrimeros,
+               aciertosSegundos = source.aciertosSegundos,
+               aciertosTerceros = source.aciertosTerceros,
+               puntosBalonOro = source.puntosBalonOro,
+               puntosGuanteOro = source.puntosGuanteOro,
+               puntosBotaOro = source.puntosBotaOro,
+               puntosJovenTorneo = source.puntosJovenTorneo,
+               updated = CURRENT_TIMESTAMP
+           WHEN NOT MATCHED THEN
+             INSERT (userId, puntos, puntosFaseGrupos, puntosCampeon, aciertosExactos, aciertosGanador, aciertosGolesEquipo, aciertosDiferenciaGol, aciertosPrimeros, aciertosSegundos, aciertosTerceros, puntosBalonOro, puntosGuanteOro, puntosBotaOro, puntosJovenTorneo, updated)
+             VALUES (source.userId, source.puntos, source.puntosFaseGrupos, source.puntosCampeon, source.aciertosExactos, source.aciertosGanador, source.aciertosGolesEquipo, source.aciertosDiferenciaGol, source.aciertosPrimeros, source.aciertosSegundos, source.aciertosTerceros, source.puntosBalonOro, source.puntosGuanteOro, source.puntosBotaOro, source.puntosJovenTorneo, CURRENT_TIMESTAMP);
          `, [r.id, r.puntos, r.puntosFaseGrupos, r.puntosCampeon, r.aciertosExactos, r.aciertosGanador, r.aciertosGolesEquipo, r.aciertosDiferenciaGol, r.aciertosPrimeros, r.aciertosSegundos, r.aciertosTerceros, r.puntosBalonOro, r.puntosGuanteOro, r.puntosBotaOro, r.puntosJovenTorneo]);
       }
     } else if (options && options.singleUserId) {
       // Ensure the registered/modified user has a ranking row initialized if it doesn't exist
       await client.query(`
-         INSERT INTO user_rankings ("userId", "puntos", "puntosFaseGrupos", "puntosCampeon", "aciertosExactos", "aciertosGanador", "aciertosGolesEquipo", "aciertosDiferenciaGol", "aciertosPrimeros", "aciertosSegundos", "aciertosTerceros", "puntosBalonOro", "puntosGuanteOro", "puntosBotaOro", "puntosJovenTorneo", updated)
-         VALUES ($1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CURRENT_TIMESTAMP)
-         ON CONFLICT ("userId") DO NOTHING
+         MERGE INTO user_rankings WITH (HOLDLOCK) AS target
+         USING (SELECT $1 AS userId) AS source
+         ON target.userId = source.userId
+         WHEN NOT MATCHED THEN
+           INSERT (userId, puntos, puntosFaseGrupos, puntosCampeon, aciertosExactos, aciertosGanador, aciertosGolesEquipo, aciertosDiferenciaGol, aciertosPrimeros, aciertosSegundos, aciertosTerceros, puntosBalonOro, puntosGuanteOro, puntosBotaOro, puntosJovenTorneo, updated)
+           VALUES (source.userId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CURRENT_TIMESTAMP);
       `, [options.singleUserId]);
     }
 
@@ -896,25 +938,25 @@ async function startServer() {
   const PORT = 3000;
 
   try {
-    await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS match_overrides TEXT DEFAULT '{}'`);
+    await pool.query(`IF COL_LENGTH('config', 'match_overrides') IS NULL ALTER TABLE config ADD match_overrides NVARCHAR(MAX) DEFAULT '{}'`);
   } catch (err) {
     console.warn('Could not run ALTER TABLE config to add match_overrides:', err);
   }
 
   try {
-    await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS deadline TEXT DEFAULT '2026-06-14T23:59:00'`);
+    await pool.query(`IF COL_LENGTH('config', 'deadline') IS NULL ALTER TABLE config ADD deadline NVARCHAR(255) DEFAULT '2026-06-14T23:59:00'`);
   } catch (err) {
     console.warn('Could not run ALTER TABLE config to add deadline:', err);
   }
 
   try {
-    await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS official_campeon TEXT DEFAULT ''`);
+    await pool.query(`IF COL_LENGTH('config', 'official_campeon') IS NULL ALTER TABLE config ADD official_campeon NVARCHAR(255) DEFAULT ''`);
   } catch (err) {
     console.warn('Could not run ALTER TABLE config to add official_campeon:', err);
   }
 
   try {
-    await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS maintenance_mode BOOLEAN DEFAULT FALSE`);
+    await pool.query(`IF COL_LENGTH('config', 'maintenance_mode') IS NULL ALTER TABLE config ADD maintenance_mode BIT DEFAULT 0`);
   } catch (err) {
     console.warn('Could not run ALTER TABLE config to add maintenance_mode:', err);
   }
@@ -1025,9 +1067,12 @@ async function startServer() {
       `, [newUser.id, newUser.nombreCompleto, newUser.cedula, newUser.correo || null, newUser.empresa, newUser.localidad, newUser.fechaHoraRegistro ? new Date(newUser.fechaHoraRegistro) : null, newUser.role, newUser.blocked]);
 
       await pool.query(`
-         INSERT INTO user_rankings ("userId", "puntos", "puntosFaseGrupos", "puntosCampeon", "aciertosExactos", "aciertosGanador", "aciertosGolesEquipo", "aciertosDiferenciaGol", "aciertosPrimeros", "aciertosSegundos", "aciertosTerceros", "puntosBalonOro", "puntosGuanteOro", "puntosBotaOro", "puntosJovenTorneo", updated)
-         VALUES ($1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CURRENT_TIMESTAMP)
-         ON CONFLICT ("userId") DO NOTHING
+         MERGE INTO user_rankings WITH (HOLDLOCK) AS target
+         USING (SELECT $1 AS userId) AS source
+         ON target.userId = source.userId
+         WHEN NOT MATCHED THEN
+           INSERT (userId, puntos, puntosFaseGrupos, puntosCampeon, aciertosExactos, aciertosGanador, aciertosGolesEquipo, aciertosDiferenciaGol, aciertosPrimeros, aciertosSegundos, aciertosTerceros, puntosBalonOro, puntosGuanteOro, puntosBotaOro, puntosJovenTorneo, updated)
+           VALUES (source.userId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CURRENT_TIMESTAMP);
       `, [newUser.id]);
 
       res.json({ user: newUser });

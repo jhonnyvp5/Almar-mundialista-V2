@@ -1,13 +1,19 @@
-const { Pool } = require('pg');
-const pool = new Pool({
-  connectionString: "postgresql://neondb_owner:npg_d4oRtylu6FEU@ep-flat-cherry-aqt2lqfh-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
-  ssl: { rejectUnauthorized: false }
-});
+const sql = require('mssql');
+require('dotenv').config();
 
-pool.query('SELECT 1').then(() => {
-  console.log('Connected');
-  process.exit(0);
-}).catch(e => {
-  console.error(e);
-  process.exit(1);
-});
+const connectionString = process.env.DATABASE_URL || "sqlserver://localhost:1433;database=neondb;user=sa;password=Password123;encrypt=true;trustServerCertificate=true;";
+
+const main = async () => {
+  try {
+    const pool = await sql.connect(connectionString);
+    const result = await pool.request().query('SELECT 1 as test');
+    console.log('✅ Connected successfully to SQL Server. Test result:', result.recordset);
+    await sql.close();
+    process.exit(0);
+  } catch (err) {
+    console.error('❌ Failed to connect to SQL Server:', err);
+    process.exit(1);
+  }
+};
+
+main();
