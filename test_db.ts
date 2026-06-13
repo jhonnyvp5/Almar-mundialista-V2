@@ -1,16 +1,11 @@
 import pool from './neonDb.ts';
 
-async function updateDb() {
-  try {
-    await pool.query(`IF COL_LENGTH('config', 'official_firsts') IS NULL ALTER TABLE config ADD official_firsts NVARCHAR(MAX) DEFAULT '{}'`);
-    await pool.query(`IF COL_LENGTH('config', 'official_seconds') IS NULL ALTER TABLE config ADD official_seconds NVARCHAR(MAX) DEFAULT '{}'`);
-    await pool.query(`IF COL_LENGTH('config', 'official_thirds') IS NULL ALTER TABLE config ADD official_thirds NVARCHAR(MAX) DEFAULT '[]'`);
-    console.log("DB updated successfully");
-  } catch (error) {
-    console.error("Error updating DB:", error);
-  } finally {
-    await pool.end();
-  }
-}
-
-updateDb();
+pool.query(`
+  ALTER TABLE config 
+  ADD COLUMN IF NOT EXISTS official_firsts JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS official_seconds JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS official_thirds JSONB DEFAULT '[]'::jsonb;
+`).then(() => {
+  console.log("DB updated");
+  pool.end();
+}).catch(console.error);

@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Database,
-  Server,
   Trophy, 
   Calendar, 
   Table as TableIcon, 
@@ -363,43 +361,6 @@ export default function App() {
   // Loading indicator for server syncs
   const [loading, setLoading] = useState(false);
 
-  // Database Connection Health States
-  const [dbStatus, setDbStatus] = useState<any>(null);
-  const [dbStatusLoading, setDbStatusLoading] = useState<boolean>(false);
-
-  const fetchDbStatus = async () => {
-    try {
-      setDbStatusLoading(true);
-      const res = await fetch('/api/db-status');
-      const data = await res.json();
-      setDbStatus(data);
-    } catch (err) {
-      console.error('Error fetching db status:', err);
-    } finally {
-      setDbStatusLoading(false);
-    }
-  };
-
-  const handleRetryDbConnection = async () => {
-    try {
-      setDbStatusLoading(true);
-      const res = await fetch('/api/db-status/retry', { method: 'POST' });
-      const data = await res.json();
-      setDbStatus(data);
-      if (data.success) {
-        showToast('¡Conectado exitosamente a Azure SQL Database!');
-        fetchAdminData();
-      } else {
-        showToast('Conexión fallida. Seguimos en modo fallback local.');
-      }
-    } catch (err) {
-      console.error('Error retrying connection:', err);
-      showToast('Error al intentar reconectar.');
-    } finally {
-      setDbStatusLoading(false);
-    }
-  };
-
   // Helper toast notification
   const showToast = (message: string) => {
     setToast(message);
@@ -678,7 +639,6 @@ export default function App() {
       fetchRankings();
       if (currentUser.role === 'admin') {
         fetchAdminData();
-        fetchDbStatus();
       }
     }
   }, [currentUser]);
@@ -6061,84 +6021,6 @@ export default function App() {
                   <span>Exportar a Excel (CSV)</span>
                 </button>
               </div>
-            </div>
-
-            {/* PANEL DE MONITOREO DE BASE DE DATOS */}
-            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-xl ${dbStatus?.fallbackMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                    <Database className="h-5 w-5 animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-slate-100 uppercase tracking-tight flex items-center gap-2">
-                      Estado de Conexión Base de Datos SQL
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${dbStatus?.fallbackMode ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${dbStatus?.fallbackMode ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
-                        {dbStatus?.fallbackMode ? 'Modo Local Offline Resiliente' : 'Conectado a Azure SQL Server'}
-                      </span>
-                    </h3>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {dbStatus?.fallbackMode 
-                        ? 'La base de datos en Azure SQL Server está inaccesible debido a un bloqueo por firewall de Azure. El sistema está operando de manera offline redirigiendo todas las consultas localmente de forma transparente.'
-                        : 'El sistema está conectado exitosamente a la base de datos oficial en Azure Cloud. Todas las consultas y datos se leen y escriben directamente en el servidor SQL Server.'}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={dbStatusLoading}
-                  onClick={handleRetryDbConnection}
-                  className="w-full sm:w-auto px-4 py-2.5 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 disabled:bg-slate-800 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer border border-rose-500 flex items-center justify-center gap-1.5 whitespace-nowrap self-stretch sm:self-center font-bold"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${dbStatusLoading ? 'animate-spin' : ''}`} />
-                  <span>{dbStatusLoading ? 'PROBANDO...' : 'RECONECTAR Y PROBAR LIVE'}</span>
-                </button>
-              </div>
-
-              {dbStatus?.fallbackMode && (
-                <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-850 text-slate-300 space-y-3.5">
-                  <div className="flex items-start gap-2.5">
-                    <AlertTriangle className="h-4.5 w-4.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <div className="space-y-1.5">
-                      <div className="text-xs font-bold text-amber-400 uppercase tracking-tight">Acción requerida: Desbloquear IP de Cloud Run en Azure</div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Azure SQL Server bloquea la dirección IP de este entorno de pruebas. Para restaurar la sincronización en vivo y deshabilitar el fallback, agregue la dirección IP bloqueada en el firewall de Azure SQL Server:
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 bg-slate-900/60 p-3 rounded-lg border border-slate-800 text-[11px]">
-                    <div className="md:col-span-4 space-y-1">
-                      <span className="block text-[9px] uppercase font-black text-slate-400 font-bold">Servidor Azure SQL</span>
-                      <span className="font-mono text-white font-semibold">{dbStatus?.server || 'Cargando...'}</span>
-                    </div>
-                    <div className="md:col-span-4 space-y-1">
-                      <span className="block text-[9px] uppercase font-black text-slate-400 font-bold">Base de Datos</span>
-                      <span className="font-mono text-white font-semibold">{dbStatus?.database || 'Cargando...'}</span>
-                    </div>
-                    <div className="md:col-span-4 space-y-1 bg-rose-500/10 p-2 rounded border border-rose-500/20">
-                      <span className="block text-[9px] uppercase font-black text-rose-400 font-bold">Dirección IP Mapeada</span>
-                      <span className="font-mono text-rose-300 font-extrabold text-xs select-all flex items-center gap-1">
-                        <span className="bg-rose-500/20 px-1 rounded">{dbStatus?.blockedIp || '34.34.253.246'}</span>
-                        <span className="text-[9px] font-normal text-slate-400 select-none">(Doble clic para copiar)</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="text-[11px] space-y-1">
-                    <div className="font-bold text-slate-200 uppercase tracking-wider text-[10px]">Pasos para dar acceso en Azure:</div>
-                    <ol className="list-decimal pl-4 space-y-1 text-slate-400 font-medium">
-                      <li>Inicia sesión en el <a href="https://portal.azure.com" target="_blank" rel="noopener noreferrer" className="text-rose-400 hover:underline">Azure Portal</a>.</li>
-                      <li>Navega a tu servidor de SQL Server: <code className="bg-slate-900 px-1 py-0.5 rounded text-rose-300 font-mono">sql-database-dev-eastus-001</code>.</li>
-                      <li>Bajo el menú de la izquierda <strong>Seguridad</strong>, haz clic en <strong>Redes (Networking)</strong>.</li>
-                      <li>Agrega una regla de firewall con Nombre: <code className="bg-slate-900 px-1 py-0.5 rounded text-rose-300 font-mono font-bold">CloudRunAdminDev</code> con la IP bloqueada indicada arriba como IP de Inicio y de Fin.</li>
-                      <li>Guarda la configuración y en <strong>1 minuto</strong> haz clic arriba en el botón <strong>Reconectar y Probar Live</strong>.</li>
-                    </ol>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* BLOCK 1: Manejo de Participantes & Estadísticas en 2x2 */}
