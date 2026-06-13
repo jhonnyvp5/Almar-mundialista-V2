@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import pool from './neonDb';
+import pool, { isFallbackModeActive } from './neonDb';
 import * as xlsx from 'xlsx';
 import { TEAMS, GROUPS, generateGroupStageMatches, generateKnockoutMatches } from './src/data';
 import { Team } from './src/types';
@@ -1930,6 +1930,17 @@ async function startServer() {
   // API - Get Server Current Time
   app.get('/api/time', async (req, res) => {
     res.json({ serverTime: new Date().toISOString() });
+  });
+
+  // API - Get Database Connection and Fallback Status
+  app.get('/api/db-status', (req, res) => {
+    res.json({
+      fallbackMode: isFallbackModeActive(),
+      server: "sql-database-dev-eastus-001.database.windows.net",
+      database: "sqldb-mundial2026-dev-eastus-001",
+      user: "mundial2026_dev_sql_user",
+      status: isFallbackModeActive() ? "Offline / Local Fallback active (Azure SQL firewall block)" : "Connected to Azure SQL Database"
+    });
   });
 
   // Vite development mode setup or production build fallback
