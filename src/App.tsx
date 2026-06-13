@@ -477,20 +477,22 @@ export default function App() {
     );
   };
 
-  const renderMaintenanceOverlay = (sectionName: string) => {
+  const renderMaintenanceBanner = (sectionName: string) => {
     return (
-      <div className="bg-red-500/5 border border-red-900/35 rounded-2xl p-8 flex flex-col items-center text-center space-y-4 max-w-2xl mx-auto my-8">
-        <div className="bg-red-500/10 p-4 rounded-full border border-red-500/20 mb-1 animate-pulse">
-          <Wrench className="h-10 w-10 text-red-500" />
+      <div className="bg-red-550/10 border border-red-500/20 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 max-w-5xl mx-auto my-4 text-left shadow-lg">
+        <div className="bg-red-500/20 p-2.5 rounded-full border border-red-500/30 shrink-0">
+          <Wrench className="h-6 w-6 text-red-500 animate-pulse" />
         </div>
-        <h3 className="text-xl font-extrabold text-white uppercase tracking-tight">
-          La sección {sectionName} está temporalmente fuera de servicio
-        </h3>
-        <p className="text-xs text-slate-300 leading-relaxed max-w-sm">
-          El sistema se encuentra en <span className="text-amber-400 font-bold">Modo Mantenimiento</span>. Por seguridad y estabilidad de la plataforma, la carga y el guardado de pronósticos han sido deshabilitadas hasta que finalicen las tareas administrativas. Una vez desactivado el modo mantenimiento, podrás continuar sin problemas.
-        </p>
-        <div className="px-3 py-1 bg-red-950/40 border border-red-900/30 text-rose-300 text-[10px] uppercase font-black tracking-widest rounded-full">
-          Estás en una sesión activa, pero con privilegios de edición pausados
+        <div className="space-y-1 text-center sm:text-left flex-1">
+          <h4 className="text-sm font-extrabold text-white uppercase tracking-wider flex items-center justify-center sm:justify-start gap-1.5 leading-none">
+            🔧 Modo Mantenimiento en la sección: {sectionName}
+          </h4>
+          <p className="text-xs text-slate-300 leading-relaxed max-w-3xl pt-0.5">
+            El sistema se encuentra en <span className="text-red-400 font-bold">Modo Mantenimiento</span>. Por seguridad y estabilidad de la plataforma, el guardado o registro de pronósticos ha sido pausado. <span className="text-emerald-400 font-bold">Puedes visualizar tus pronósticos completados y recorrer la sección con total tranquilidad.</span>
+          </p>
+        </div>
+        <div className="px-2.5 py-1 bg-red-950/40 border border-red-900/35 text-rose-300 text-[9px] uppercase font-black tracking-widest rounded-full leading-none shrink-0">
+          EDICIÓN EN PAUSA 🔒
         </div>
       </div>
     );
@@ -518,65 +520,56 @@ export default function App() {
 
       // Fetch user predictions
       if (userId) {
-        if (systemConfig?.maintenance_mode && currentUser?.role !== 'admin') {
-          // If maintenance is active, do not load predictions (keep them empty on frontend)
+        const resPred = await fetch(`/api/predictions/${userId}`);
+        if (resPred.status === 403) {
           setUserPredictions({});
           setManualFirstPlaces({});
           setManualSecondPlaces({});
           setManualThirdsByGroup({});
           setManualThirdPlaces([]);
         } else {
-          const resPred = await fetch(`/api/predictions/${userId}`);
-          if (resPred.status === 403) {
-            setUserPredictions({});
-            setManualFirstPlaces({});
-            setManualSecondPlaces({});
-            setManualThirdsByGroup({});
-            setManualThirdPlaces([]);
-          } else {
-            const dataPred = await resPred.json();
-            setUserPredictions(dataPred);
+          const dataPred = await resPred.json();
+          setUserPredictions(dataPred);
 
-            // Parse custom group overrides from db predictions
-            const loadedFirsts: Record<string, string> = {};
-            const loadedSeconds: Record<string, string> = {};
-            const loadedThirds: Record<string, string> = {};
-            const loadedThirdList: string[] = [];
+          // Parse custom group overrides from db predictions
+          const loadedFirsts: Record<string, string> = {};
+          const loadedSeconds: Record<string, string> = {};
+          const loadedThirds: Record<string, string> = {};
+          const loadedThirdList: string[] = [];
 
-            Object.keys(dataPred).forEach((key) => {
-              if (key.startsWith('group_override_first_')) {
-                const group = key.replace('group_override_first_', '');
-                loadedFirsts[group] = dataPred[key].predictedWinnerId || '';
-              } else if (key.startsWith('group_override_second_')) {
-                const group = key.replace('group_override_second_', '');
-                loadedSeconds[group] = dataPred[key].predictedWinnerId || '';
-              } else if (key.startsWith('group_override_third_')) {
-                const group = key.replace('group_override_third_', '');
-                const val = dataPred[key].predictedWinnerId || '';
-                loadedThirds[group] = val;
-                if (val && val !== 'no_aplica' && !loadedThirdList.includes(val)) {
-                  loadedThirdList.push(val);
-                }
+          Object.keys(dataPred).forEach((key) => {
+            if (key.startsWith('group_override_first_')) {
+              const group = key.replace('group_override_first_', '');
+              loadedFirsts[group] = dataPred[key].predictedWinnerId || '';
+            } else if (key.startsWith('group_override_second_')) {
+              const group = key.replace('group_override_second_', '');
+              loadedSeconds[group] = dataPred[key].predictedWinnerId || '';
+            } else if (key.startsWith('group_override_third_')) {
+              const group = key.replace('group_override_third_', '');
+              const val = dataPred[key].predictedWinnerId || '';
+              loadedThirds[group] = val;
+              if (val && val !== 'no_aplica' && !loadedThirdList.includes(val)) {
+                loadedThirdList.push(val);
               }
-            });
+            }
+          });
 
-            if (Object.keys(loadedFirsts).length > 0) {
-              setManualFirstPlaces(loadedFirsts);
-            }
-            if (Object.keys(loadedSeconds).length > 0) {
-              setManualSecondPlaces(loadedSeconds);
-            }
-            if (Object.keys(loadedThirds).length > 0) {
-              setManualThirdsByGroup(loadedThirds);
-            }
+          if (Object.keys(loadedFirsts).length > 0) {
+            setManualFirstPlaces(loadedFirsts);
+          }
+          if (Object.keys(loadedSeconds).length > 0) {
+            setManualSecondPlaces(loadedSeconds);
+          }
+          if (Object.keys(loadedThirds).length > 0) {
+            setManualThirdsByGroup(loadedThirds);
+          }
 
-            const loadedBestThirdsPrediction = dataPred['group_override_best_thirds_list'];
-            if (loadedBestThirdsPrediction && loadedBestThirdsPrediction.predictedWinnerId) {
-              const list = loadedBestThirdsPrediction.predictedWinnerId.split(',').filter(Boolean);
-              setManualThirdPlaces(list);
-            } else if (loadedThirdList.length > 0) {
-              setManualThirdPlaces(loadedThirdList.slice(0, 8));
-            }
+          const loadedBestThirdsPrediction = dataPred['group_override_best_thirds_list'];
+          if (loadedBestThirdsPrediction && loadedBestThirdsPrediction.predictedWinnerId) {
+            const list = loadedBestThirdsPrediction.predictedWinnerId.split(',').filter(Boolean);
+            setManualThirdPlaces(list);
+          } else if (loadedThirdList.length > 0) {
+            setManualThirdPlaces(loadedThirdList.slice(0, 8));
           }
         }
       }
@@ -2526,8 +2519,8 @@ export default function App() {
     );
   }
 
-  // Render maintenance screen if active and user is not an administrator
-  if (systemConfig?.maintenance_mode && currentUser?.role !== 'admin') {
+  // Render maintenance screen if active and user is not logged in / has no active session
+  if (systemConfig?.maintenance_mode && !currentUser) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#110505] via-[#0d0101] to-[#040000] text-slate-100 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden font-sans">
         
@@ -3239,11 +3232,9 @@ export default function App() {
             
             {renderDeadlineBanner()}
 
-            {systemConfig?.maintenance_mode && currentUser?.role !== 'admin' ? (
-              renderMaintenanceOverlay("Fase de Grupos")
-            ) : (
-              <>
-                <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col gap-4">
+            {systemConfig?.maintenance_mode && currentUser?.role !== 'admin' && renderMaintenanceBanner("Fase de Grupos")}
+
+            <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col gap-4">
                   <div className="space-y-1">
                     <h2 className="text-xl font-extrabold text-white uppercase tracking-tight flex items-center gap-2">
                       <TableIcon className="h-5 w-5 text-amber-500" />
@@ -3614,9 +3605,6 @@ export default function App() {
                 </div>
               </div>
             )}
-
-              </>
-            )}
           </div>
         )}
 
@@ -3624,12 +3612,10 @@ export default function App() {
         {activeTab === 'calendar' && (
           <div className="space-y-6">
             
-            {systemConfig?.maintenance_mode && currentUser?.role !== 'admin' ? (
-              renderMaintenanceOverlay("Mis Pronósticos")
-) : (
-              <>
-                {/* Control Filters panel */}
-                <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
+            {systemConfig?.maintenance_mode && currentUser?.role !== 'admin' && renderMaintenanceBanner("Mis Pronósticos")}
+
+            {/* Control Filters panel */}
+            <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-900 space-y-4">
               
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-850 pb-4">
                 <div className="space-y-1">
@@ -3998,9 +3984,6 @@ export default function App() {
                 </div>
               )}
             </div>
-
-              </>
-            )}
           </div>
         )}
 
@@ -4010,11 +3993,9 @@ export default function App() {
             
             {renderDeadlineBanner()}
 
-            {systemConfig?.maintenance_mode && currentUser?.role !== 'admin' ? (
-              renderMaintenanceOverlay("Llaves Eliminatorias")
-            ) : (
-              <>
-                <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            {systemConfig?.maintenance_mode && currentUser?.role !== 'admin' && renderMaintenanceBanner("Llaves Eliminatorias")}
+
+            <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-1">
                 <h2 className="text-xl font-extrabold text-white uppercase tracking-tight flex items-center gap-2">
                   <Trophy className="h-5 w-5 text-amber-500" />
@@ -4102,11 +4083,7 @@ export default function App() {
                   );
                 })}
               </div>
-
             </div>
-
-              </>
-            )}
           </div>
         )}
 
@@ -4934,12 +4911,10 @@ export default function App() {
             <div className="space-y-8 animate-fade-in max-w-6xl mx-auto">
               {renderDeadlineBanner()}
 
-              {systemConfig?.maintenance_mode && currentUser?.role !== 'admin' ? (
-                renderMaintenanceOverlay("Premios FIFA")
-              ) : (
-                <>
-                  {/* Header Info Banner */}
-                  <div className="relative overflow-hidden rounded-3xl border border-amber-500/10 bg-gradient-to-r from-[#030d22] via-[#091b3a] to-[#04112c] p-6 sm:p-8 shadow-2xl">
+              {systemConfig?.maintenance_mode && currentUser?.role !== 'admin' && renderMaintenanceBanner("Premios FIFA")}
+
+              {/* Header Info Banner */}
+              <div className="relative overflow-hidden rounded-3xl border border-amber-500/10 bg-gradient-to-r from-[#030d22] via-[#091b3a] to-[#04112c] p-6 sm:p-8 shadow-2xl">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
                 <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl -ml-20 -mb-20 pointer-events-none" />
                 
@@ -5356,9 +5331,6 @@ export default function App() {
                   </div>
                 )}
               </div>
-
-                </>
-              )}
             </div>
           );
         })()}

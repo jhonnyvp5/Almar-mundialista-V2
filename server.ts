@@ -1485,11 +1485,6 @@ async function startServer() {
       const db = await loadDatabase(userId);
       const user = db.users.find(u => u.id === userId);
       
-      // If maintenance mode is active & user is not admin, prevent loading forecasts
-      if (db.config?.maintenance_mode && user && user.role !== 'admin') {
-        return res.status(403).json({ error: 'La carga de pronósticos está deshabilitada debido al modo mantenimiento.' });
-      }
-
       const userPredictions = db.predictions[userId] || {};
       res.json(userPredictions);
     } catch (e) {
@@ -1975,15 +1970,7 @@ async function startServer() {
       // Calculate predictions statistics explicitly from database queries for maximum accuracy
       const { rows: pMatchesCount } = await pool.query('SELECT COUNT(*) AS count FROM match_predictions');
       const { rows: pKnockoutsCount } = await pool.query('SELECT COUNT(*) AS count FROM knockout_predictions');
-      const { rows: pGroupsCount } = await pool.query(`
-        SELECT 
-          COALESCE(SUM(
-            (CASE WHEN "firstPlaceId" IS NOT NULL AND "firstPlaceId" <> '' THEN 1 ELSE 0 END) +
-            (CASE WHEN "secondPlaceId" IS NOT NULL AND "secondPlaceId" <> '' THEN 1 ELSE 0 END) +
-            (CASE WHEN "thirdPlaceId" IS NOT NULL AND "thirdPlaceId" <> '' THEN 1 ELSE 0 END)
-          ), 0) AS count 
-        FROM group_standings_predictions
-      `);
+      const { rows: pGroupsCount } = await pool.query('SELECT COUNT(*) AS count FROM group_standings_predictions');
       const { rows: pAwardsCount } = await pool.query('SELECT COUNT(*) AS count FROM fifa_awards_predictions');
 
       const mCount = parseInt(pMatchesCount[0]?.count || '0', 10);
