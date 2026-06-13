@@ -1,9 +1,17 @@
 import { Pool } from 'pg';
+import dotenv from 'dotenv';
+
+// Configure dotenv
+dotenv.config();
 
 // Create a new pool using the connection string format
 // Para usar este pool en el servidor, reemplaza el manejo local por consultas
 // Ejemplo: const { rows } = await pool.query('SELECT * FROM users');
-let connectionString = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_d4oRtylu6FEU@ep-flat-cherry-aqt2lqfh-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+const envUrl = process.env.DATABASE_URL;
+let connectionString = (envUrl && (envUrl.startsWith('postgresql://') || envUrl.startsWith('postgres://')))
+  ? envUrl
+  : "postgresql://neondb_owner:npg_d4oRtylu6FEU@ep-flat-cherry-aqt2lqfh-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+
 if (connectionString.includes('npg_x4kmFtLcYf2H')) {
   connectionString = connectionString.replace('npg_x4kmFtLcYf2H', 'npg_d4oRtylu6FEU');
 }

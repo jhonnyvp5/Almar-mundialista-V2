@@ -3,7 +3,11 @@ const path = require('path');
 const { Pool } = require('pg');
 require('dotenv').config();
 
-let connectionString = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_d4oRtylu6FEU@ep-flat-cherry-aqt2lqfh-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+const envUrl = process.env.DATABASE_URL;
+let connectionString = (envUrl && (envUrl.startsWith('postgresql://') || envUrl.startsWith('postgres://')))
+  ? envUrl
+  : "postgresql://neondb_owner:npg_d4oRtylu6FEU@ep-flat-cherry-aqt2lqfh-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require";
+
 if (connectionString.includes('npg_x4kmFtLcYf2H')) {
   connectionString = connectionString.replace('npg_x4kmFtLcYf2H', 'npg_d4oRtylu6FEU');
 }
