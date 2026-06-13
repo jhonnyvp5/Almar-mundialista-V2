@@ -81,6 +81,7 @@ function getValueCaseInsensitive(obj: any, key: string): any {
 }
 
 // --- IN-MEMORY CACHE & REQUEST COALESCING ---
+const APP_VERSION = "2026.06.13.01"; // Increment whenever updates are made to code/system
 let cachedDbSnapshot: DatabaseSchema | null = null;
 let cachedDbPromise: Promise<DatabaseSchema> | null = null;
 let cachedRankingJson: string | null = null;
@@ -1482,6 +1483,13 @@ async function startServer() {
 
     try {
       const db = await loadDatabase(userId);
+      const user = db.users.find(u => u.id === userId);
+      
+      // If maintenance mode is active & user is not admin, prevent loading forecasts
+      if (db.config?.maintenance_mode && user && user.role !== 'admin') {
+        return res.status(403).json({ error: 'La carga de pronósticos está deshabilitada debido al modo mantenimiento.' });
+      }
+
       const userPredictions = db.predictions[userId] || {};
       res.json(userPredictions);
     } catch (e) {
@@ -1508,6 +1516,11 @@ async function startServer() {
     }
     if (user.blocked) {
       return res.status(403).json({ error: 'Usuario bloqueado.' });
+    }
+
+    // Block saving during maintenance mode for non-advent users
+    if (db.config?.maintenance_mode && user.role !== 'admin') {
+      return res.status(403).json({ error: 'El sistema se encuentra en modo mantenimiento. No se pueden registrar pronósticos en este momento.' });
     }
 
     if (!db.predictions[userId]) {
@@ -1629,15 +1642,18 @@ async function startServer() {
 
   // API - Get current Configuration
   app.get('/api/config', async (req, res) => {
-    res.setHeader('ETag', `W/"config-${cacheVersions.config}"`);
+    res.setHeader('ETag', `W/"config-${cacheVersions.config}-${APP_VERSION}"`);
     res.setHeader('Cache-Control', 'public, no-cache');
-    if (req.headers['if-none-match'] === `W/"config-${cacheVersions.config}"`) {
+    if (req.headers['if-none-match'] === `W/"config-${cacheVersions.config}-${APP_VERSION}"`) {
       return res.status(304).end();
     }
 
     try {
       const db = await loadDatabase();
-      res.json(db.config);
+      res.json({
+        ...db.config,
+        appVersion: APP_VERSION
+      });
     } catch (error) {
       console.error('Get config error:', error);
       res.status(500).json({ error: 'Error interno del servidor al obtener la configuración.' });
@@ -1949,31 +1965,57 @@ async function startServer() {
 
   // API - Get general statistics
   app.get('/api/admin/stats', async (req, res) => {
-    const db = await loadDatabase();
-    
-    const totalUsers = db.users.length;
-    const activeUsers = db.users.filter(u => !u.blocked).length;
-    const blockedUsers = db.users.filter(u => u.blocked).length;
+    try {
+      const db = await loadDatabase();
+      
+      const totalUsers = db.users.length;
+      const activeUsers = db.users.filter(u => !u.blocked).length;
+      const blockedUsers = db.users.filter(u => u.blocked).length;
 
-    // Calculate predictions statistics
-    const totalPredictionsMade = Object.values(db.predictions).reduce((sum, userPreds) => {
-      return sum + Object.keys(userPreds).length;
-    }, 0);
+      // Calculate predictions statistics explicitly from database queries for maximum accuracy
+      const { rows: pMatchesCount } = await pool.query('SELECT COUNT(*) AS count FROM match_predictions');
+      const { rows: pKnockoutsCount } = await pool.query('SELECT COUNT(*) AS count FROM knockout_predictions');
+      const { rows: pGroupsCount } = await pool.query(`
+        SELECT 
+          COALESCE(SUM(
+            (CASE WHEN "firstPlaceId" IS NOT NULL AND "firstPlaceId" <> '' THEN 1 ELSE 0 END) +
+            (CASE WHEN "secondPlaceId" IS NOT NULL AND "secondPlaceId" <> '' THEN 1 ELSE 0 END) +
+            (CASE WHEN "thirdPlaceId" IS NOT NULL AND "thirdPlaceId" <> '' THEN 1 ELSE 0 END)
+          ), 0) AS count 
+        FROM group_standings_predictions
+      `);
+      const { rows: pAwardsCount } = await pool.query('SELECT COUNT(*) AS count FROM fifa_awards_predictions');
 
-    const matchPredictionCounts: Record<string, number> = {};
-    Object.values(db.predictions).forEach(userPreds => {
-      Object.keys(userPreds).forEach(mId => {
-        matchPredictionCounts[mId] = (matchPredictionCounts[mId] || 0) + 1;
+      const mCount = parseInt(pMatchesCount[0]?.count || '0', 10);
+      const kCount = parseInt(pKnockoutsCount[0]?.count || '0', 10);
+      const gCount = parseInt(pGroupsCount[0]?.count || '0', 10);
+      const aCount = parseInt(pAwardsCount[0]?.count || '0', 10);
+
+      const totalPredictionsMade = mCount + kCount + gCount + aCount;
+
+      const matchPredictionCounts: Record<string, number> = {};
+      Object.values(db.predictions).forEach(userPreds => {
+        Object.keys(userPreds).forEach(mId => {
+          matchPredictionCounts[mId] = (matchPredictionCounts[mId] || 0) + 1;
+        });
       });
-    });
 
-    res.json({
-      totalUsers,
-      activeUsers,
-      blockedUsers,
-      totalPredictionsMade,
-      matchPredictionCounts
-    });
+      res.json({
+        totalUsers,
+        activeUsers,
+        blockedUsers,
+        totalPredictionsMade,
+        breakdown: {
+          groupStandings: gCount,
+          matchesAndKnockouts: mCount + kCount,
+          fifaAwards: aCount
+        },
+        matchPredictionCounts
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Error general al calcular las estadísticas del sistema.' });
+    }
   });
 
   // API - Get Server Current Time
