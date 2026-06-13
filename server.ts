@@ -921,6 +921,32 @@ async function startServer() {
 
   app.use(express.json());
 
+  // API - Health Check Database
+  app.get('/api/health/db', async (req, res) => {
+    try {
+      const startTime = Date.now();
+      const result = await pool.query('SELECT 1 AS ok');
+      const duration = Date.now() - startTime;
+      return res.json({
+        status: 'success',
+        message: 'Conexión a la base de datos establecida correctamente con SELECT 1.',
+        pingMs: duration,
+        data: result.rows
+      });
+    } catch (error: any) {
+      console.error('Database connection diagnostic error:', error);
+      const obfuscatedConnStr = (process.env.DATABASE_URL || '').replace(/:([^:@]+)@/, ':****@');
+      return res.status(500).json({
+        status: 'error',
+        message: 'Fallo en la conexión a la base de datos.',
+        error: error.message || String(error),
+        code: error.code || null,
+        stack: error.stack || null,
+        connectionStringObfuscated: obfuscatedConnStr
+      });
+    }
+  });
+
   // API - Auth Check Cedula
   app.get('/api/auth/check-cedula/:cedula', async (req, res) => {
     try {
