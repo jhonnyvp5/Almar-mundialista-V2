@@ -80,31 +80,67 @@ function getValueCaseInsensitive(obj: any, key: string): any {
   return undefined;
 }
 
-async function loadDatabase(userId?: string): Promise<DatabaseSchema> {
-  try {
-    const { rows: users } = userId 
-      ? await pool.query('SELECT * FROM users WHERE id = $1', [userId])
-      : await pool.query('SELECT * FROM users');
+// --- IN-MEMORY CACHE & REQUEST COALESCING ---
+let cachedDbSnapshot: DatabaseSchema | null = null;
+let cachedDbPromise: Promise<DatabaseSchema> | null = null;
+let cachedRankingJson: string | null = null;
+let cachedRankingArray: any[] | null = null;
 
+const cacheVersions = {
+  db: Date.now(),
+  config: Date.now(),
+  ranking: Date.now(),
+  results: Date.now()
+};
+
+const userPredictionCacheVersions: Record<string, number> = {};
+
+function invalidateDbCache() {
+  cachedDbSnapshot = null;
+  cachedDbPromise = null;
+  cachedRankingJson = null;
+  cachedRankingArray = null;
+  cacheVersions.db = Date.now();
+  cacheVersions.config = Date.now();
+  cacheVersions.ranking = Date.now();
+  cacheVersions.results = Date.now();
+}
+
+function invalidateUserPredictionsCache(userId: string) {
+  userPredictionCacheVersions[userId] = Date.now();
+}
+
+async function getFullDatabase(): Promise<DatabaseSchema> {
+  if (cachedDbSnapshot) {
+    return cachedDbSnapshot;
+  }
+  if (cachedDbPromise) {
+    return cachedDbPromise;
+  }
+
+  cachedDbPromise = (async () => {
+    try {
+      const db = await loadDatabaseRaw();
+      cachedDbSnapshot = db;
+      return db;
+    } finally {
+      cachedDbPromise = null;
+    }
+  })();
+
+  return cachedDbPromise;
+}
+
+async function loadDatabaseRaw(): Promise<DatabaseSchema> {
+  try {
+    const { rows: users } = await pool.query('SELECT * FROM users');
     const { rows: matches } = await pool.query('SELECT * FROM matches');
     
     // Read from the 4 new prediction tables
-    const { rows: pMatches } = userId
-      ? await pool.query('SELECT * FROM match_predictions WHERE "userId" = $1', [userId])
-      : await pool.query('SELECT * FROM match_predictions');
-
-    const { rows: pKnockouts } = userId
-      ? await pool.query('SELECT * FROM knockout_predictions WHERE "userId" = $1', [userId])
-      : await pool.query('SELECT * FROM knockout_predictions');
-
-    const { rows: pGroups } = userId
-      ? await pool.query('SELECT * FROM group_standings_predictions WHERE "userId" = $1', [userId])
-      : await pool.query('SELECT * FROM group_standings_predictions');
-
-    const { rows: pAwards } = userId
-      ? await pool.query('SELECT * FROM fifa_awards_predictions WHERE "userId" = $1', [userId])
-      : await pool.query('SELECT * FROM fifa_awards_predictions');
-
+    const { rows: pMatches } = await pool.query('SELECT * FROM match_predictions');
+    const { rows: pKnockouts } = await pool.query('SELECT * FROM knockout_predictions');
+    const { rows: pGroups } = await pool.query('SELECT * FROM group_standings_predictions');
+    const { rows: pAwards } = await pool.query('SELECT * FROM fifa_awards_predictions');
     const { rows: conf } = await pool.query("SELECT * FROM config WHERE id = 'system_config'");
 
     const db: DatabaseSchema = {
@@ -230,9 +266,30 @@ async function loadDatabase(userId?: string): Promise<DatabaseSchema> {
 
     return db;
   } catch (error) {
-    console.error('Neon DB load error:', error);
+    console.error('Neon DB raw load error:', error);
     throw error;
   }
+}
+
+async function loadDatabase(userId?: string): Promise<DatabaseSchema> {
+  const fullDb = await getFullDatabase();
+
+  const dbCopy: DatabaseSchema = {
+    users: userId ? fullDb.users.filter(u => u.id === userId) : [...fullDb.users],
+    matches: [...fullDb.matches],
+    predictions: {},
+    config: { ...fullDb.config }
+  };
+
+  if (userId) {
+    if (fullDb.predictions[userId]) {
+      dbCopy.predictions[userId] = JSON.parse(JSON.stringify(fullDb.predictions[userId]));
+    }
+  } else {
+    dbCopy.predictions = JSON.parse(JSON.stringify(fullDb.predictions));
+  }
+
+  return dbCopy;
 }
 
 
@@ -421,6 +478,10 @@ async function saveDatabase(db: DatabaseSchema, options?: {
     }
 
     await client.query('COMMIT');
+    invalidateDbCache();
+    if (options && options.singleUserPredictionsId) {
+      invalidateUserPredictionsCache(options.singleUserPredictionsId);
+    }
   } catch (e) {
     await client.query('ROLLBACK');
     console.error("SaveDB Error", e);
@@ -1059,6 +1120,7 @@ async function startServer() {
          ON CONFLICT ("userId") DO NOTHING
       `, [newUser.id]);
 
+      invalidateDbCache();
       res.json({ user: newUser });
     } catch (error: any) {
       console.error('Register error:', error);
@@ -1210,6 +1272,7 @@ async function startServer() {
       delete db.predictions[id];
     }
 
+    invalidateDbCache();
     res.json({ success: true, message: 'Usuario y pronósticos eliminados correctamente.' });
   });
 
@@ -1406,9 +1469,25 @@ async function startServer() {
   // API - Get predictions of a user
   app.get('/api/predictions/:userId', async (req, res) => {
     const { userId } = req.params;
-    const db = await loadDatabase(userId);
-    const userPredictions = db.predictions[userId] || {};
-    res.json(userPredictions);
+
+    if (!userPredictionCacheVersions[userId]) {
+      userPredictionCacheVersions[userId] = Date.now();
+    }
+    const version = userPredictionCacheVersions[userId];
+    res.setHeader('ETag', `W/"pred-${userId}-${version}"`);
+    res.setHeader('Cache-Control', 'public, no-cache');
+    if (req.headers['if-none-match'] === `W/"pred-${userId}-${version}"`) {
+      return res.status(304).end();
+    }
+
+    try {
+      const db = await loadDatabase(userId);
+      const userPredictions = db.predictions[userId] || {};
+      res.json(userPredictions);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: 'Error getting predictions' });
+    }
   });
 
   // API - Save predictions of a user with locking validations
@@ -1550,39 +1629,15 @@ async function startServer() {
 
   // API - Get current Configuration
   app.get('/api/config', async (req, res) => {
+    res.setHeader('ETag', `W/"config-${cacheVersions.config}"`);
+    res.setHeader('Cache-Control', 'public, no-cache');
+    if (req.headers['if-none-match'] === `W/"config-${cacheVersions.config}"`) {
+      return res.status(304).end();
+    }
+
     try {
-      const { rows: conf } = await pool.query("SELECT * FROM config WHERE id = 'system_config'");
-      if (conf.length === 0) {
-        return res.json({
-          unlockedWeek: 1,
-          official_balon_oro: '',
-          official_guante_oro: '',
-          official_bota_oro: '',
-          official_joven_torneo: '',
-          official_campeon: '',
-          official_firsts: {},
-          official_seconds: {},
-          official_thirds: [],
-          match_overrides: {},
-          deadline: '2026-06-14T23:59:00',
-          maintenance_mode: false
-        });
-      }
-      const systemConfig = {
-        unlockedWeek: conf[0].unlockedWeek || 1,
-        official_balon_oro: conf[0].official_balon_oro || '',
-        official_guante_oro: conf[0].official_guante_oro || '',
-        official_bota_oro: conf[0].official_bota_oro || '',
-        official_joven_torneo: conf[0].official_joven_torneo || '',
-        official_campeon: conf[0].official_campeon || '',
-        official_firsts: typeof conf[0].official_firsts === 'string' ? JSON.parse(conf[0].official_firsts) : conf[0].official_firsts || {},
-        official_seconds: typeof conf[0].official_seconds === 'string' ? JSON.parse(conf[0].official_seconds) : conf[0].official_seconds || {},
-        official_thirds: typeof conf[0].official_thirds === 'string' ? JSON.parse(conf[0].official_thirds) : conf[0].official_thirds || [],
-        match_overrides: typeof conf[0].match_overrides === 'string' ? JSON.parse(conf[0].match_overrides) : conf[0].match_overrides || {},
-        deadline: conf[0].deadline || '2026-06-14T23:59:00',
-        maintenance_mode: typeof conf[0].maintenance_mode === 'boolean' ? conf[0].maintenance_mode : (conf[0].maintenance_mode === 'true' || conf[0].maintenance_mode === 1 || conf[0].maintenance_mode === true)
-      };
-      res.json(systemConfig);
+      const db = await loadDatabase();
+      res.json(db.config);
     } catch (error) {
       console.error('Get config error:', error);
       res.status(500).json({ error: 'Error interno del servidor al obtener la configuración.' });
@@ -1771,6 +1826,11 @@ async function startServer() {
 
   // API - Get official results
   app.get('/api/admin/results', async (req, res) => {
+    res.setHeader('ETag', `W/"results-${cacheVersions.results}"`);
+    res.setHeader('Cache-Control', 'public, no-cache');
+    if (req.headers['if-none-match'] === `W/"results-${cacheVersions.results}"`) {
+      return res.status(304).end();
+    }
     const db = await loadDatabase();
     res.json(db.matches);
   });
@@ -1778,7 +1838,18 @@ async function startServer() {
 
   // API - Get Ranking
   app.get('/api/ranking', async (req, res) => {
+    res.setHeader('ETag', `W/"ranking-${cacheVersions.ranking}"`);
+    res.setHeader('Cache-Control', 'public, no-cache');
+    if (req.headers['if-none-match'] === `W/"ranking-${cacheVersions.ranking}"`) {
+      return res.status(304).end();
+    }
+
     try {
+      if (cachedRankingJson) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.send(cachedRankingJson);
+      }
+
       // Perform a LEFT JOIN starting from users to include ALL users who are not admin
       const { rows: fullRanking } = await pool.query(`
         SELECT 
@@ -1786,11 +1857,6 @@ async function startServer() {
           u."nombreCompleto" AS "nombreCompleto",
           u.empresa,
           u.localidad,
-          u.cedula,
-          u.correo,
-          u."fechaHoraRegistro" AS "fechaHoraRegistro",
-          u.role,
-          u.blocked,
           COALESCE(r.puntos, 0) AS puntos,
           COALESCE(r."puntosFaseGrupos", 0) AS "puntosFaseGrupos",
           COALESCE(r."puntosCampeon", 0) AS "puntosCampeon",
@@ -1815,11 +1881,6 @@ async function startServer() {
         nombre: (r.nombreCompleto || '').replace(/[\uFFFD\u00A0]/g, 'Ñ'),
         empresa: r.empresa,
         localidad: r.localidad,
-        cedula: r.cedula,
-        correo: r.correo,
-        fechaRegistro: r.fechaHoraRegistro,
-        role: r.role,
-        blocked: r.blocked,
         puntos: Number(r.puntos),
         puntosFaseGrupos: Number(r.puntosFaseGrupos),
         puntosCampeon: Number(r.puntosCampeon),
@@ -1875,7 +1936,11 @@ async function startServer() {
         }
       });
 
-      res.json(stats);
+      cachedRankingJson = JSON.stringify(stats);
+      cachedRankingArray = stats;
+
+      res.setHeader('Content-Type', 'application/json');
+      res.send(cachedRankingJson);
     } catch (e) {
       console.error(e);
       res.status(500).json({ error: 'Error getting ranking' });
