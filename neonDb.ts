@@ -96,6 +96,8 @@ interface EmulatedDb {
 
 let fallbackStore: EmulatedDb | null = null;
 let fallbackModeActive = false;
+export let lastErrorIp: string | null = null;
+export let lastConnectionError: string | null = null;
 
 // Return whether we are operating under local fallback
 export function isFallbackModeActive(): boolean {
@@ -717,15 +719,18 @@ function getPool(): Promise<mssql.ConnectionPool> {
     poolPromise = pool.connect().then(p => {
       console.log('✅ Connected to MS SQL Server successfully.');
       fallbackModeActive = false;
+      lastErrorIp = null;
+      lastConnectionError = null;
       return p;
     }).catch(err => {
       const errMsg = err?.message || '';
       fallbackModeActive = true;
-      console.log('ℹ️ Dynamic State: SQL Connection unavailable. Transparently routing queries to Azure-Resilient Local SQL Emulator.');
+      lastConnectionError = errMsg;
 
       if (errMsg.includes('is not allowed to access the server') || errMsg.includes('Client with IP address')) {
         const ipMatch = errMsg.match(/IP address '([^']+)'/);
-        const ipAddress = ipMatch ? ipMatch[1] : 'the container IP';
+        lastErrorIp = ipMatch ? ipMatch[1] : null;
+        const ipAddress = lastErrorIp || 'the container IP';
         
         console.error('\n' + '='.repeat(80));
         console.error('⚠️  AZURE SQL FIREWALL ERROR DETECTED  ⚠️');
@@ -752,6 +757,41 @@ function getPool(): Promise<mssql.ConnectionPool> {
     });
   }
   return poolPromise;
+}
+
+export async function testConnectionAndReset(): Promise<{ success: boolean; error?: string; ipAddress?: string }> {
+  poolPromise = null;
+  fallbackModeActive = false;
+
+  try {
+    const p = await getPool();
+    // Test connection with lightweight query
+    const res = await p.request().query('SELECT 1 as test');
+    console.log('✅ Connection test succeeded! Disabling fallbackModeActive.');
+    fallbackModeActive = false;
+    lastErrorIp = null;
+    lastConnectionError = null;
+    return { success: true };
+  } catch (err: any) {
+    const errMsg = err?.message || '';
+    fallbackModeActive = true;
+    poolPromise = null;
+    lastConnectionError = errMsg;
+    
+    let ipAddress: string | undefined = undefined;
+    if (errMsg.includes('is not allowed to access the server') || errMsg.includes('Client with IP address')) {
+      const ipMatch = errMsg.match(/IP address '([^']+)'/);
+      if (ipMatch) {
+         ipAddress = ipMatch[1];
+      }
+    }
+    lastErrorIp = ipAddress || null;
+    return {
+      success: false,
+      error: errMsg,
+      ipAddress: ipAddress
+    };
+  }
 }
 
 // Helper to translate pg queries to MS SQL queries

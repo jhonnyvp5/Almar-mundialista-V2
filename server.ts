@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import pool, { isFallbackModeActive } from './neonDb';
+import pool, { isFallbackModeActive, testConnectionAndReset, lastErrorIp, lastConnectionError } from './neonDb';
 import * as xlsx from 'xlsx';
 import { TEAMS, GROUPS, generateGroupStageMatches, generateKnockoutMatches } from './src/data';
 import { Team } from './src/types';
@@ -1939,7 +1939,26 @@ async function startServer() {
       server: "sql-database-dev-eastus-001.database.windows.net",
       database: "sqldb-mundial2026-dev-eastus-001",
       user: "mundial2026_dev_sql_user",
-      status: isFallbackModeActive() ? "Offline / Local Fallback active (Azure SQL firewall block)" : "Connected to Azure SQL Database"
+      blockedIp: lastErrorIp,
+      connectionError: lastConnectionError,
+      status: isFallbackModeActive() 
+        ? "Offline (Local Fallback active debido a firewall de Azure SQL)" 
+        : "Connected to Azure SQL Database"
+    });
+  });
+
+  // API - Force Reconnect / Test Database Connection
+  app.post('/api/db-status/retry', async (req, res) => {
+    console.log('🔄 Manual DB reconnection test triggered from frontend...');
+    const result = await testConnectionAndReset();
+    res.json({
+      success: result.success,
+      fallbackMode: isFallbackModeActive(),
+      blockedIp: lastErrorIp,
+      connectionError: lastConnectionError,
+      status: result.success 
+        ? "Connected to Azure SQL Database" 
+        : "Offline / Local Fallback active"
     });
   });
 
