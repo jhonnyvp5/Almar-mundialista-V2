@@ -99,7 +99,30 @@ function getPool(): Promise<mssql.ConnectionPool> {
       console.log('✅ Connected to MS SQL Server successfully.');
       return p;
     }).catch(err => {
-      console.error('❌ Failed to connect to MS SQL Server:', err);
+      const errMsg = err?.message || '';
+      if (errMsg.includes('is not allowed to access the server') || errMsg.includes('Client with IP address')) {
+        const ipMatch = errMsg.match(/IP address '([^']+)'/);
+        const ipAddress = ipMatch ? ipMatch[1] : 'the container IP';
+        
+        console.error('\n' + '='.repeat(80));
+        console.error('⚠️  AZURE SQL FIREWALL ERROR DETECTED  ⚠️');
+        console.error('='.repeat(80));
+        console.error(`Your Azure SQL Database is blocking connections from the current environment.`);
+        console.error(`Blocked IP Address: ${ipAddress}`);
+        console.error('\nTO FIX THIS ERROR:');
+        console.error(`1. Go to the Azure Portal (portal.azure.com)`);
+        console.error(`2. Find your Azure SQL Server: sql-database-dev-eastus-001`);
+        console.error(`3. Under "Security", select "Networking"`);
+        console.error(`4. Under "Firewall rules", add a rule allowing:`);
+        console.error(`   - Name: GoogleCloudRunDev`);
+        console.error(`   - Start IP: ${ipAddress}`);
+        console.error(`   - End IP: ${ipAddress}`);
+        console.error(`   (OR enable the checkbox "Allow Azure services and resources to access this server" or "Allow all public IPs")`);
+        console.error(`5. Save the changes (it takes about 1-5 minutes to apply).`);
+        console.error('='.repeat(80) + '\n');
+      } else {
+        console.error('❌ Failed to connect to MS SQL Server:', err);
+      }
       poolPromise = null;
       throw err;
     });
