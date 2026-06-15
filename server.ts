@@ -1527,19 +1527,17 @@ async function startServer() {
     // Read match meta dates for time locking
     const incomingMatchIds = Object.keys(predictions);
 
-    // Check general deadline for Fase de grupos, Llaves Eliminatorias, and Premios FIFA
+    // Check general deadline for Fase de grupos and Premios FIFA
     const deadlineStr = db.config?.deadline || '2026-06-14T23:59:00';
     const dlIso = deadlineStr.includes('-05:00') || deadlineStr.includes('Z') ? deadlineStr : deadlineStr + '-05:00';
     const deadlineMs = new Date(dlIso).getTime();
     if (Date.now() > deadlineMs && user.role !== 'admin') {
       const hasRestricted = incomingMatchIds.some(id => 
-        id.startsWith('G-') || 
-        id.startsWith('K') || 
         id.startsWith('group_override_') || 
         id.startsWith('award_')
       );
       if (hasRestricted) {
-        return res.status(400).json({ error: 'La fecha límite para registrar "Fase de Grupos", "Llaves Eliminatorias" y "Premios FIFA" ha expirado.' });
+        return res.status(400).json({ error: 'La fecha límite para registrar "Fase de Grupos" y "Premios FIFA" ha expirado.' });
       }
     }
     
@@ -1614,8 +1612,9 @@ async function startServer() {
             return res.status(400).json({ error: `El partido con ID ${matchId} ya está cerrado debido a que falta menos de 1 hora para su inicio.` });
           }
 
-          // 3. Already completed lock check
-          if (currentSaved[matchId] && currentSaved[matchId].completed) {
+          // 3. Already completed lock check (except for standard G- and K matches)
+          const isStandardMatch = matchId.startsWith('G-') || matchId.startsWith('K');
+          if (!isStandardMatch && currentSaved[matchId] && currentSaved[matchId].completed) {
             return res.status(400).json({ error: `El pronóstico para el partido ${matchId} ya fue registrado anteriormente y está bloqueado para edición.` });
           }
         }

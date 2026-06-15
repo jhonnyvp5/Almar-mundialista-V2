@@ -270,6 +270,7 @@ export default function App() {
   // General States
   const [toast, setToast] = useState<string | null>(null);
   const [ranking, setRanking] = useState<any[]>([]);
+  const [selectedLocality, setSelectedLocality] = useState<string>('Todos');
   const [rankingSearchText, setRankingSearchText] = useState('');
   const [rankingCurrentPage, setRankingCurrentPage] = useState(1);
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
@@ -289,16 +290,68 @@ export default function App() {
     }));
   }, [ranking]);
 
+  const filteredByLocalityRanking = useMemo(() => {
+    if (!selectedLocality || selectedLocality === 'Todos') {
+      return rankingWithRanks.map(u => ({ ...u, localRank: u.originalRank }));
+    }
+
+    const cleanSel = selectedLocality.trim().toUpperCase();
+
+    const subset = rankingWithRanks.filter(u => {
+      const cleanEmp = (u.empresa || '').trim().toUpperCase();
+      const cleanLoc = (u.localidad || '').trim().toUpperCase();
+
+      if (cleanSel === 'BIOGEMAR S.A') {
+        return cleanEmp.includes('BIOGEMAR') || cleanLoc.includes('BIOGEMAR');
+      }
+      if (cleanSel === 'LIMBOPACK S.A.') {
+        return cleanEmp.includes('LIMBOPACK') || cleanLoc.includes('LIMBOPACK');
+      }
+      if (cleanSel === 'SOCALMAR S.A.') {
+        return cleanEmp.includes('SOCALMAR') || cleanLoc.includes('SOCALMAR');
+      }
+      if (cleanSel === 'CHURUTE') {
+        return cleanLoc.includes('CHURUTE') || cleanEmp.includes('CHURUTE');
+      }
+      if (cleanSel === 'GARZAL') {
+        return cleanLoc.includes('GARZAL') || cleanEmp.includes('GARZAL');
+      }
+      if (cleanSel === 'SANTAY-LA DELIA') {
+        return (
+          cleanLoc.includes('SANTAY') ||
+          cleanLoc.includes('DELIA') ||
+          cleanEmp.includes('SANTAY') ||
+          cleanEmp.includes('DELIA')
+        );
+      }
+      if (cleanSel === 'PRODUPESADA-CANTAGALLO') {
+        return (
+          cleanEmp.includes('PRODUPESADA') ||
+          cleanLoc.includes('PRODUPESADA') ||
+          cleanLoc.includes('CANTAGALLO') ||
+          cleanEmp.includes('CANTAGALLO')
+        );
+      }
+
+      return cleanEmp.includes(cleanSel) || cleanLoc.includes(cleanSel);
+    });
+
+    return subset.map((u, index) => ({
+      ...u,
+      localRank: index + 1
+    }));
+  }, [rankingWithRanks, selectedLocality]);
+
   const filteredRankings = useMemo(() => {
     const query = normalizeSearchText(rankingSearchText);
-    if (!query) return rankingWithRanks;
-    return rankingWithRanks.filter(u => {
+    if (!query) return filteredByLocalityRanking;
+    return filteredByLocalityRanking.filter(u => {
       const nameMatch = normalizeSearchText(u.nombre).includes(query);
       const companyMatch = normalizeSearchText(u.empresa).includes(query);
       const locationMatch = normalizeSearchText(u.localidad).includes(query);
       return nameMatch || companyMatch || locationMatch;
     });
-  }, [rankingWithRanks, rankingSearchText]);
+  }, [filteredByLocalityRanking, rankingSearchText]);
 
   const itemsPerPage = 30;
   const totalRankingPages = Math.max(1, Math.ceil(filteredRankings.length / itemsPerPage));
@@ -1815,10 +1868,6 @@ export default function App() {
       showToast('🔒 El sistema está en mantenimiento. No se permiten registrar o modificar pronósticos.');
       return;
     }
-    if (isPastDeadline()) {
-      showToast('❌ El plazo de registro ha expirado.');
-      return;
-    }
 
     const pred = userPredictions[matchId];
     if (!pred || pred.predictedHome === '' || pred.predictedAway === '') {
@@ -1854,13 +1903,7 @@ export default function App() {
         ...prev,
         [matchId]: { ...prev[matchId], completed: true }
       }));
-      const isGroupStage = matchId.startsWith('G-');
-      const isKnockoutStage = matchId.startsWith('K');
-      if ((isGroupStage || isKnockoutStage) && currentUser.role === 'user' && !isPastDeadline()) {
-        showToast('💾 ¡Pronóstico guardado con éxito! Podrás editarlo hasta el plazo límite.');
-      } else {
-        showToast('💾 ¡Pronóstico guardado y bloqueado con éxito!');
-      }
+      showToast('💾 ¡Pronóstico guardado con éxito! Podrás editarlo mientras la semana esté habilitada y falte más de 1 hora para el partido.');
       fetchScoresAndPredictions(currentUser.id);
     } catch (e) {
       showToast('Error al conectar con el servidor.');
@@ -1875,10 +1918,6 @@ export default function App() {
       showToast('🔒 El sistema está en mantenimiento. No se permiten registrar o modificar pronósticos.');
       return;
     }
-    if (isPastDeadline()) {
-      showToast('❌ El plazo de registro ha expirado.');
-      return;
-    }
 
     // Find all matches of this week that have entered scores
     const payload: Record<string, any> = {};
@@ -1889,10 +1928,9 @@ export default function App() {
       const isTimeLocked = isMatchLockedForTime(m);
       const isWeeklyLocked = isMatchWeeklyLocked(m.date, m.stage);
       const hasOfficialResult = m.homeScore !== undefined;
-      const isExpired = isPastDeadline();
       
-      const isGroupEditable = m.stage === 'group' && currentUser?.role === 'user' && !isExpired;
-      const isKnockoutEditable = m.stage !== 'group' && currentUser?.role === 'user' && !isExpired;
+      const isGroupEditable = m.stage === 'group' && currentUser?.role === 'user';
+      const isKnockoutEditable = m.stage !== 'group' && currentUser?.role === 'user';
       
       const isWeekEditingEnabled = editingWeeks[weekNumber];
       const isCompleted = !!userPredictions[m.id]?.completed;
@@ -3767,7 +3805,7 @@ export default function App() {
                           </div>
 
                           {/* Batch Action Buttons */}
-                          {currentUser && currentUser.role === 'user' && !isPastDeadline() && (
+                          {currentUser && currentUser.role === 'user' && (
                             <div className="flex items-center gap-2.5">
                               {isWeekEditingEnabled ? (
                                 <>
@@ -4221,20 +4259,20 @@ export default function App() {
             </div>
 
             {/* ==================== PANEL: PODIO DE LOS 5 PRIMEROS LUGARES ==================== */}
-            {ranking.length > 0 && (
+            {filteredByLocalityRanking.length > 0 && (
               <div className="bg-gradient-to-b from-slate-900/10 to-slate-900/40 border border-slate-900 rounded-3xl p-6 shadow-2xl max-w-4xl mx-auto space-y-6 relative overflow-hidden">
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
                 
                 <div className="text-center font-black text-xs uppercase tracking-[0.2em] text-amber-400 flex items-center justify-center gap-2">
                   <Trophy className="h-4 w-4 text-amber-500 animate-pulse" />
-                  <span>Podio de Honor • Top 5 de Líderes</span>
+                  <span>{selectedLocality === 'Todos' ? 'Podio de Honor • Top 5 de Líderes' : `Podio de Honor • Top 5 en ${selectedLocality}`}</span>
                 </div>
 
                 {/* Top 3 Podium Stands */}
                 <div className="grid grid-cols-3 gap-3 sm:gap-6 items-end pt-8 pb-4 max-w-2xl mx-auto px-1 sm:px-4">
                   {/* 2do Lugar */}
                   <div className="flex flex-col items-center">
-                    {ranking[1] ? (
+                    {filteredByLocalityRanking[1] ? (
                       <motion.div 
                         initial={{ opacity: 0, y: 15 }} 
                         animate={{ opacity: 1, y: 0 }}
@@ -4244,16 +4282,16 @@ export default function App() {
                         <div className="relative mb-2 flex flex-col items-center text-center">
                           <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">🥈</span>
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-1">2° Lugar</span>
-                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={sanitizeText(ranking[1].nombre)}>
-                            {formatPodiumName(ranking[1].nombre)}
+                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={sanitizeText(filteredByLocalityRanking[1].nombre)}>
+                            {formatPodiumName(filteredByLocalityRanking[1].nombre)}
                           </div>
                           <div className="text-[9px] text-slate-500 font-semibold truncate max-w-[85px] sm:max-w-[150px]">
-                            {ranking[1].empresa || ranking[1].localidad || '-'}
+                            {filteredByLocalityRanking[1].empresa || filteredByLocalityRanking[1].localidad || '-'}
                           </div>
                         </div>
                         {/* Stand pillar */}
                         <div className="w-full bg-slate-800/45 border border-slate-700/50 h-20 rounded-t-xl flex flex-col items-center justify-center shadow-lg pt-1 relative overflow-hidden backdrop-blur-sm">
-                          <span className="text-xl font-black text-slate-300 font-mono">{ranking[1].puntos}</span>
+                          <span className="text-xl font-black text-slate-300 font-mono">{filteredByLocalityRanking[1].puntos}</span>
                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Puntos</span>
                         </div>
                       </motion.div>
@@ -4270,7 +4308,7 @@ export default function App() {
 
                   {/* 1er Lugar (Center, tallest) */}
                   <div className="flex flex-col items-center">
-                    {ranking[0] ? (
+                    {filteredByLocalityRanking[0] ? (
                       <motion.div 
                         initial={{ opacity: 0, y: 15 }} 
                         animate={{ opacity: 1, y: 0 }}
@@ -4283,17 +4321,17 @@ export default function App() {
                         <div className="relative mb-2 flex flex-col items-center text-center">
                           <span className="text-4xl filter drop-shadow-[0_4px_6px_rgba(242,156,17,0.3)]">🥇</span>
                           <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider mt-1">Líder Absoluto</span>
-                          <div className="text-sm font-black text-white mt-0.5 truncate max-w-[100px] sm:max-w-[170px] px-1" title={sanitizeText(ranking[0].nombre)}>
-                            {formatPodiumName(ranking[0].nombre)}
+                          <div className="text-sm font-black text-white mt-0.5 truncate max-w-[100px] sm:max-w-[170px] px-1" title={sanitizeText(filteredByLocalityRanking[0].nombre)}>
+                            {formatPodiumName(filteredByLocalityRanking[0].nombre)}
                           </div>
                           <div className="text-[9px] text-slate-400 font-semibold truncate max-w-[100px] sm:max-w-[170px]">
-                            {ranking[0].empresa || ranking[0].localidad || '-'}
+                            {filteredByLocalityRanking[0].empresa || filteredByLocalityRanking[0].localidad || '-'}
                           </div>
                         </div>
                         {/* Stand pillar */}
                         <div className="w-full bg-gradient-to-b from-amber-500/25 to-amber-500/5 border border-amber-500/40 h-28 rounded-t-xl flex flex-col items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.2)] relative overflow-hidden backdrop-blur-sm">
                           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.08),transparent)]" />
-                          <span className="text-4xl font-black text-amber-400 font-mono relative z-10 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">{ranking[0].puntos}</span>
+                          <span className="text-4xl font-black text-amber-400 font-mono relative z-10 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">{filteredByLocalityRanking[0].puntos}</span>
                           <span className="text-[10px] font-black text-amber-500/90 uppercase tracking-widest relative z-10">Puntos</span>
                         </div>
                       </motion.div>
@@ -4310,7 +4348,7 @@ export default function App() {
 
                   {/* 3er Lugar */}
                   <div className="flex flex-col items-center">
-                    {ranking[2] ? (
+                    {filteredByLocalityRanking[2] ? (
                       <motion.div 
                         initial={{ opacity: 0, y: 15 }} 
                         animate={{ opacity: 1, y: 0 }}
@@ -4320,16 +4358,16 @@ export default function App() {
                         <div className="relative mb-2 flex flex-col items-center text-center">
                           <span className="text-3xl filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">🥉</span>
                           <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider mt-1">3° Lugar</span>
-                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={sanitizeText(ranking[2].nombre)}>
-                            {formatPodiumName(ranking[2].nombre)}
+                          <div className="text-xs font-bold text-slate-200 mt-0.5 truncate max-w-[85px] sm:max-w-[150px] px-1" title={sanitizeText(filteredByLocalityRanking[2].nombre)}>
+                            {formatPodiumName(filteredByLocalityRanking[2].nombre)}
                           </div>
                           <div className="text-[9px] text-slate-500 font-semibold truncate max-w-[85px] sm:max-w-[150px]">
-                            {ranking[2].empresa || ranking[2].localidad || '-'}
+                            {filteredByLocalityRanking[2].empresa || filteredByLocalityRanking[2].localidad || '-'}
                           </div>
                         </div>
                         {/* Stand pillar */}
                         <div className="w-full bg-gradient-to-b from-amber-700/20 to-transparent border border-amber-700/40 h-16 rounded-t-xl flex flex-col items-center justify-center shadow-lg pt-1 relative overflow-hidden backdrop-blur-sm">
-                          <span className="text-lg font-black text-amber-500 font-mono relative z-10 filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{ranking[2].puntos}</span>
+                          <span className="text-lg font-black text-amber-500 font-mono relative z-10 filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">{filteredByLocalityRanking[2].puntos}</span>
                           <span className="text-[9px] font-black text-amber-600/80 uppercase tracking-widest relative z-10">Puntos</span>
                         </div>
                       </motion.div>
@@ -4346,9 +4384,9 @@ export default function App() {
                 </div>
 
                 {/* 4to and 5to Lugar panels */}
-                {(ranking[3] || ranking[4]) && (
+                {(filteredByLocalityRanking[3] || filteredByLocalityRanking[4]) && (
                   <div className="flex flex-col sm:flex-row justify-center gap-3 max-w-xl mx-auto pt-2">
-                    {ranking[3] && (
+                    {filteredByLocalityRanking[3] && (
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.95 }} 
                         animate={{ opacity: 1, scale: 1 }}
@@ -4358,23 +4396,23 @@ export default function App() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="text-[10px] bg-slate-900 px-2.5 py-1.5 rounded-lg text-slate-400 font-black font-mono">4°</span>
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-slate-200 truncate" title={sanitizeText(ranking[3].nombre)}>
-                              {formatPodiumName(ranking[3].nombre)}
+                            <div className="text-xs font-bold text-slate-200 truncate" title={sanitizeText(filteredByLocalityRanking[3].nombre)}>
+                              {formatPodiumName(filteredByLocalityRanking[3].nombre)}
                             </div>
                             <div className="text-[9px] text-slate-500 truncate font-semibold">
-                              {ranking[3].empresa || ranking[3].localidad || '-'}
+                              {filteredByLocalityRanking[3].empresa || filteredByLocalityRanking[3].localidad || '-'}
                             </div>
                           </div>
                         </div>
                         <div className="shrink-0 text-right">
                           <span className="text-xs font-black text-slate-350 font-mono bg-slate-900 px-2 py-1 rounded-lg">
-                            {ranking[3].puntos} pts
+                            {filteredByLocalityRanking[3].puntos} pts
                           </span>
                         </div>
                       </motion.div>
                     )}
 
-                    {ranking[4] && (
+                    {filteredByLocalityRanking[4] && (
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.95 }} 
                         animate={{ opacity: 1, scale: 1 }}
@@ -4384,17 +4422,17 @@ export default function App() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="text-[10px] bg-slate-900 px-2.5 py-1.5 rounded-lg text-slate-400 font-black font-mono">5°</span>
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-slate-200 truncate" title={sanitizeText(ranking[4].nombre)}>
-                              {formatPodiumName(ranking[4].nombre)}
+                            <div className="text-xs font-bold text-slate-200 truncate" title={sanitizeText(filteredByLocalityRanking[4].nombre)}>
+                              {formatPodiumName(filteredByLocalityRanking[4].nombre)}
                             </div>
                             <div className="text-[9px] text-slate-500 truncate font-semibold">
-                              {ranking[4].empresa || ranking[4].localidad || '-'}
+                              {filteredByLocalityRanking[4].empresa || filteredByLocalityRanking[4].localidad || '-'}
                             </div>
                           </div>
                         </div>
                         <div className="shrink-0 text-right">
                           <span className="text-xs font-black text-slate-350 font-mono bg-slate-900 px-2 py-1 rounded-lg">
-                            {ranking[4].puntos} pts
+                            {filteredByLocalityRanking[4].puntos} pts
                           </span>
                         </div>
                       </motion.div>
@@ -4407,40 +4445,66 @@ export default function App() {
             {/* Ranking table */}
             <div className="bg-slate-900/30 border border-slate-900 rounded-2xl overflow-hidden shadow-xl max-w-4xl mx-auto">
               {/* Search and filter bar */}
-              <div className="p-4 border-b border-slate-900 bg-slate-950/40 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+              <div className="p-4 border-b border-slate-900 bg-slate-950/40 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-2 shrink-0">
                   <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                   <span className="text-xs font-black text-slate-300 uppercase tracking-widest">
                     Tabla de Posiciones
                   </span>
                 </div>
                 
-                <div className="relative w-full sm:w-80">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
-                    <Search className="h-4 w-4" />
-                  </span>
-                  <input
-                    type="text"
-                    value={rankingSearchText}
-                    onChange={(e) => {
-                      setRankingSearchText(e.target.value);
-                      setRankingCurrentPage(1); // reset page to 1 on new search
-                    }}
-                    placeholder="Buscar por nombre, apellido o empresa..."
-                    className="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium text-slate-250 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition shadow-inner"
-                  />
-                  {rankingSearchText && (
-                    <button
-                      onClick={() => {
-                        setRankingSearchText('');
-                        setRankingCurrentPage(1);
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                  {/* Selector Grupo-Localidad */}
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <span className="text-[10px] uppercase font-extrabold text-slate-400 whitespace-nowrap">Grupo-Localidad:</span>
+                    <select
+                      value={selectedLocality}
+                      onChange={(e) => {
+                        setSelectedLocality(e.target.value);
+                        setRankingCurrentPage(1); // Reset page to 1 on filter trigger
                       }}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-white cursor-pointer"
-                      title="Limpiar búsqueda"
+                      className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-bold text-slate-250 focus:outline-none focus:border-amber-500/50 transition cursor-pointer w-full sm:w-56 appearance-none bg-no-repeat bg-[right_0.5rem_center]"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+                        backgroundSize: '1.25rem'
+                      }}
                     >
-                      ✕
-                    </button>
-                  )}
+                      {['Todos', 'BIOGEMAR S.A', 'CHURUTE', 'GARZAL', 'LIMBOPACK S.A.', 'PRODUPESADA-CANTAGALLO', 'SANTAY-LA DELIA', 'SOCALMAR S.A.'].map(locOption => (
+                        <option key={locOption} value={locOption} className="bg-slate-950 text-slate-200 font-bold">
+                          {locOption}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Search bar */}
+                  <div className="relative w-full sm:w-72">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                      <Search className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="text"
+                      value={rankingSearchText}
+                      onChange={(e) => {
+                        setRankingSearchText(e.target.value);
+                        setRankingCurrentPage(1); // reset page to 1 on new search
+                      }}
+                      placeholder="Buscar por nombre o empresa..."
+                      className="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-250 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition shadow-inner"
+                    />
+                    {rankingSearchText && (
+                      <button
+                        onClick={() => {
+                          setRankingSearchText('');
+                          setRankingCurrentPage(1);
+                        }}
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-white cursor-pointer"
+                        title="Limpiar búsqueda"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -4460,19 +4524,24 @@ export default function App() {
                       </tr>
                     ) : filteredRankings.length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="p-8 text-center text-slate-500 font-medium">No se encontraron participantes que coincidan con la búsqueda.</td>
+                        <td colSpan={3} className="p-8 text-center text-slate-500 font-medium">No se encontraron participantes que coincidan con la búsqueda o filtro.</td>
                       </tr>
                     ) : (
                       paginatedRankings.map((u) => (
                         <tr key={u.id} className={`hover:bg-slate-900/10 transition-colors ${u.id === currentUser?.id ? 'bg-amber-500/5 border-l-2 border-l-amber-500' : ''}`}>
-                          <td className="p-4 text-center font-bold font-mono">
-                            {u.originalRank === 1 ? '🥇 1' : (u.originalRank === 2 ? '🥈 2' : (u.originalRank === 3 ? '🥉 3' : u.originalRank))}
+                          <td className="p-4 text-center font-bold font-mono text-sm">
+                            {u.localRank === 1 ? '🥇 1' : (u.localRank === 2 ? '🥈 2' : (u.localRank === 3 ? '🥉 3' : u.localRank))}
                           </td>
                           <td className="p-4 font-bold text-slate-250 text-sm">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
                               <span>{sanitizeText(u.nombre)}</span>
-                              <span className="text-[10px] text-slate-500 font-medium font-sans">
-                                ({u.empresa || '-'} • {u.localidad || '-'})
+                              <span className="text-[10px] text-slate-500 font-medium font-sans flex items-center gap-1.5">
+                                <span>({u.empresa || '-'} • {u.localidad || '-'})</span>
+                                {selectedLocality !== 'Todos' && (
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[9px] font-black uppercase tracking-wider font-mono">
+                                    Pos. {u.originalRank} Gral
+                                  </span>
+                                )}
                               </span>
                               {u.id === currentUser?.id && (
                                 <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 rounded uppercase tracking-wider self-start sm:self-auto mt-1 sm:mt-0">
