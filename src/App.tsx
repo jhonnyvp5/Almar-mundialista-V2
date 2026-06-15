@@ -1491,9 +1491,8 @@ export default function App() {
     const isTimeLocked = isMatchLockedForTime(m);
     const isWeeklyLocked = isMatchWeeklyLocked(m.date, m.stage);
     const hasOfficialResult = m.homeScore !== undefined;
-    const isExpired = isPastDeadline();
-    const isKnockoutEditable = currentUser?.role === 'user' && !isExpired;
-    const isLocked = isOfficial ? true : (m.completed && !isKnockoutEditable) || isTimeLocked || isWeeklyLocked || hasOfficialResult || isExpired;
+    const isKnockoutEditable = currentUser?.role === 'user';
+    const isLocked = isOfficial ? true : (m.completed && !isKnockoutEditable) || isTimeLocked || isWeeklyLocked || hasOfficialResult;
 
     const isDisabled = isOfficial || isLocked || isHomePlaceholder || isAwayPlaceholder;
     const isTie = hScore !== '' && aScore !== '' && parseInt(hScore, 10) === parseInt(aScore, 10);
@@ -1508,8 +1507,8 @@ export default function App() {
     };
 
     const selectWinnerWithSave = async (selectedId: string) => {
-      if (isPastDeadline()) {
-        showToast('❌ El plazo de registro ha expirado.');
+      if (isLocked) {
+        showToast('❌ Este partido se encuentra bloqueado para cambios.');
         return;
       }
       setUserPredictions(prev => {
@@ -1781,8 +1780,8 @@ export default function App() {
     const matchIso = `${year}-${pad(month)}-${pad(day)}T${pad(hours)}:${pad(minutes)}:00-05:00`;
     const matchTimeMs = new Date(matchIso).getTime();
     
-    // Less than 1 hour remaining!
-    return (matchTimeMs - serverTimeMs) <= 60 * 60 * 1000;
+    // Less than 50 minutes remaining! (allows a 10-minute grace period for server-client clock drift or latency)
+    return (matchTimeMs - serverTimeMs) <= 50 * 60 * 1000;
   };
 
   // Check if group stage manual classification is locked (1 hour before first match start, but allowed for standard user until deadline)
@@ -3884,7 +3883,7 @@ export default function App() {
                                   
                                   <div className="flex items-center gap-1 text-slate-400">
                                     <Clock className="h-3 w-3" />
-                                    <span>{m.date} a las {m.time} UTC</span>
+                                    <span>{m.date} a las {m.time} ECU</span>
                                   </div>
                                 </div>
 

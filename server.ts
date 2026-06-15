@@ -1466,8 +1466,8 @@ async function startServer() {
     const matchIso = `${year}-${pad(month)}-${pad(day)}T${pad(hours)}:${pad(minutes)}:00-05:00`;
     const matchTimeMs = new Date(matchIso).getTime();
     
-    // Check if remaining time is more than 3600000 ms (1 hour)
-    return (matchTimeMs - serverTimeMs) > 60 * 60 * 1000;
+    // Check if remaining time is more than 50 minutes (allows a 10-minute grace period for server-client clock drift or latency)
+    return (matchTimeMs - serverTimeMs) > 50 * 60 * 1000;
   }
 
   // API - Get predictions of a user
@@ -1612,7 +1612,14 @@ async function startServer() {
 
           // 2. Time Lock check (exactly 1 hour before kickoff)
           if (matchMeta && !isBeforeMatchOneHour(matchMeta.date, matchMeta.time)) {
-            return res.status(400).json({ error: `El partido con ID ${matchId} ya está cerrado debido a que falta menos de 1 hora para su inicio.` });
+            const serverTimeMs = Date.now();
+            const [year, month, day] = matchMeta.date.split('-').map(Number);
+            const [hours, minutes] = matchMeta.time.split(':').map(Number);
+            const pad = (n: number) => n.toString().padStart(2, '0');
+            const matchIso = `${year}-${pad(month)}-${pad(day)}T${pad(hours)}:${pad(minutes)}:00-05:00`;
+            const matchTimeMs = new Date(matchIso).getTime();
+            const diffMin = (matchTimeMs - serverTimeMs) / (60 * 1000);
+            return res.status(400).json({ error: `El partido con ID ${matchId} (fecha: ${matchMeta.date}, hora: ${matchMeta.time}) ya está cerrado debido a que falta menos de 1 hora para su inicio. (MatchIso: ${matchIso}, ServerTime: ${new Date(serverTimeMs).toISOString()}, Diff: ${diffMin.toFixed(1)} mins)` });
           }
 
           // 3. Already completed lock check (except for standard G- and K matches)
