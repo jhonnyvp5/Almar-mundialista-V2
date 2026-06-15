@@ -1776,7 +1776,10 @@ export default function App() {
     const serverTimeMs = Date.now();
     const [year, month, day] = match.date.split('-').map(Number);
     const [hours, minutes] = match.time.split(':').map(Number);
-    const matchTimeMs = new Date(year, month - 1, day, hours, minutes).getTime();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    // Force Ecuador Timezone (UTC-5)
+    const matchIso = `${year}-${pad(month)}-${pad(day)}T${pad(hours)}:${pad(minutes)}:00-05:00`;
+    const matchTimeMs = new Date(matchIso).getTime();
     
     // Less than 1 hour remaining!
     return (matchTimeMs - serverTimeMs) <= 60 * 60 * 1000;
@@ -1789,8 +1792,8 @@ export default function App() {
     }
     if (isPastDeadline()) return true;
     const serverTimeMs = Date.now();
-    // First match starts on 2026-06-11 at 14:00. Note: month 5 is June (0-indexed)
-    const firstMatchTimeMs = new Date(2026, 5, 11, 14, 0).getTime();
+    // First match starts on 2026-06-11 at 14:00 ECU (UTC-5)
+    const firstMatchTimeMs = new Date('2026-06-11T14:00:00-05:00').getTime();
     return (firstMatchTimeMs - serverTimeMs) <= 60 * 60 * 1000;
   };
 
