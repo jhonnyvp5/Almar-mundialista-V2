@@ -13,7 +13,18 @@ try {
     writable: true,
     value: function (input: RequestInfo | URL, init?: RequestInit) {
       let finalInput = input;
-      const baseUrl = ((import.meta as any).env?.VITE_API_URL as string) || '';
+      let baseUrl = ((import.meta as any).env?.VITE_API_URL as string) || '';
+      
+      // If running in development, localhost, or any AI Studio / Cloud Run test env (*.run.app),
+      // we bypass VITE_API_URL to make relative requests so that local frontend talks directly to local backend.
+      if (typeof window !== 'undefined' && (
+        window.location.hostname.endsWith('.run.app') ||
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1'
+      )) {
+        baseUrl = '';
+      }
+
       if (baseUrl) {
         const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
         if (typeof input === 'string') {
