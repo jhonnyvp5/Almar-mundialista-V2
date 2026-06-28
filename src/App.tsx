@@ -1049,6 +1049,34 @@ export default function App() {
     return computeAllStandings(pureOfficialMatches);
   }, [combinedMatches]);
 
+  // Dynamically compute official group positions from official standings
+  const computedOfficialGroupPositions = useMemo(() => {
+    const firsts: Record<string, string> = {};
+    const seconds: Record<string, string> = {};
+    GROUPS.forEach(g => {
+       if (officialStandings[g] && officialStandings[g].length >= 2) {
+         firsts[g] = officialStandings[g][0].teamId;
+         seconds[g] = officialStandings[g][1].teamId;
+       }
+    });
+    return { firsts, seconds };
+  }, [officialStandings]);
+
+  // Pre-populate admin official positions if they are currently empty
+  useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      const hasNoSavedFirsts = !systemConfig?.official_firsts || Object.keys(systemConfig.official_firsts).length === 0;
+      const hasNoSavedSeconds = !systemConfig?.official_seconds || Object.keys(systemConfig.official_seconds).length === 0;
+      
+      if (hasNoSavedFirsts && Object.keys(adminOfficialFirsts).length === 0 && Object.keys(computedOfficialGroupPositions.firsts).length > 0) {
+        setAdminOfficialFirsts(computedOfficialGroupPositions.firsts);
+      }
+      if (hasNoSavedSeconds && Object.keys(adminOfficialSeconds).length === 0 && Object.keys(computedOfficialGroupPositions.seconds).length > 0) {
+        setAdminOfficialSeconds(computedOfficialGroupPositions.seconds);
+      }
+    }
+  }, [computedOfficialGroupPositions, systemConfig, currentUser]);
+
   // Check if group stage predictions and selections have been completed (Deprecated for users, but left just in case)
   const isGroupStageSelectionsCompleted = useMemo(() => {
     const hasAllFirst = GROUPS.every(g => manualFirstPlaces[g] && manualFirstPlaces[g].trim() !== '');
@@ -6900,29 +6928,26 @@ export default function App() {
                 </div>
 
                 {(() => {
-                  // Compute temporary official standings from already saved matches
-                  const offMatches = initialMatches.map(m => {
-                    const saved = officialResults[m.id] || {};
-                    return { 
-                      ...m, 
-                      predictedHome: saved.homeScore !== undefined ? String(saved.homeScore) : '', 
-                      predictedAway: saved.awayScore !== undefined ? String(saved.awayScore) : '' 
-                    };
-                  });
-                  const offStandings = computeAllStandings(offMatches);
-                  const offFirsts: Record<string, string> = {};
-                  const offSeconds: Record<string, string> = {};
-                  GROUPS.forEach(g => {
-                     if (offStandings[g] && offStandings[g].length >= 2) {
-                       offFirsts[g] = offStandings[g][0].teamId;
-                       offSeconds[g] = offStandings[g][1].teamId;
-                     }
-                  });
-
-                  const computedThirds = getRankedThirdPlacedTeams(offStandings);
+                  const computedThirds = getRankedThirdPlacedTeams(officialStandings);
 
                   const handleSaveBracket = async () => {
                      if (!currentUser) return;
+
+                     // Validar que todos los grupos tengan 1° y 2° seleccionados
+                     const missingFirst = GROUPS.filter(g => !adminOfficialFirsts[g]);
+                     const missingSecond = GROUPS.filter(g => !adminOfficialSeconds[g]);
+                     if (missingFirst.length > 0 || missingSecond.length > 0) {
+                       showToast("⚠️ Debe seleccionar el 1° y 2° lugar para todos los grupos.");
+                       return;
+                     }
+                     
+                     // Validar que el primer y segundo lugar no sean el mismo equipo
+                     const sameTeamGroup = GROUPS.find(g => adminOfficialFirsts[g] === adminOfficialSeconds[g]);
+                     if (sameTeamGroup) {
+                       showToast(`⚠️ En el Grupo ${sameTeamGroup}, el primer y segundo lugar no pueden ser el mismo equipo.`);
+                       return;
+                     }
+
                      if (adminOfficialThirds.length !== 8) {
                        showToast("⚠️ Debe seleccionar exactamente 8 mejores terceros."); 
                        return;
@@ -6932,8 +6957,8 @@ export default function App() {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
                          body: JSON.stringify({ 
-                           official_firsts: offFirsts, 
-                           official_seconds: offSeconds, 
+                           official_firsts: adminOfficialFirsts, 
+                           official_seconds: adminOfficialSeconds, 
                            official_thirds: adminOfficialThirds 
                          })
                        });
@@ -6948,6 +6973,81 @@ export default function App() {
 
                   return (
                     <div className="space-y-4">
+                       {/* Posiciones de Grupos Oficiales Manuales / Corrección */}
+                       <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-850 space-y-3">
+                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-800">
+                           <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                             Posiciones Oficiales de Grupos (1° y 2° Lugar)
+                           </h4>
+                           <button 
+                             onClick={() => {
+                               setAdminOfficialFirsts({ ...computedOfficialGroupPositions.firsts });
+                               setAdminOfficialSeconds({ ...computedOfficialGroupPositions.seconds });
+                               showToast("⚡ Posiciones autocompletadas según resultados actuales.");
+                             }}
+                             className="text-[10px] bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 px-2.5 py-1 rounded-md transition-colors font-bold uppercase tracking-wider"
+                           >
+                             Autocalcular con Partidos
+                           </button>
+                         </div>
+                         
+                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                           {GROUPS.map((gId) => {
+                             const groupTeams = TEAMS.filter(t => t.group === gId);
+                             const selectedFirst = adminOfficialFirsts[gId] || '';
+                             const selectedSecond = adminOfficialSeconds[gId] || '';
+                             
+                             return (
+                               <div key={gId} className="bg-slate-900/40 p-3 rounded-xl border border-slate-850/50 space-y-2">
+                                 <div className="text-xs font-black text-amber-400 uppercase tracking-wider border-b border-slate-800/40 pb-1 flex justify-between items-center">
+                                   <span>Grupo {gId}</span>
+                                   <span className="text-[9px] text-slate-500 lowercase font-medium">selecciona clasificados</span>
+                                 </div>
+                                 
+                                 <div className="grid grid-cols-2 gap-2">
+                                   <div className="space-y-1">
+                                     <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">1° Lugar</label>
+                                     <select
+                                       value={selectedFirst}
+                                       onChange={(e) => {
+                                         setAdminOfficialFirsts(prev => ({ ...prev, [gId]: e.target.value }));
+                                       }}
+                                       className="bg-slate-950 border border-slate-800 focus:border-amber-500/50 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-200 focus:outline-none w-full"
+                                     >
+                                       <option value="">-- Seleccionar --</option>
+                                       {groupTeams.map(t => (
+                                         <option key={t.id} value={t.id}>
+                                           {t.flag} {t.name}
+                                         </option>
+                                       ))}
+                                     </select>
+                                   </div>
+                                   
+                                   <div className="space-y-1">
+                                     <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">2° Lugar</label>
+                                     <select
+                                       value={selectedSecond}
+                                       onChange={(e) => {
+                                         setAdminOfficialSeconds(prev => ({ ...prev, [gId]: e.target.value }));
+                                       }}
+                                       className="bg-slate-950 border border-slate-800 focus:border-amber-500/50 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-200 focus:outline-none w-full"
+                                     >
+                                       <option value="">-- Seleccionar --</option>
+                                       {groupTeams.map(t => (
+                                         <option key={t.id} value={t.id}>
+                                           {t.flag} {t.name}
+                                         </option>
+                                       ))}
+                                     </select>
+                                   </div>
+                                 </div>
+                               </div>
+                             );
+                           })}
+                         </div>
+                       </div>
+
+                       {/* Mejores terceros */}
                        <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-850">
                          <div className="flex justify-between items-center mb-3">
                            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
