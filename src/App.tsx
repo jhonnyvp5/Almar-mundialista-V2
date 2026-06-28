@@ -2460,8 +2460,10 @@ export default function App() {
       // Filter search name
       let matchesSearch = true;
       if (searchTeam.trim() !== '') {
-        const homeResolved = resolveTeamWithManualOverrides(m.homeTeamId);
-        const awayResolved = resolveTeamWithManualOverrides(m.awayTeamId);
+        const hId = (hasOfficialBracketConfigured && m.officialHomeTeamId) ? m.officialHomeTeamId : m.homeTeamId;
+        const aId = (hasOfficialBracketConfigured && m.officialAwayTeamId) ? m.officialAwayTeamId : m.awayTeamId;
+        const homeResolved = resolveTeamWithManualOverrides(hId, hasOfficialBracketConfigured);
+        const awayResolved = resolveTeamWithManualOverrides(aId, hasOfficialBracketConfigured);
         const hName = 'name' in homeResolved ? homeResolved.name : '';
         const aName = 'name' in awayResolved ? awayResolved.name : '';
         matchesSearch = hName.toLowerCase().includes(searchTeam.toLowerCase()) || 
@@ -2473,15 +2475,17 @@ export default function App() {
 
       return matchesStage && matchesGroup && matchesWeek && matchesDate && matchesSearch && matchesSubTab;
     });
-  }, [combinedMatches, calendarSubTab, stageFilter, groupFilter, weekFilter, dateFilter, searchTeam, manualFirstPlaces, manualSecondPlaces, manualThirdPlaces, unlockedWeek]);
+  }, [combinedMatches, calendarSubTab, stageFilter, groupFilter, weekFilter, dateFilter, searchTeam, manualFirstPlaces, manualSecondPlaces, manualThirdPlaces, unlockedWeek, hasOfficialBracketConfigured]);
 
   // Handle simulated predictions for remaining gaps
   const handleRandomFillPendingPredictions = () => {
     const randomSet: Record<string, any> = {};
     combinedMatches.forEach(m => {
       if (!m.completed) {
-        const homeRes = resolveTeamWithManualOverrides(m.homeTeamId);
-        const awayRes = resolveTeamWithManualOverrides(m.awayTeamId);
+        const hId = (hasOfficialBracketConfigured && m.officialHomeTeamId) ? m.officialHomeTeamId : m.homeTeamId;
+        const aId = (hasOfficialBracketConfigured && m.officialAwayTeamId) ? m.officialAwayTeamId : m.awayTeamId;
+        const homeRes = resolveTeamWithManualOverrides(hId, hasOfficialBracketConfigured);
+        const awayRes = resolveTeamWithManualOverrides(aId, hasOfficialBracketConfigured);
         const homeRank = 'rank' in homeRes ? homeRes.rank : 50;
         const awayRank = 'rank' in awayRes ? awayRes.rank : 50;
 
@@ -3995,8 +3999,10 @@ export default function App() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {weekMatches.map((m) => {
-                            const homeRes = resolveTeamWithManualOverrides(m.homeTeamId);
-                            const awayRes = resolveTeamWithManualOverrides(m.awayTeamId);
+                            const hId = (hasOfficialBracketConfigured && m.officialHomeTeamId) ? m.officialHomeTeamId : m.homeTeamId;
+                            const aId = (hasOfficialBracketConfigured && m.officialAwayTeamId) ? m.officialAwayTeamId : m.awayTeamId;
+                            const homeRes = resolveTeamWithManualOverrides(hId, hasOfficialBracketConfigured);
+                            const awayRes = resolveTeamWithManualOverrides(aId, hasOfficialBracketConfigured);
 
                             const isHomePlaceholder = 'placeholder' in homeRes;
                             const isAwayPlaceholder = 'placeholder' in awayRes;
