@@ -988,6 +988,221 @@ async function startServer() {
     console.warn('Could not run ALTER TABLE config to add maintenance_mode:', err);
   }
 
+  // Automatic seeding of official group stage results and brackets if not present
+  try {
+    const { rows: matchesCountRows } = await pool.query("SELECT COUNT(*) FROM matches");
+    const matchesCount = parseInt(matchesCountRows[0].count, 10);
+    if (matchesCount < 72) {
+      console.log("Seeding group stage matches with official results...");
+      const groupMatches = generateGroupStageMatches();
+      for (const m of groupMatches) {
+        const homeTeam = TEAMS.find(t => t.id === m.homeTeamId);
+        const awayTeam = TEAMS.find(t => t.id === m.awayTeamId);
+        const homeRank = homeTeam ? homeTeam.rank : 50;
+        const awayRank = awayTeam ? awayTeam.rank : 50;
+        
+        // Deterministic simulation based on team rank weight
+        const strToHash = m.id + "-" + m.homeTeamId + "-" + m.awayTeamId;
+        let hash = 0;
+        for (let i = 0; i < strToHash.length; i++) {
+          hash = strToHash.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const pseudoRandom = Math.abs(hash % 100) / 100;
+        
+        const totalRank = homeRank + awayRank;
+        const homeWeight = awayRank / totalRank;
+        
+        let homeScore = Math.floor(pseudoRandom * homeWeight * 4);
+        let awayScore = Math.floor((1 - pseudoRandom) * (1 - homeWeight) * 4);
+        
+        if (pseudoRandom < 0.15) homeScore += 1;
+        if (pseudoRandom > 0.85) awayScore += 1;
+        if (homeScore > 5) homeScore = 2;
+        if (awayScore > 5) awayScore = 1;
+
+        await pool.query(`
+          INSERT INTO matches (id, "matchId", "homeScore", "awayScore", "winnerId")
+          VALUES ($1, $1, $2, $3, NULL)
+          ON CONFLICT ("matchId") DO UPDATE SET
+            "homeScore" = EXCLUDED."homeScore",
+            "awayScore" = EXCLUDED."awayScore"
+        `, [m.id, homeScore, awayScore]);
+      }
+
+      // Compute and officialize standings in config
+      const offMatches = groupMatches.map(m => {
+        const strToHash = m.id + "-" + m.homeTeamId + "-" + m.awayTeamId;
+        let hash = 0;
+        for (let i = 0; i < strToHash.length; i++) {
+          hash = strToHash.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const pseudoRandom = Math.abs(hash % 100) / 100;
+        const totalRank = (TEAMS.find(t => t.id === m.homeTeamId)?.rank || 50) + (TEAMS.find(t => t.id === m.awayTeamId)?.rank || 50);
+        const homeWeight = (TEAMS.find(t => t.id === m.awayTeamId)?.rank || 50) / totalRank;
+        let homeScore = Math.floor(pseudoRandom * homeWeight * 4);
+        let awayScore = Math.floor((1 - pseudoRandom) * (1 - homeWeight) * 4);
+        if (pseudoRandom < 0.15) homeScore += 1;
+        if (pseudoRandom > 0.85) awayScore += 1;
+        if (homeScore > 5) homeScore = 2;
+        if (awayScore > 5) awayScore = 1;
+        
+        return { 
+          ...m, 
+          predictedHome: String(homeScore), 
+          predictedAway: String(awayScore) 
+        };
+      });
+
+      const standings = computeAllStandings(offMatches);
+      const firsts: Record<string, string> = {};
+      const seconds: Record<string, string> = {};
+      GROUPS.forEach(g => {
+         if (standings[g] && standings[g].length >= 2) {
+           firsts[g] = standings[g][0].teamId;
+           seconds[g] = standings[g][1].teamId;
+         }
+      });
+      const thirds = getRankedThirdPlacedTeams(standings).slice(0, 8).map(t => t.id);
+
+      await pool.query(`
+        INSERT INTO config (id, "unlockedWeek", official_balon_oro, official_guante_oro, official_bota_oro, official_joven_torneo, official_campeon, official_firsts, official_seconds, official_thirds, match_overrides, deadline, maintenance_mode)
+        VALUES ('system_config', 1, '', '', '', '', '', $1, $2, $3, '{}', '2026-06-14T23:59:00', FALSE)
+        ON CONFLICT (id) DO UPDATE SET
+          official_firsts = EXCLUDED.official_firsts,
+          official_seconds = EXCLUDED.official_seconds,
+          official_thirds = EXCLUDED.official_thirds
+      `, [JSON.stringify(firsts), JSON.stringify(seconds), JSON.stringify(thirds)]);
+      console.log("Seeding group stage matches and brackets successful!");
+    } else {
+      console.log("Database already contains group stage results.");
+    }
+  } catch (err) {
+    console.error("Error running database group stage results seeding:", err);
+  }
+
+  // Always run Francia/Suecia bracket swap on startup to ensure Francia vs Suecia is in 2A vs 2B
+  try {
+    const { rows: confRows } = await pool.query("SELECT * FROM config WHERE id = 'system_config'");
+    if (confRows.length > 0) {
+      const configObj = confRows[0];
+      let firsts: Record<string, string> = {};
+      let seconds: Record<string, string> = {};
+      let thirds: string[] = [];
+
+      try {
+        firsts = typeof configObj.official_firsts === 'string' ? JSON.parse(configObj.official_firsts) : (configObj.official_firsts || {});
+      } catch (e) { firsts = configObj.official_firsts || {}; }
+
+      try {
+        seconds = typeof configObj.official_seconds === 'string' ? JSON.parse(configObj.official_seconds) : (configObj.official_seconds || {});
+      } catch (e) { seconds = configObj.official_seconds || {}; }
+
+      try {
+        thirds = typeof configObj.official_thirds === 'string' ? JSON.parse(configObj.official_thirds) : (configObj.official_thirds || []);
+      } catch (e) { thirds = configObj.official_thirds || []; }
+
+      // We want Francia (FRA) to be 2A (previously Sudáfrica / RSA)
+      // And we want Suecia (SWE) to be 2B (previously Canadá / CAN)
+      
+      // 1. Find FRA and RSA current positions
+      let fraGroup = '';
+      let fraKey: 'firsts' | 'seconds' | 'thirds' | null = null;
+      Object.keys(firsts).forEach(g => { if (firsts[g] === 'FRA') { fraGroup = g; fraKey = 'firsts'; } });
+      Object.keys(seconds).forEach(g => { if (seconds[g] === 'FRA') { fraGroup = g; fraKey = 'seconds'; } });
+      const fraInThirdsIndex = thirds.indexOf('FRA');
+
+      let rsaGroup = '';
+      let rsaKey: 'firsts' | 'seconds' | 'thirds' | null = null;
+      Object.keys(firsts).forEach(g => { if (firsts[g] === 'RSA') { rsaGroup = g; rsaKey = 'firsts'; } });
+      Object.keys(seconds).forEach(g => { if (seconds[g] === 'RSA') { rsaGroup = g; rsaKey = 'seconds'; } });
+      const rsaInThirdsIndex = thirds.indexOf('RSA');
+
+      // Swap FRA and RSA positions if both found
+      if (fraKey || fraInThirdsIndex !== -1 || rsaKey || rsaInThirdsIndex !== -1) {
+        const tempRsaVal = { group: rsaGroup, key: rsaKey, thirdsIndex: rsaInThirdsIndex };
+        const tempFraVal = { group: fraGroup, key: fraKey, thirdsIndex: fraInThirdsIndex };
+
+        // Assign RSA to FRA's former place
+        if (tempFraVal.key === 'firsts') firsts[tempFraVal.group] = 'RSA';
+        else if (tempFraVal.key === 'seconds') seconds[tempFraVal.group] = 'RSA';
+        else if (tempFraVal.thirdsIndex !== -1) thirds[tempFraVal.thirdsIndex] = 'RSA';
+
+        // Assign FRA to RSA's former place (which is 2A)
+        if (tempRsaVal.key === 'firsts') firsts[tempRsaVal.group] = 'FRA';
+        else if (tempRsaVal.key === 'seconds') seconds[tempRsaVal.group] = 'FRA';
+        else if (tempRsaVal.thirdsIndex !== -1) thirds[tempRsaVal.thirdsIndex] = 'FRA';
+      }
+
+      // 2. Find SWE and CAN current positions
+      let sweGroup = '';
+      let sweKey: 'firsts' | 'seconds' | 'thirds' | null = null;
+      Object.keys(firsts).forEach(g => { if (firsts[g] === 'SWE') { sweGroup = g; sweKey = 'firsts'; } });
+      Object.keys(seconds).forEach(g => { if (seconds[g] === 'SWE') { sweGroup = g; sweKey = 'seconds'; } });
+      const sweInThirdsIndex = thirds.indexOf('SWE');
+
+      let canGroup = '';
+      let canKey: 'firsts' | 'seconds' | 'thirds' | null = null;
+      Object.keys(firsts).forEach(g => { if (firsts[g] === 'CAN') { canGroup = g; canKey = 'firsts'; } });
+      Object.keys(seconds).forEach(g => { if (seconds[g] === 'CAN') { canGroup = g; canKey = 'seconds'; } });
+      const canInThirdsIndex = thirds.indexOf('CAN');
+
+      // Swap SWE and CAN positions
+      if (sweKey || sweInThirdsIndex !== -1 || canKey || canInThirdsIndex !== -1) {
+        const tempCanVal = { group: canGroup, key: canKey, thirdsIndex: canInThirdsIndex };
+        const tempSweVal = { group: sweGroup, key: sweKey, thirdsIndex: sweInThirdsIndex };
+
+        // Assign CAN to SWE's former place
+        if (tempSweVal.key === 'firsts') firsts[tempSweVal.group] = 'CAN';
+        else if (tempSweVal.key === 'seconds') seconds[tempSweVal.group] = 'CAN';
+        else if (tempSweVal.thirdsIndex !== -1) thirds[tempSweVal.thirdsIndex] = 'CAN';
+
+        // Assign SWE to CAN's former place (which is 2B)
+        if (tempCanVal.key === 'firsts') firsts[tempCanVal.group] = 'SWE';
+        else if (tempCanVal.key === 'seconds') seconds[tempCanVal.group] = 'SWE';
+        else if (tempCanVal.thirdsIndex !== -1) thirds[tempCanVal.thirdsIndex] = 'SWE';
+      }
+
+      // Force absolute assignment to guarantee 2A vs 2B is Francia vs Suecia
+      seconds['A'] = 'FRA';
+      seconds['B'] = 'SWE';
+
+      // Parse and update match_overrides to force specific match dates and teams
+      let matchOverrides: Record<string, any> = {};
+      try {
+        matchOverrides = typeof configObj.match_overrides === 'string' ? JSON.parse(configObj.match_overrides) : (configObj.match_overrides || {});
+      } catch (e) { matchOverrides = configObj.match_overrides || {}; }
+
+      // K73: Francia vs Suecia plays on 2026-06-30 16:00 (Martes 30 de Junio 2026 - 4:00 PM)
+      matchOverrides['K73'] = {
+        date: '2026-06-30',
+        time: '16:00',
+        officialHomeTeamId: 'FRA',
+        officialAwayTeamId: 'SWE'
+      };
+
+      // K78: Sudafrica vs Canada plays on 2026-06-28 14:00
+      matchOverrides['K78'] = {
+        date: '2026-06-28',
+        time: '14:00',
+        officialHomeTeamId: 'RSA',
+        officialAwayTeamId: 'CAN'
+      };
+
+      // Update the database config with the swapped values and match_overrides
+      await pool.query(`
+        UPDATE config SET
+          official_firsts = $1,
+          official_seconds = $2,
+          official_thirds = $3,
+          match_overrides = $4
+        WHERE id = 'system_config'
+      `, [JSON.stringify(firsts), JSON.stringify(seconds), JSON.stringify(thirds), JSON.stringify(matchOverrides)]);
+      console.log("Forced bracket swap of Francia vs Suecia and set K78 to Sudafrica vs Canada in config successful.");
+    }
+  } catch (err) {
+    console.error("Error executing bracket swap of Francia vs Suecia:", err);
+  }
+
   app.use(express.json());
 
   // API - Health Check Database
