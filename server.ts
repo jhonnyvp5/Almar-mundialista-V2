@@ -593,14 +593,18 @@ async function saveDatabase(db: DatabaseSchema, options?: {
 
     // 2. Resolve official champion if K104 is played
     const baseKnockoutMatches = generateKnockoutMatches();
+    const overrides = db.config?.match_overrides || {};
     const officialKnockoutMatches = baseKnockoutMatches.map((m) => {
       const dbMatch = db.matches.find(om => om.matchId === m.id);
+      const matchOverride: any = overrides[m.id] || {};
       return {
         ...m,
         predictedHome: dbMatch?.homeScore !== undefined && dbMatch?.homeScore !== null ? String(dbMatch.homeScore) : '',
         predictedAway: dbMatch?.awayScore !== undefined && dbMatch?.awayScore !== null ? String(dbMatch.awayScore) : '',
         predictedWinnerId: dbMatch?.winnerId || '',
-        completed: dbMatch?.homeScore !== undefined && dbMatch?.homeScore !== null && !isNaN(dbMatch.homeScore)
+        completed: dbMatch?.homeScore !== undefined && dbMatch?.homeScore !== null && !isNaN(dbMatch.homeScore),
+        homeTeamId: matchOverride.officialHomeTeamId || m.homeTeamId,
+        awayTeamId: matchOverride.officialAwayTeamId || m.awayTeamId
       };
     });
 

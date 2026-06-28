@@ -379,6 +379,11 @@ export default function App() {
   const [adminOfficialSeconds, setAdminOfficialSeconds] = useState<Record<string, string>>({});
   const [adminOfficialThirds, setAdminOfficialThirds] = useState<string[]>([]);
 
+  // Admin bracket team override states
+  const [editingTeamsMatchId, setEditingTeamsMatchId] = useState<string | null>(null);
+  const [editHomeId, setEditHomeId] = useState<string>('default');
+  const [editAwayId, setEditAwayId] = useState<string>('default');
+
   // Scheduling States
   const [scheduleStageFilter, setScheduleStageFilter] = useState<string>('all');
   const [scheduleWeekFilter, setScheduleWeekFilter] = useState<string>('all');
@@ -1027,7 +1032,10 @@ export default function App() {
         // official logic
         homeScore: official.homeScore,
         awayScore: official.awayScore,
-        winnerId: official.winnerId
+        winnerId: official.winnerId,
+        // Inject official team overrides if they exist
+        officialHomeTeamId: matchOverride?.officialHomeTeamId,
+        officialAwayTeamId: matchOverride?.officialAwayTeamId
       };
     });
   }, [initialMatches, userPredictions, officialResults, systemConfig]);
@@ -1048,34 +1056,6 @@ export default function App() {
     });
     return computeAllStandings(pureOfficialMatches);
   }, [combinedMatches]);
-
-  // Dynamically compute official group positions from official standings
-  const computedOfficialGroupPositions = useMemo(() => {
-    const firsts: Record<string, string> = {};
-    const seconds: Record<string, string> = {};
-    GROUPS.forEach(g => {
-       if (officialStandings[g] && officialStandings[g].length >= 2) {
-         firsts[g] = officialStandings[g][0].teamId;
-         seconds[g] = officialStandings[g][1].teamId;
-       }
-    });
-    return { firsts, seconds };
-  }, [officialStandings]);
-
-  // Pre-populate admin official positions if they are currently empty
-  useEffect(() => {
-    if (currentUser?.role === 'admin') {
-      const hasNoSavedFirsts = !systemConfig?.official_firsts || Object.keys(systemConfig.official_firsts).length === 0;
-      const hasNoSavedSeconds = !systemConfig?.official_seconds || Object.keys(systemConfig.official_seconds).length === 0;
-      
-      if (hasNoSavedFirsts && Object.keys(adminOfficialFirsts).length === 0 && Object.keys(computedOfficialGroupPositions.firsts).length > 0) {
-        setAdminOfficialFirsts(computedOfficialGroupPositions.firsts);
-      }
-      if (hasNoSavedSeconds && Object.keys(adminOfficialSeconds).length === 0 && Object.keys(computedOfficialGroupPositions.seconds).length > 0) {
-        setAdminOfficialSeconds(computedOfficialGroupPositions.seconds);
-      }
-    }
-  }, [computedOfficialGroupPositions, systemConfig, currentUser]);
 
   // Check if group stage predictions and selections have been completed (Deprecated for users, but left just in case)
   const isGroupStageSelectionsCompleted = useMemo(() => {
@@ -1450,8 +1430,10 @@ export default function App() {
 
   // Helper custom knockout winner resolver to respect manual overrides
   function getKnockoutWinnerIdWithOverrides(match: Match, isOfficial: boolean = false): string | undefined {
-    const home = resolveTeamWithManualOverrides(match.homeTeamId, isOfficial);
-    const away = resolveTeamWithManualOverrides(match.awayTeamId, isOfficial);
+    const effHomeId = (isOfficial && (match as any).officialHomeTeamId) ? (match as any).officialHomeTeamId : match.homeTeamId;
+    const effAwayId = (isOfficial && (match as any).officialAwayTeamId) ? (match as any).officialAwayTeamId : match.awayTeamId;
+    const home = resolveTeamWithManualOverrides(effHomeId, isOfficial);
+    const away = resolveTeamWithManualOverrides(effAwayId, isOfficial);
 
     if ('placeholder' in home || 'placeholder' in away) return undefined;
 
@@ -1486,8 +1468,10 @@ export default function App() {
   }
 
   function getKnockoutLoserIdWithOverrides(match: Match, isOfficial: boolean = false): string | undefined {
-    const home = resolveTeamWithManualOverrides(match.homeTeamId, isOfficial);
-    const away = resolveTeamWithManualOverrides(match.awayTeamId, isOfficial);
+    const effHomeId = (isOfficial && (match as any).officialHomeTeamId) ? (match as any).officialHomeTeamId : match.homeTeamId;
+    const effAwayId = (isOfficial && (match as any).officialAwayTeamId) ? (match as any).officialAwayTeamId : match.awayTeamId;
+    const home = resolveTeamWithManualOverrides(effHomeId, isOfficial);
+    const away = resolveTeamWithManualOverrides(effAwayId, isOfficial);
 
     if ('placeholder' in home || 'placeholder' in away) return undefined;
 
@@ -1498,12 +1482,81 @@ export default function App() {
   }
 
   const renderBracketMatchCard = (m: any, isOfficial: boolean = false) => {
-    const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, isOfficial);
-    const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, isOfficial);
+    const effHomeId = (isOfficial && m.officialHomeTeamId) ? m.officialHomeTeamId : m.homeTeamId;
+    const effAwayId = (isOfficial && m.officialAwayTeamId) ? m.officialAwayTeamId : m.awayTeamId;
+    const homeRes = resolveTeamWithManualOverrides(effHomeId, isOfficial);
+    const awayRes = resolveTeamWithManualOverrides(effAwayId, isOfficial);
     const winnerId = getKnockoutWinnerIdWithOverrides(m, isOfficial);
 
     const isHomePlaceholder = 'placeholder' in homeRes;
     const isAwayPlaceholder = 'placeholder' in awayRes;
+
+    const isEditingThisMatch = editingTeamsMatchId === m.id;
+
+    if (isEditingThisMatch) {
+      const sortedTeams = [...TEAMS].sort((a, b) => a.name.localeCompare(b.name));
+      return (
+        <div key={m.id} className="bg-slate-900/80 border border-amber-500/50 p-3 rounded-xl space-y-2.5 text-xs relative shadow-lg shadow-amber-500/5">
+          <div className="flex items-center justify-between pb-1 border-b border-slate-950">
+            <div className="text-[8px] text-amber-500 font-extrabold uppercase tracking-wider">M- {m.id} • Modificar Llave</div>
+          </div>
+          
+          <div className="space-y-2">
+            {/* Home Select */}
+            <div className="space-y-0.5">
+              <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Local (Home):</label>
+              <select
+                value={editHomeId}
+                onChange={(e) => setEditHomeId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded p-1 text-[11px] font-bold focus:outline-none focus:border-amber-500"
+              >
+                <option value="default">🧬 Original ({m.homeTeamId})</option>
+                {sortedTeams.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Away Select */}
+            <div className="space-y-0.5">
+              <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Visitante (Away):</label>
+              <select
+                value={editAwayId}
+                onChange={(e) => setEditAwayId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded p-1 text-[11px] font-bold focus:outline-none focus:border-amber-500"
+              >
+                <option value="default">🧬 Original ({m.awayTeamId})</option>
+                {sortedTeams.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1 border-t border-slate-950/40">
+            <button
+              onClick={() => {
+                handleSaveMatchTeams(m.id, editHomeId, editAwayId);
+                setEditingTeamsMatchId(null);
+              }}
+              className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-1 px-2 rounded text-[10px] uppercase text-center transition cursor-pointer"
+            >
+              Guardar
+            </button>
+            <button
+              onClick={() => setEditingTeamsMatchId(null)}
+              className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-1 px-2 rounded text-[10px] uppercase text-center transition cursor-pointer"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     let hScore, aScore, pWinnerId;
     if (isOfficial) {
@@ -1572,16 +1625,37 @@ export default function App() {
     return (
       <div key={m.id} className={`bg-slate-900/80 border p-3 rounded-xl space-y-2 text-xs relative hover:border-slate-700 transition-colors ${m.completed ? 'border-emerald-800/30 bg-emerald-950/5' : 'border-slate-850'}`}>
         <div className="flex items-center justify-between pb-1 border-b border-slate-950">
-          <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">M- {m.id}</div>
-          {!isLocked && isReadyToSave && (
-            <button
-              onClick={handleLocalSave}
-              className="text-[9px] text-emerald-400 hover:text-emerald-300 font-bold underline flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
-            >
-              <Save className="h-2.5 w-2.5" />
-              <span>Guardar</span>
-            </button>
-          )}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">M- {m.id}</span>
+            {isOfficial && m.completed && <span className="text-[8px] px-1 bg-emerald-500/10 text-emerald-400 font-extrabold uppercase rounded border border-emerald-500/10">Jugado</span>}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {isOfficial && currentUser?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setEditingTeamsMatchId(m.id);
+                  setEditHomeId(m.officialHomeTeamId || 'default');
+                  setEditAwayId(m.officialAwayTeamId || 'default');
+                }}
+                className="text-[9px] text-amber-500 hover:text-amber-400 font-bold flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
+                title="Modificar equipos de esta llave"
+              >
+                <Edit className="h-2.5 w-2.5" />
+                <span>Editar Equipos</span>
+              </button>
+            )}
+
+            {!isLocked && isReadyToSave && (
+              <button
+                onClick={handleLocalSave}
+                className="text-[9px] text-emerald-400 hover:text-emerald-300 font-bold underline flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
+              >
+                <Save className="h-2.5 w-2.5" />
+                <span>Guardar</span>
+              </button>
+            )}
+          </div>
         </div>
         
         {/* Home Row */}
@@ -2113,6 +2187,50 @@ export default function App() {
       fetchConfig();
     } catch {
       showToast('❌ Error de red al guardar horarios.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveMatchTeams = async (matchId: string, homeId: string, awayId: string) => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+
+    try {
+      setLoading(true);
+      const currentOverrides = { ...(systemConfig?.match_overrides || {}) };
+      
+      if (!currentOverrides[matchId]) {
+        currentOverrides[matchId] = { date: '', time: '' };
+      }
+      
+      const homeVal = homeId === 'default' ? undefined : homeId;
+      const awayVal = awayId === 'default' ? undefined : awayId;
+
+      currentOverrides[matchId] = {
+        ...currentOverrides[matchId],
+        officialHomeTeamId: homeVal,
+        officialAwayTeamId: awayVal
+      };
+
+      const res = await fetch('/api/admin/matches/schedule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': currentUser.id
+        },
+        body: JSON.stringify({ match_overrides: currentOverrides })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(`❌ Error: ${data.error}`);
+        return;
+      }
+
+      showToast('⚽ Equipos oficiales de la llave actualizados correctamente.');
+      fetchConfig();
+    } catch {
+      showToast('❌ Error de red al guardar equipos de la llave.');
     } finally {
       setLoading(false);
     }
@@ -6481,7 +6599,7 @@ export default function App() {
               {/* Grid content */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto max-h-[350px] pr-1.5">
                 {(() => {
-                  const items = initialMatches.filter(m => {
+                  const items = combinedMatches.filter(m => {
                     if (scheduleStageFilter !== 'all' && m.stage !== scheduleStageFilter) return false;
                     const matchWeek = m.date ? getMatchWeek(m.date, m.stage).toString() : '';
                     if (scheduleWeekFilter !== 'all' && matchWeek !== scheduleWeekFilter) return false;
@@ -6498,8 +6616,10 @@ export default function App() {
                   }
 
                   return items.map((m) => {
-                    const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, true);
-                    const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, true);
+                    const hId = m.officialHomeTeamId || m.homeTeamId;
+                    const aId = m.officialAwayTeamId || m.awayTeamId;
+                    const homeRes = resolveTeamWithManualOverrides(hId, true);
+                    const awayRes = resolveTeamWithManualOverrides(aId, true);
 
                     const currentVal = scheduleOverrides[m.id] || { 
                       date: systemConfig?.match_overrides?.[m.id]?.date || m.date || '', 
@@ -6623,8 +6743,10 @@ export default function App() {
                     .filter(m => selectedAdminMatchStage === 'all' || m.stage === selectedAdminMatchStage)
                     .filter(m => selectedAdminMatchWeek === 'all' || getMatchWeek(m.date, m.stage).toString() === selectedAdminMatchWeek)
                     .map((m) => {
-                      const homeRes = resolveTeamWithManualOverrides(m.homeTeamId, true);
-                      const awayRes = resolveTeamWithManualOverrides(m.awayTeamId, true);
+                      const hId = m.officialHomeTeamId || m.homeTeamId;
+                      const aId = m.officialAwayTeamId || m.awayTeamId;
+                      const homeRes = resolveTeamWithManualOverrides(hId, true);
+                      const awayRes = resolveTeamWithManualOverrides(aId, true);
 
                       const savedScore = officialResults[m.id] || {};
                       
@@ -6928,26 +7050,29 @@ export default function App() {
                 </div>
 
                 {(() => {
-                  const computedThirds = getRankedThirdPlacedTeams(officialStandings);
+                  // Compute temporary official standings from already saved matches
+                  const offMatches = initialMatches.map(m => {
+                    const saved = officialResults[m.id] || {};
+                    return { 
+                      ...m, 
+                      predictedHome: saved.homeScore !== undefined ? String(saved.homeScore) : '', 
+                      predictedAway: saved.awayScore !== undefined ? String(saved.awayScore) : '' 
+                    };
+                  });
+                  const offStandings = computeAllStandings(offMatches);
+                  const offFirsts: Record<string, string> = {};
+                  const offSeconds: Record<string, string> = {};
+                  GROUPS.forEach(g => {
+                     if (offStandings[g] && offStandings[g].length >= 2) {
+                       offFirsts[g] = offStandings[g][0].teamId;
+                       offSeconds[g] = offStandings[g][1].teamId;
+                     }
+                  });
+
+                  const computedThirds = getRankedThirdPlacedTeams(offStandings);
 
                   const handleSaveBracket = async () => {
                      if (!currentUser) return;
-
-                     // Validar que todos los grupos tengan 1° y 2° seleccionados
-                     const missingFirst = GROUPS.filter(g => !adminOfficialFirsts[g]);
-                     const missingSecond = GROUPS.filter(g => !adminOfficialSeconds[g]);
-                     if (missingFirst.length > 0 || missingSecond.length > 0) {
-                       showToast("⚠️ Debe seleccionar el 1° y 2° lugar para todos los grupos.");
-                       return;
-                     }
-                     
-                     // Validar que el primer y segundo lugar no sean el mismo equipo
-                     const sameTeamGroup = GROUPS.find(g => adminOfficialFirsts[g] === adminOfficialSeconds[g]);
-                     if (sameTeamGroup) {
-                       showToast(`⚠️ En el Grupo ${sameTeamGroup}, el primer y segundo lugar no pueden ser el mismo equipo.`);
-                       return;
-                     }
-
                      if (adminOfficialThirds.length !== 8) {
                        showToast("⚠️ Debe seleccionar exactamente 8 mejores terceros."); 
                        return;
@@ -6957,8 +7082,8 @@ export default function App() {
                          method: 'POST',
                          headers: { 'Content-Type': 'application/json', 'x-user-id': currentUser.id },
                          body: JSON.stringify({ 
-                           official_firsts: adminOfficialFirsts, 
-                           official_seconds: adminOfficialSeconds, 
+                           official_firsts: offFirsts, 
+                           official_seconds: offSeconds, 
                            official_thirds: adminOfficialThirds 
                          })
                        });
@@ -6973,81 +7098,6 @@ export default function App() {
 
                   return (
                     <div className="space-y-4">
-                       {/* Posiciones de Grupos Oficiales Manuales / Corrección */}
-                       <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-850 space-y-3">
-                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-slate-800">
-                           <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                             Posiciones Oficiales de Grupos (1° y 2° Lugar)
-                           </h4>
-                           <button 
-                             onClick={() => {
-                               setAdminOfficialFirsts({ ...computedOfficialGroupPositions.firsts });
-                               setAdminOfficialSeconds({ ...computedOfficialGroupPositions.seconds });
-                               showToast("⚡ Posiciones autocompletadas según resultados actuales.");
-                             }}
-                             className="text-[10px] bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 px-2.5 py-1 rounded-md transition-colors font-bold uppercase tracking-wider"
-                           >
-                             Autocalcular con Partidos
-                           </button>
-                         </div>
-                         
-                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                           {GROUPS.map((gId) => {
-                             const groupTeams = TEAMS.filter(t => t.group === gId);
-                             const selectedFirst = adminOfficialFirsts[gId] || '';
-                             const selectedSecond = adminOfficialSeconds[gId] || '';
-                             
-                             return (
-                               <div key={gId} className="bg-slate-900/40 p-3 rounded-xl border border-slate-850/50 space-y-2">
-                                 <div className="text-xs font-black text-amber-400 uppercase tracking-wider border-b border-slate-800/40 pb-1 flex justify-between items-center">
-                                   <span>Grupo {gId}</span>
-                                   <span className="text-[9px] text-slate-500 lowercase font-medium">selecciona clasificados</span>
-                                 </div>
-                                 
-                                 <div className="grid grid-cols-2 gap-2">
-                                   <div className="space-y-1">
-                                     <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">1° Lugar</label>
-                                     <select
-                                       value={selectedFirst}
-                                       onChange={(e) => {
-                                         setAdminOfficialFirsts(prev => ({ ...prev, [gId]: e.target.value }));
-                                       }}
-                                       className="bg-slate-950 border border-slate-800 focus:border-amber-500/50 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-200 focus:outline-none w-full"
-                                     >
-                                       <option value="">-- Seleccionar --</option>
-                                       {groupTeams.map(t => (
-                                         <option key={t.id} value={t.id}>
-                                           {t.flag} {t.name}
-                                         </option>
-                                       ))}
-                                     </select>
-                                   </div>
-                                   
-                                   <div className="space-y-1">
-                                     <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">2° Lugar</label>
-                                     <select
-                                       value={selectedSecond}
-                                       onChange={(e) => {
-                                         setAdminOfficialSeconds(prev => ({ ...prev, [gId]: e.target.value }));
-                                       }}
-                                       className="bg-slate-950 border border-slate-800 focus:border-amber-500/50 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-200 focus:outline-none w-full"
-                                     >
-                                       <option value="">-- Seleccionar --</option>
-                                       {groupTeams.map(t => (
-                                         <option key={t.id} value={t.id}>
-                                           {t.flag} {t.name}
-                                         </option>
-                                       ))}
-                                     </select>
-                                   </div>
-                                 </div>
-                               </div>
-                             );
-                           })}
-                         </div>
-                       </div>
-
-                       {/* Mejores terceros */}
                        <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-850">
                          <div className="flex justify-between items-center mb-3">
                            <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
