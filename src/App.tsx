@@ -1067,19 +1067,13 @@ export default function App() {
 
   // Check if official bracket has been defined by Admin
   const hasOfficialBracketConfigured = useMemo(() => {
-    return Object.keys(adminOfficialFirsts).length === 12 && 
-           Object.keys(adminOfficialSeconds).length === 12 && 
-           adminOfficialThirds.length === 8;
-  }, [adminOfficialFirsts, adminOfficialSeconds, adminOfficialThirds]);
+    return true; // Forced to true so the official bracket is always shown since 1/16 is officially defined
+  }, []);
 
   // Check if all group stage matches (weeks 1, 2, 3) have official results published.
   const isOfficialGroupStageCompleted = useMemo(() => {
-    const groupMatches = initialMatches.filter(m => m.stage === 'group');
-    return groupMatches.length > 0 && groupMatches.every(m => {
-      const score = officialResults[m.id];
-      return score && score.homeScore !== undefined && score.awayScore !== undefined;
-    });
-  }, [initialMatches, officialResults]);
+    return true; // Forced to true so the official bracket is always shown
+  }, []);
 
 
   // Handle auto-populating selectors (1st, 2nd, best thirds) based on real standings
@@ -1496,20 +1490,21 @@ export default function App() {
     if (isEditingThisMatch) {
       const sortedTeams = [...TEAMS].sort((a, b) => a.name.localeCompare(b.name));
       return (
-        <div key={m.id} className="bg-slate-900 border border-amber-500/50 p-2 rounded-2xl space-y-2 text-[10px] relative shadow-xl w-[155px]">
-          <div className="flex items-center justify-between pb-1 border-b border-slate-800">
-            <div className="text-[7px] text-amber-500 font-extrabold uppercase tracking-wider">M-{m.id} • Equipos</div>
+        <div key={m.id} className="bg-slate-900/80 border border-amber-500/50 p-3 rounded-xl space-y-2.5 text-xs relative shadow-lg shadow-amber-500/5">
+          <div className="flex items-center justify-between pb-1 border-b border-slate-950">
+            <div className="text-[8px] text-amber-500 font-extrabold uppercase tracking-wider">M- {m.id} • Modificar Llave</div>
           </div>
           
-          <div className="space-y-1.5">
+          <div className="space-y-2">
+            {/* Home Select */}
             <div className="space-y-0.5">
-              <label className="text-[7px] text-slate-400 font-bold uppercase tracking-wider">Local:</label>
+              <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Local (Home):</label>
               <select
                 value={editHomeId}
                 onChange={(e) => setEditHomeId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded p-0.5 text-[9px] font-bold focus:outline-none focus:border-amber-500"
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded p-1 text-[11px] font-bold focus:outline-none focus:border-amber-500"
               >
-                <option value="default">Vacío / Original ({m.homeTeamId})</option>
+                <option value="default">🧬 Original ({m.homeTeamId})</option>
                 {sortedTeams.map(t => (
                   <option key={t.id} value={t.id}>
                     {t.name}
@@ -1518,14 +1513,15 @@ export default function App() {
               </select>
             </div>
 
+            {/* Away Select */}
             <div className="space-y-0.5">
-              <label className="text-[7px] text-slate-400 font-bold uppercase tracking-wider">Visitante:</label>
+              <label className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Visitante (Away):</label>
               <select
                 value={editAwayId}
                 onChange={(e) => setEditAwayId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded p-0.5 text-[9px] font-bold focus:outline-none focus:border-amber-500"
+                className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded p-1 text-[11px] font-bold focus:outline-none focus:border-amber-500"
               >
-                <option value="default">Vacío / Original ({m.awayTeamId})</option>
+                <option value="default">🧬 Original ({m.awayTeamId})</option>
                 {sortedTeams.map(t => (
                   <option key={t.id} value={t.id}>
                     {t.name}
@@ -1535,19 +1531,19 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex gap-1 pt-1.5 border-t border-slate-800">
+          <div className="flex items-center gap-2 pt-1 border-t border-slate-950/40">
             <button
               onClick={() => {
                 handleSaveMatchTeams(m.id, editHomeId, editAwayId);
                 setEditingTeamsMatchId(null);
               }}
-              className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-0.5 rounded text-[8px] uppercase text-center transition cursor-pointer"
+              className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-1 px-2 rounded text-[10px] uppercase text-center transition cursor-pointer"
             >
               Guardar
             </button>
             <button
               onClick={() => setEditingTeamsMatchId(null)}
-              className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-0.5 rounded text-[8px] uppercase text-center transition cursor-pointer"
+              className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-1 px-2 rounded text-[10px] uppercase text-center transition cursor-pointer"
             >
               Cancelar
             </button>
@@ -1620,572 +1616,124 @@ export default function App() {
       }
     };
 
-    const getAbbr = (teamRes: any, short = false) => {
-      if ('id' in teamRes) return teamRes.id;
-      if (teamRes.placeholder) {
-        return '';
-      }
-      return 'N/A';
-    };
-
-    const hAbbr = getAbbr(homeRes, true);
-    const aAbbr = getAbbr(awayRes, true);
-
-    const isMatchWinnerHome = winnerId === (homeRes as any).id;
-    const isMatchWinnerAway = winnerId === (awayRes as any).id;
-
     return (
-      <div 
-        key={m.id} 
-        className={`w-[155px] bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 border rounded-2xl p-2 flex flex-col items-center gap-1.5 transition-all duration-300 relative group shadow-lg ${
-          m.completed 
-            ? 'border-emerald-500/20 shadow-emerald-950/5' 
-            : 'border-slate-850 hover:border-amber-500/30 shadow-black/40'
-        }`}
-      >
-        {/* Action icons / edit triggers on top right */}
-        <div className="absolute top-0.5 right-1.5 flex items-center gap-1">
-          {isOfficial && currentUser?.role === 'admin' && (
-            <button
-              onClick={() => {
-                setEditingTeamsMatchId(m.id);
-                setEditHomeId(m.officialHomeTeamId || 'default');
-                setEditAwayId(m.officialAwayTeamId || 'default');
-              }}
-              className="text-slate-500 hover:text-amber-400 transition bg-transparent border-none p-0.5 cursor-pointer"
-              title="Editar Equipos"
-            >
-              <Edit className="h-2.5 w-2.5" />
-            </button>
-          )}
+      <div key={m.id} className={`bg-slate-900/80 border p-3 rounded-xl space-y-2 text-xs relative hover:border-slate-700 transition-colors ${m.completed ? 'border-emerald-800/30 bg-emerald-950/5' : 'border-slate-850'}`}>
+        <div className="flex items-center justify-between pb-1 border-b border-slate-950">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">M- {m.id}</span>
+            {isOfficial && m.completed && <span className="text-[8px] px-1 bg-emerald-500/10 text-emerald-400 font-extrabold uppercase rounded border border-emerald-500/10">Jugado</span>}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {isOfficial && currentUser?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setEditingTeamsMatchId(m.id);
+                  setEditHomeId(m.officialHomeTeamId || 'default');
+                  setEditAwayId(m.officialAwayTeamId || 'default');
+                }}
+                className="text-[9px] text-amber-500 hover:text-amber-400 font-bold flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
+                title="Modificar equipos de esta llave"
+              >
+                <Edit className="h-2.5 w-2.5" />
+                <span>Editar Equipos</span>
+              </button>
+            )}
 
-          {!isLocked && isReadyToSave && (
-            <button
-              onClick={handleLocalSave}
-              className="text-emerald-400 hover:text-emerald-300 transition bg-transparent border-none p-0.5 cursor-pointer"
-              title="Guardar Pronóstico"
-            >
-              <Save className="h-2.5 w-2.5 animate-pulse" />
-            </button>
-          )}
+            {!isLocked && isReadyToSave && (
+              <button
+                onClick={handleLocalSave}
+                className="text-[9px] text-emerald-400 hover:text-emerald-300 font-bold underline flex items-center gap-0.5 bg-transparent border-none p-0 cursor-pointer"
+              >
+                <Save className="h-2.5 w-2.5" />
+                <span>Guardar</span>
+              </button>
+            )}
+          </div>
         </div>
-
-        {/* Header Badge */}
-        <div className="bg-slate-950/90 text-slate-200 border border-slate-850 rounded-full px-2 py-0.5 text-[8.5px] font-black tracking-widest uppercase text-center mt-1 w-full max-w-[125px] select-none shadow-sm min-h-[17px] flex items-center justify-center">
-          {hAbbr || aAbbr ? (
-            <>
-              <span className={isMatchWinnerHome ? 'text-amber-400 font-extrabold' : ''}>{hAbbr}</span>
-              {hAbbr && aAbbr && <span className="text-slate-600 mx-1">-</span>}
-              <span className={isMatchWinnerAway ? 'text-amber-400 font-extrabold' : ''}>{aAbbr}</span>
-            </>
-          ) : (
-            <span className="text-slate-600 font-semibold">—</span>
-          )}
-        </div>
-
-        {/* Flags Container with Floating Scores */}
-        <div className="flex items-center justify-between w-full gap-2.5 relative mt-0.5 select-none px-0.5">
-          {/* Home Flag */}
-          <div className="relative flex-1 aspect-[4/3] rounded-xl overflow-hidden border border-slate-800/80 bg-slate-950 shadow-inner group">
+        
+        {/* Home Row */}
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 truncate flex-1 min-w-0">
             {'flag' in homeRes ? (
-              <img 
-                src={getTeamFlagUrl((homeRes as any).id)} 
-                className={`w-full h-full object-cover transition-all duration-300 ${
-                  winnerId && !isMatchWinnerHome ? 'opacity-40 grayscale-[30%]' : 'opacity-100'
-                }`} 
-                alt="" 
-                referrerPolicy="no-referrer" 
-              />
+              <img src={getTeamFlagUrl((homeRes as any).id)} className="w-5 h-3.5 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-slate-900/60 text-slate-500 font-extrabold text-[8px] text-center px-1 leading-tight">
-                {/* Blank for placeholder */}
-              </div>
+              <span className="shrink-0 text-xs text-slate-500">🏳️</span>
             )}
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/15 pointer-events-none rounded-xl" />
+            <span className={`truncate font-semibold ${winnerId === (homeRes as any).id ? 'text-amber-400 font-extrabold shadow-sm' : 'text-slate-300'}`}>
+              {'name' in homeRes ? homeRes.name : homeRes.text}
+            </span>
           </div>
 
-          {/* Home Score Bubble overlay */}
-          <div className="absolute left-[34%] top-1/2 -translate-y-1/2 z-10">
-            <input
-              type="text"
-              disabled={isDisabled}
-              value={hScore}
-              onChange={(e) => handleLocalPredictionChange(m.id, 'home', e.target.value)}
-              placeholder="-"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleLocalSave();
-              }}
-              className={`w-[22px] h-[22px] text-center bg-slate-950 border rounded-full text-[10px] font-extrabold font-mono focus:outline-none p-0 shadow-lg flex items-center justify-center transition-all ${
-                isMatchWinnerHome 
-                  ? 'border-amber-500 text-amber-400 ring-1 ring-amber-500/20' 
-                  : 'border-slate-800 text-slate-300 focus:border-amber-500'
-              } disabled:opacity-90`}
-            />
-          </div>
+          <input
+            type="text"
+            disabled={isDisabled}
+            value={hScore}
+            onChange={(e) => handleLocalPredictionChange(m.id, 'home', e.target.value)}
+            placeholder="-"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleLocalSave();
+            }}
+            className="w-8 text-center bg-slate-950 border border-slate-800 rounded py-0.5 px-1 text-xs text-amber-400 font-bold font-mono focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-50"
+          />
+        </div>
 
-          {/* Away Score Bubble overlay */}
-          <div className="absolute right-[34%] top-1/2 -translate-y-1/2 z-10">
-            <input
-              type="text"
-              disabled={isDisabled}
-              value={aScore}
-              onChange={(e) => handleLocalPredictionChange(m.id, 'away', e.target.value)}
-              placeholder="-"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleLocalSave();
-              }}
-              className={`w-[22px] h-[22px] text-center bg-slate-950 border rounded-full text-[10px] font-extrabold font-mono focus:outline-none p-0 shadow-lg flex items-center justify-center transition-all ${
-                isMatchWinnerAway 
-                  ? 'border-amber-500 text-amber-400 ring-1 ring-amber-500/20' 
-                  : 'border-slate-800 text-slate-300 focus:border-amber-500'
-              } disabled:opacity-90`}
-            />
-          </div>
-
-          {/* Away Flag */}
-          <div className="relative flex-1 aspect-[4/3] rounded-xl overflow-hidden border border-slate-800/80 bg-slate-950 shadow-inner group">
+        {/* Away Row */}
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 truncate flex-1 min-w-0">
             {'flag' in awayRes ? (
-              <img 
-                src={getTeamFlagUrl((awayRes as any).id)} 
-                className={`w-full h-full object-cover transition-all duration-300 ${
-                  winnerId && !isMatchWinnerAway ? 'opacity-40 grayscale-[30%]' : 'opacity-100'
-                }`} 
-                alt="" 
-                referrerPolicy="no-referrer" 
-              />
+              <img src={getTeamFlagUrl((awayRes as any).id)} className="w-5 h-3.5 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-slate-900/60 text-slate-500 font-extrabold text-[8px] text-center px-1 leading-tight">
-                {/* Blank for placeholder */}
-              </div>
+              <span className="shrink-0 text-xs text-slate-500">🏳️</span>
             )}
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/15 pointer-events-none rounded-xl" />
+            <span className={`truncate font-semibold ${winnerId === (awayRes as any).id ? 'text-amber-400 font-extrabold shadow-sm' : 'text-slate-300'}`}>
+              {'name' in awayRes ? awayRes.name : awayRes.text}
+            </span>
           </div>
+
+          <input
+            type="text"
+            disabled={isDisabled}
+            value={aScore}
+            onChange={(e) => handleLocalPredictionChange(m.id, 'away', e.target.value)}
+            placeholder="-"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleLocalSave();
+            }}
+            className="w-8 text-center bg-slate-950 border border-slate-800 rounded py-0.5 px-1 text-xs text-amber-400 font-bold font-mono focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-50"
+          />
         </div>
 
         {/* Tie Breaker if Tie */}
         {isTie && !isLocked && (
-          <div className="pt-1.5 border-t border-slate-950 w-full text-center space-y-1 mt-0.5 select-none animate-fade-in">
-            <div className="text-[7.5px] text-amber-400 font-black uppercase tracking-wider">Gana Penales</div>
-            <div className="flex gap-1 px-0.5">
+          <div className="pt-2 border-t border-slate-950 mt-1 space-y-1">
+            <div className="text-[8px] text-amber-400 font-bold uppercase">Empate. Escoge el ganador:</div>
+            <div className="flex gap-1.5">
               <button
                 onClick={() => selectWinnerWithSave((homeRes as any).id)}
-                className={`px-1 py-0.5 rounded-lg text-[8px] font-black tracking-tight transition-all cursor-pointer truncate flex-1 flex items-center justify-center gap-0.5 leading-none h-4.5 ${
-                  pWinnerId === (homeRes as any).id 
-                    ? 'bg-amber-400 text-slate-950 font-black shadow' 
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-850'
+                className={`px-1.5 py-1 rounded text-[9px] font-bold transition-all cursor-pointer truncate flex-1 flex items-center justify-center gap-1 leading-none ${
+                  pWinnerId === (homeRes as any).id ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
                 }`}
               >
-                {hAbbr}
+                {'flag' in homeRes && (
+                  <img src={getTeamFlagUrl((homeRes as any).id)} className="w-3.5 h-2.5 object-cover rounded shadow-xs shrink-0" alt="" referrerPolicy="no-referrer" />
+                )}
+                <span className="truncate">{(homeRes as any).name || 'L'}</span>
               </button>
               <button
                 onClick={() => selectWinnerWithSave((awayRes as any).id)}
-                className={`px-1 py-0.5 rounded-lg text-[8px] font-black tracking-tight transition-all cursor-pointer truncate flex-1 flex items-center justify-center gap-0.5 leading-none h-4.5 ${
-                  pWinnerId === (awayRes as any).id 
-                    ? 'bg-amber-400 text-slate-950 font-black shadow' 
-                    : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-850'
+                className={`px-1.5 py-1 rounded text-[9px] font-bold transition-all cursor-pointer truncate flex-1 flex items-center justify-center gap-1 leading-none ${
+                  pWinnerId === (awayRes as any).id ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-950 text-slate-400 hover:text-white'
                 }`}
               >
-                {aAbbr}
+                {'flag' in awayRes && (
+                  <img src={getTeamFlagUrl((awayRes as any).id)} className="w-3.5 h-2.5 object-cover rounded shadow-xs shrink-0" alt="" referrerPolicy="no-referrer" />
+                )}
+                <span className="truncate">{(awayRes as any).name || 'V'}</span>
               </button>
             </div>
           </div>
         )}
-      </div>
-    );
-  };
-
-  const renderFullConnectedBracket = (isOfficial: boolean) => {
-    return (
-      <div className="overflow-x-auto pb-6 select-none">
-        <div className="min-w-[1850px] flex items-center justify-between bg-slate-950/40 p-6 rounded-3xl border border-slate-900/60 relative shadow-2xl h-[950px] backdrop-blur-sm">
-          
-          {/* COL 1: 16AVOS IZQUIERDA (8 matches absolutely positioned) */}
-          <div className="relative h-[850px] w-[187px] shrink-0 self-center">
-            <div className="absolute -top-12 left-0 right-0 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-900/60 pb-1.5 flex items-center justify-center gap-1 select-none">
-              <span>16AVOS IZQUIERDA</span>
-              <span className="text-slate-600">→</span>
-            </div>
-            
-            {[
-              { id: 'K75', center: 75 },
-              { id: 'K73', center: 175 },
-              { id: 'K78', center: 275 },
-              { id: 'K76', center: 375 },
-              { id: 'K84', center: 475 },
-              { id: 'K83', center: 575 },
-              { id: 'K82', center: 675 },
-              { id: 'K81', center: 775 }
-            ].map(({ id, center }) => {
-              const m = combinedMatches.find(x => x.id === id);
-              if (!m) return null;
-              return (
-                <div 
-                  key={id} 
-                  style={{ top: `${center - 45}px` }} 
-                  className="absolute left-0 w-[155px] group transition-transform duration-200 hover:scale-[1.03]"
-                >
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              );
-            })}
-
-            {/* Connecting SVG lines */}
-            <svg className="absolute right-0 top-0 h-full w-8 pointer-events-none stroke-slate-850" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M 0 75 L 16 75 M 0 175 L 16 175 M 16 75 L 16 175 M 16 125 L 32 125" />
-              <path d="M 0 275 L 16 275 M 0 375 L 16 375 M 16 275 L 16 375 M 16 325 L 32 325" />
-              <path d="M 0 475 L 16 475 M 0 575 L 16 575 M 16 475 L 16 575 M 16 525 L 32 525" />
-              <path d="M 0 675 L 16 675 M 0 775 L 16 775 M 16 675 L 16 775 M 16 725 L 32 725" />
-            </svg>
-
-            {/* Glowing dot connectors */}
-            {[125, 325, 525, 725].map((y) => (
-              <div key={y} style={{ top: `${y - 8}px` }} className="absolute right-[12px] w-2 h-4 bg-slate-950 border border-slate-800 rounded-full shadow-inner flex items-center justify-center">
-                <div className="w-1 h-2 bg-amber-500/80 rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-          {/* COL 2: OCTAVOS IZQUIERDA (4 matches absolutely positioned) */}
-          <div className="relative h-[850px] w-[187px] shrink-0 self-center">
-            <div className="absolute -top-12 left-0 right-0 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-900/60 pb-1.5 flex items-center justify-center gap-1 select-none">
-              <span>OCTAVOS IZQUIERDA</span>
-              <span className="text-slate-600">→</span>
-            </div>
-
-            {[
-              { id: 'K89', center: 125 },
-              { id: 'K91', center: 325 },
-              { id: 'K93', center: 525 },
-              { id: 'K94', center: 725 }
-            ].map(({ id, center }) => {
-              const m = combinedMatches.find(x => x.id === id);
-              if (!m) return null;
-              return (
-                <div 
-                  key={id} 
-                  style={{ top: `${center - 45}px` }} 
-                  className="absolute left-0 w-[155px] group transition-transform duration-200 hover:scale-[1.03]"
-                >
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              );
-            })}
-
-            {/* Connecting SVG lines */}
-            <svg className="absolute right-0 top-0 h-full w-8 pointer-events-none stroke-slate-850" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M 0 125 L 16 125 M 0 325 L 16 325 M 16 125 L 16 325 M 16 225 L 32 225" />
-              <path d="M 0 525 L 16 525 M 0 725 L 16 725 M 16 525 L 16 725 M 16 625 L 32 625" />
-            </svg>
-
-            {/* Glowing dot connectors */}
-            {[225, 625].map((y) => (
-              <div key={y} style={{ top: `${y - 8}px` }} className="absolute right-[12px] w-2 h-4 bg-slate-950 border border-slate-800 rounded-full shadow-inner flex items-center justify-center">
-                <div className="w-1 h-2 bg-amber-500/80 rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-          {/* COL 3: CUARTOS IZQUIERDA (2 matches absolutely positioned) */}
-          <div className="relative h-[850px] w-[187px] shrink-0 self-center">
-            <div className="absolute -top-12 left-0 right-0 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-900/60 pb-1.5 flex items-center justify-center gap-1 select-none">
-              <span>CUARTOS IZQUIERDA</span>
-              <span className="text-slate-600">→</span>
-            </div>
-
-            {[
-              { id: 'K97', center: 225 },
-              { id: 'K98', center: 625 }
-            ].map(({ id, center }) => {
-              const m = combinedMatches.find(x => x.id === id);
-              if (!m) return null;
-              return (
-                <div 
-                  key={id} 
-                  style={{ top: `${center - 45}px` }} 
-                  className="absolute left-0 w-[155px] group transition-transform duration-200 hover:scale-[1.03]"
-                >
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              );
-            })}
-
-            {/* Connecting SVG lines */}
-            <svg className="absolute right-0 top-0 h-full w-8 pointer-events-none stroke-slate-850" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M 0 225 L 16 225 M 0 625 L 16 625 M 16 225 L 16 625 M 16 425 L 32 425" />
-            </svg>
-
-            {/* Glowing dot connectors */}
-            {[425].map((y) => (
-              <div key={y} style={{ top: `${y - 8}px` }} className="absolute right-[12px] w-2 h-4 bg-slate-950 border border-slate-800 rounded-full shadow-inner flex items-center justify-center">
-                <div className="w-1 h-2 bg-amber-500/80 rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-          {/* COL 4: SEMIFINAL IZQUIERDA (1 match absolutely positioned) */}
-          <div className="relative h-[850px] w-[187px] shrink-0 self-center">
-            <div className="absolute -top-12 left-0 right-0 text-[10px] font-black text-rose-400 uppercase tracking-widest text-center border-b border-slate-900/60 pb-1.5 flex items-center justify-center gap-1 select-none">
-              <span>SEMIFINAL</span>
-              <span className="text-slate-600">→</span>
-            </div>
-
-            {[
-              { id: 'K101', center: 425 }
-            ].map(({ id, center }) => {
-              const m = combinedMatches.find(x => x.id === id);
-              if (!m) return null;
-              return (
-                <div 
-                  key={id} 
-                  style={{ top: `${center - 45}px` }} 
-                  className="absolute left-0 w-[155px] group transition-transform duration-200 hover:scale-[1.03]"
-                >
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              );
-            })}
-
-            {/* Connecting SVG lines */}
-            <svg className="absolute right-0 top-0 h-full w-8 pointer-events-none stroke-slate-850" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M 0 425 L 32 425" />
-            </svg>
-
-            {/* Glowing dot connectors */}
-            {[425].map((y) => (
-              <div key={y} style={{ top: `${y - 8}px` }} className="absolute right-[12px] w-2 h-4 bg-slate-950 border border-slate-800 rounded-full shadow-inner flex items-center justify-center">
-                <div className="w-1 h-2 bg-amber-500/80 rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-          {/* COL 5: COLUMNA CENTRAL (TROFEO, LA GRAN FINAL & CAMPEÓN) */}
-          <div className="flex flex-col justify-between items-center h-[850px] py-6 bg-slate-950/50 rounded-3xl border border-slate-900 px-4 relative overflow-hidden shadow-2xl backdrop-blur-md w-[260px] shrink-0 self-center">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-amber-500/10 blur-[90px] rounded-full pointer-events-none" />
-            <div className="text-center space-y-1 select-none z-10">
-              <div className="text-3xl font-extrabold text-white tracking-tighter uppercase font-sans drop-shadow-[0_4px_12px_rgba(255,255,255,0.15)] leading-none">
-                BRACKET <span className="text-amber-500">MUNDIAL</span>
-              </div>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                OFICIAL 2026
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center gap-3 w-full select-none z-10">
-              <div className="bg-slate-950/95 text-white border border-slate-800 px-5 py-0.5 text-[10px] font-black tracking-widest rounded-full shadow-lg uppercase">
-                FINAL
-              </div>
-              <img 
-                src="https://i.pinimg.com/474x/3f/2c/16/3f2c1645bd037c8d2471bbd9be550989.jpg" 
-                className="h-56 object-contain drop-shadow-[0_0_35px_rgba(245,158,11,0.25)] select-none transition-transform duration-500 hover:scale-[1.05]" 
-                alt="FIFA World Cup Trophy" 
-                referrerPolicy="no-referrer" 
-              />
-              <div className="bg-slate-950 border border-slate-850 px-6 py-1 rounded-b-2xl shadow-xl text-center w-full max-w-[180px]">
-                <div className="text-[9px] font-black tracking-widest text-slate-300">FIFA WORLD CUP™</div>
-              </div>
-            </div>
-
-            <div className="w-full max-w-[155px] z-10">
-              {combinedMatches.filter(m => m.id === 'K104').map(m => (
-                <div key={m.id} className="relative group transition-transform duration-200 hover:scale-[1.03] border border-amber-500/20 rounded-2xl bg-amber-500/5">
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              ))}
-            </div>
-
-            <div className="w-full z-10 flex flex-col items-center">
-              {combinedMatches.filter(m => m.stage === 'final').map((m) => {
-                const winnerId = getKnockoutWinnerIdWithOverrides(m, isOfficial);
-                const champion = winnerId ? TEAMS.find(t => t.id === winnerId) : null;
-
-                return champion ? (
-                  <div key={m.id} className="bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 px-4 py-2.5 rounded-2xl text-slate-950 text-center space-y-1 shadow-[0_0_20px_rgba(245,158,11,0.25)] border border-amber-300 flex flex-col items-center justify-center animate-bounce w-full max-w-[165px]">
-                    <Crown className="h-5 w-5 text-slate-950 fill-slate-950/20" />
-                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-950">¡CAMPEÓN!</div>
-                    <img src={getTeamFlagUrl(champion.id)} className="w-10 h-6.5 object-cover rounded shadow-md border border-amber-600/50 my-1" alt="" referrerPolicy="no-referrer" />
-                    <div className="text-xs font-black uppercase tracking-tight text-slate-950">{champion.name}</div>
-                  </div>
-                ) : (
-                  <div key={m.id} className="bg-slate-950/60 border border-dashed border-slate-850 px-4 py-3 rounded-2xl text-center flex flex-col items-center justify-center text-slate-500 space-y-1 w-full max-w-[165px]">
-                    <Trophy className="h-5 w-5 text-slate-700 animate-pulse" />
-                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-600">CAMPEÓN POR DEFINIR</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="w-full max-w-[155px] z-10 flex flex-col items-center">
-              <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                TERCER PUESTO
-              </div>
-              {combinedMatches.filter(m => m.id === 'K103').map(m => (
-                <div key={m.id} className="relative group transition-transform duration-200 hover:scale-[1.02] opacity-80">
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* COL 6: SEMIFINAL DERECHA (1 match absolutely positioned) */}
-          <div className="relative h-[850px] w-[187px] shrink-0 self-center">
-            <div className="absolute -top-12 left-0 right-0 text-[10px] font-black text-rose-400 uppercase tracking-widest text-center border-b border-slate-900/60 pb-1.5 flex items-center justify-center gap-1 select-none">
-              <span className="text-slate-600">←</span>
-              <span>SEMIFINAL</span>
-            </div>
-
-            {[
-              { id: 'K102', center: 425 }
-            ].map(({ id, center }) => {
-              const m = combinedMatches.find(x => x.id === id);
-              if (!m) return null;
-              return (
-                <div 
-                  key={id} 
-                  style={{ top: `${center - 45}px` }} 
-                  className="absolute right-0 w-[155px] group transition-transform duration-200 hover:scale-[1.03]"
-                >
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              );
-            })}
-
-            {/* Connecting SVG lines */}
-            <svg className="absolute left-0 top-0 h-full w-8 pointer-events-none stroke-slate-855" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M 32 425 L 0 425" />
-            </svg>
-
-            {/* Glowing dot connectors */}
-            {[425].map((y) => (
-              <div key={y} style={{ top: `${y - 8}px` }} className="absolute left-[12px] w-2 h-4 bg-slate-950 border border-slate-800 rounded-full shadow-inner flex items-center justify-center">
-                <div className="w-1 h-2 bg-amber-500/80 rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-          {/* COL 7: CUARTOS DERECHA (2 matches absolutely positioned) */}
-          <div className="relative h-[850px] w-[187px] shrink-0 self-center">
-            <div className="absolute -top-12 left-0 right-0 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-900/60 pb-1.5 flex items-center justify-center gap-1 select-none">
-              <span className="text-slate-600">←</span>
-              <span>CUARTOS DERECHA</span>
-            </div>
-
-            {[
-              { id: 'K99', center: 225 },
-              { id: 'K100', center: 625 }
-            ].map(({ id, center }) => {
-              const m = combinedMatches.find(x => x.id === id);
-              if (!m) return null;
-              return (
-                <div 
-                  key={id} 
-                  style={{ top: `${center - 45}px` }} 
-                  className="absolute right-0 w-[155px] group transition-transform duration-200 hover:scale-[1.03]"
-                >
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              );
-            })}
-
-            {/* Connecting SVG lines */}
-            <svg className="absolute left-0 top-0 h-full w-8 pointer-events-none stroke-slate-855" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M 32 225 L 16 225 M 32 625 L 16 625 M 16 225 L 16 625 M 16 425 L 0 425" />
-            </svg>
-
-            {/* Glowing dot connectors */}
-            {[425].map((y) => (
-              <div key={y} style={{ top: `${y - 8}px` }} className="absolute left-[12px] w-2 h-4 bg-slate-950 border border-slate-800 rounded-full shadow-inner flex items-center justify-center">
-                <div className="w-1 h-2 bg-amber-500/80 rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-          {/* COL 8: OCTAVOS DERECHA (4 matches absolutely positioned) */}
-          <div className="relative h-[850px] w-[187px] shrink-0 self-center">
-            <div className="absolute -top-12 left-0 right-0 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-900/60 pb-1.5 flex items-center justify-center gap-1 select-none">
-              <span className="text-slate-600">←</span>
-              <span>OCTAVOS DERECHA</span>
-            </div>
-
-            {[
-              { id: 'K90', center: 125 },
-              { id: 'K92', center: 325 },
-              { id: 'K96', center: 525 },
-              { id: 'K95', center: 725 }
-            ].map(({ id, center }) => {
-              const m = combinedMatches.find(x => x.id === id);
-              if (!m) return null;
-              return (
-                <div 
-                  key={id} 
-                  style={{ top: `${center - 45}px` }} 
-                  className="absolute right-0 w-[155px] group transition-transform duration-200 hover:scale-[1.03]"
-                >
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              );
-            })}
-
-            {/* Connecting SVG lines */}
-            <svg className="absolute left-0 top-0 h-full w-8 pointer-events-none stroke-slate-855" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M 32 125 L 16 125 M 32 325 L 16 325 M 16 125 L 16 325 M 16 225 L 0 225" />
-              <path d="M 32 525 L 16 525 M 32 725 L 16 725 M 16 525 L 16 725 M 16 625 L 0 625" />
-            </svg>
-
-            {/* Glowing dot connectors */}
-            {[225, 625].map((y) => (
-              <div key={y} style={{ top: `${y - 8}px` }} className="absolute left-[12px] w-2 h-4 bg-slate-950 border border-slate-800 rounded-full shadow-inner flex items-center justify-center">
-                <div className="w-1 h-2 bg-amber-500/80 rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-          {/* COL 9: 16AVOS DERECHA (8 matches absolutely positioned) */}
-          <div className="relative h-[850px] w-[187px] shrink-0 self-center">
-            <div className="absolute -top-12 left-0 right-0 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-900/60 pb-1.5 flex items-center justify-center gap-1 select-none">
-              <span className="text-slate-600">←</span>
-              <span>16AVOS DERECHA</span>
-            </div>
-
-            {[
-              { id: 'K74', center: 75 },
-              { id: 'K77', center: 175 },
-              { id: 'K79', center: 275 },
-              { id: 'K80', center: 375 },
-              { id: 'K87', center: 475 },
-              { id: 'K86', center: 575 },
-              { id: 'K85', center: 675 },
-              { id: 'K88', center: 775 }
-            ].map(({ id, center }) => {
-              const m = combinedMatches.find(x => x.id === id);
-              if (!m) return null;
-              return (
-                <div 
-                  key={id} 
-                  style={{ top: `${center - 45}px` }} 
-                  className="absolute right-0 w-[155px] group transition-transform duration-200 hover:scale-[1.03]"
-                >
-                  {renderBracketMatchCard(m, isOfficial)}
-                </div>
-              );
-            })}
-
-            {/* Connecting SVG lines */}
-            <svg className="absolute left-0 top-0 h-full w-8 pointer-events-none stroke-slate-855" fill="none" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M 32 75 L 16 75 M 32 175 L 16 175 M 16 75 L 16 175 M 16 125 L 0 125" />
-              <path d="M 32 275 L 16 275 M 32 375 L 16 375 M 16 275 L 16 375 M 16 325 L 0 325" />
-              <path d="M 32 475 L 16 475 M 32 575 L 16 575 M 16 475 L 16 575 M 16 525 L 0 525" />
-              <path d="M 32 675 L 16 675 M 32 775 L 16 775 M 16 675 L 16 775 M 16 725 L 0 725" />
-            </svg>
-
-            {/* Glowing dot connectors */}
-            {[125, 325, 525, 725].map((y) => (
-              <div key={y} style={{ top: `${y - 8}px` }} className="absolute left-[12px] w-2 h-4 bg-slate-950 border border-slate-800 rounded-full shadow-inner flex items-center justify-center">
-                <div className="w-1 h-2 bg-amber-500/80 rounded-full animate-pulse" />
-              </div>
-            ))}
-          </div>
-
-        </div>
       </div>
     );
   };
@@ -2920,11 +2468,6 @@ export default function App() {
       const matchesSubTab = calendarSubTab === 'pending' ? !m.completed : m.completed;
 
       return matchesStage && matchesGroup && matchesWeek && matchesDate && matchesSearch && matchesSubTab;
-    }).sort((a, b) => {
-      if (a.date !== b.date) {
-        return a.date.localeCompare(b.date);
-      }
-      return a.time.localeCompare(b.time);
     });
   }, [combinedMatches, calendarSubTab, stageFilter, groupFilter, weekFilter, dateFilter, searchTeam, manualFirstPlaces, manualSecondPlaces, manualThirdPlaces, unlockedWeek, hasOfficialBracketConfigured]);
 
@@ -4671,8 +4214,62 @@ export default function App() {
               </div>
             )}
 
-            {/* Layout representation of World Cup Brackets with connecting lines */}
-            {isGroupStageSelectionsCompleted && renderFullConnectedBracket(false)}
+            {/* Layout representation of World Cup Brackets */}
+            <div className="flex overflow-x-auto gap-8 py-6 px-2">
+              
+              {/* STAGE: 1/16 (Round of 32) */}
+              <div className="min-w-[240px] flex flex-col gap-6 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Dieciseisavos (1/16)</div>
+                {combinedMatches.filter(m => m.stage === '1/16').map((m) => renderBracketMatchCard(m, false))}
+              </div>
+
+              {/* STAGE: 1/8 (Round of 16) */}
+              <div className="min-w-[240px] flex flex-col gap-6 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Octavos de Final (1/8)</div>
+                {combinedMatches.filter(m => m.stage === '1/8').map((m) => renderBracketMatchCard(m, false))}
+              </div>
+
+              {/* STAGE: 1/4 (Quarter-finals) */}
+              <div className="min-w-[240px] flex flex-col gap-12 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Cuartos de Final (1/4)</div>
+                {combinedMatches.filter(m => m.stage === '1/4').map((m) => renderBracketMatchCard(m, false))}
+              </div>
+
+              {/* STAGE: 1/2 (Semifinals) */}
+              <div className="min-w-[240px] flex flex-col gap-24 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Semifinales</div>
+                {combinedMatches.filter(m => m.stage === '1/2').map((m) => renderBracketMatchCard(m, false))}
+              </div>
+
+              {/* STAGE: FINAL (La Gran Final & Campeón) */}
+              <div className="min-w-[260px] flex flex-col gap-6 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Gran Final y Podio</div>
+                
+                {combinedMatches.filter(m => m.stage === 'final').map((m) => {
+                  const winnerId = getKnockoutWinnerIdWithOverrides(m, false);
+                  const champion = winnerId ? TEAMS.find(t => t.id === winnerId) : null;
+
+                  return (
+                    <div key={m.id} className="space-y-6">
+                      
+                      {/* Champion Crown box */}
+                      {champion && (
+                        <div className="bg-gradient-to-tr from-amber-500 to-yellow-300 p-4 rounded-xl text-slate-950 text-center space-y-1 shadow-[0_0_20px_rgba(245,158,11,0.3)] border border-amber-400 flex flex-col items-center justify-center">
+                          <Crown className="h-6 w-6 text-slate-950 fill-slate-950/20 mb-1" />
+                          <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-950">Tu Campeón Pronosticado:</div>
+                          <img src={getTeamFlagUrl(champion.id)} className="w-12 h-8 object-cover rounded-md shadow-md border border-amber-600/30 my-1.5" alt="" referrerPolicy="no-referrer" />
+                          <div className="text-sm font-black uppercase tracking-tight text-slate-950">{champion.name}</div>
+                        </div>
+                      )}
+
+                      {/* Final block */}
+                      {renderBracketMatchCard(m, false)}
+
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
 
@@ -4708,8 +4305,65 @@ export default function App() {
               </div>
             )}
 
-            {/* Layout representation of World Cup Brackets with connecting lines */}
-            {hasOfficialBracketConfigured && isOfficialGroupStageCompleted && renderFullConnectedBracket(true)}
+            {/* Layout representation of World Cup Brackets */}
+            {hasOfficialBracketConfigured && isOfficialGroupStageCompleted && (
+              <div className="flex overflow-x-auto gap-8 py-6 px-2">
+              
+              {/* STAGE: 1/16 (Round of 32) */}
+              <div className="min-w-[240px] flex flex-col gap-6 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Dieciseisavos (1/16)</div>
+                {combinedMatches.filter(m => m.stage === '1/16').map((m) => renderBracketMatchCard(m, true))}
+              </div>
+
+              {/* STAGE: 1/8 (Round of 16) */}
+              <div className="min-w-[240px] flex flex-col gap-6 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Octavos de Final (1/8)</div>
+                {combinedMatches.filter(m => m.stage === '1/8').map((m) => renderBracketMatchCard(m, true))}
+              </div>
+
+              {/* STAGE: 1/4 (Quarter-finals) */}
+              <div className="min-w-[240px] flex flex-col gap-12 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Cuartos de Final (1/4)</div>
+                {combinedMatches.filter(m => m.stage === '1/4').map((m) => renderBracketMatchCard(m, true))}
+              </div>
+
+              {/* STAGE: 1/2 (Semifinals) */}
+              <div className="min-w-[240px] flex flex-col gap-24 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Semifinales</div>
+                {combinedMatches.filter(m => m.stage === '1/2').map((m) => renderBracketMatchCard(m, true))}
+              </div>
+
+              {/* STAGE: FINAL (La Gran Final & Campeón) */}
+              <div className="min-w-[260px] flex flex-col gap-6 justify-center">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center border-b border-slate-900 pb-2">Gran Final y Podio</div>
+                
+                {combinedMatches.filter(m => m.stage === 'final').map((m) => {
+                  const winnerId = getKnockoutWinnerIdWithOverrides(m, true);
+                  const champion = winnerId ? TEAMS.find(t => t.id === winnerId) : null;
+
+                  return (
+                    <div key={m.id} className="space-y-6">
+                      
+                      {/* Champion Crown box */}
+                      {champion && (
+                        <div className="bg-gradient-to-tr from-emerald-500 to-green-300 p-4 rounded-xl text-slate-950 text-center space-y-1 shadow-[0_0_20px_rgba(16,185,129,0.3)] border border-emerald-400 flex flex-col items-center justify-center">
+                          <Crown className="h-6 w-6 text-slate-950 fill-slate-950/20 mb-1" />
+                          <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-950">Campeón Oficial del Torneo:</div>
+                          <img src={getTeamFlagUrl(champion.id)} className="w-12 h-8 object-cover rounded-md shadow-md border border-emerald-600/30 my-1.5" alt="" referrerPolicy="no-referrer" />
+                          <div className="text-sm font-black uppercase tracking-tight text-slate-950">{champion.name}</div>
+                        </div>
+                      )}
+
+                      {/* Final block */}
+                      {renderBracketMatchCard(m, true)}
+
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+            )}
 
           </div>
         )}
@@ -6500,11 +6154,6 @@ export default function App() {
                         }
 
                         return true;
-                      }).sort((a, b) => {
-                        if (a.date !== b.date) {
-                          return a.date.localeCompare(b.date);
-                        }
-                        return a.time.localeCompare(b.time);
                       });
 
                       if (filteredMatches.length === 0) {
@@ -6956,11 +6605,6 @@ export default function App() {
                     if (scheduleWeekFilter !== 'all' && matchWeek !== scheduleWeekFilter) return false;
                     if (scheduleGroupFilter !== 'all' && m.group !== scheduleGroupFilter) return false;
                     return true;
-                  }).sort((a, b) => {
-                    if (a.date !== b.date) {
-                      return a.date.localeCompare(b.date);
-                    }
-                    return a.time.localeCompare(b.time);
                   });
 
                   if (items.length === 0) {
@@ -7098,12 +6742,6 @@ export default function App() {
                   {combinedMatches
                     .filter(m => selectedAdminMatchStage === 'all' || m.stage === selectedAdminMatchStage)
                     .filter(m => selectedAdminMatchWeek === 'all' || getMatchWeek(m.date, m.stage).toString() === selectedAdminMatchWeek)
-                    .sort((a, b) => {
-                      if (a.date !== b.date) {
-                        return a.date.localeCompare(b.date);
-                      }
-                      return a.time.localeCompare(b.time);
-                    })
                     .map((m) => {
                       const hId = m.officialHomeTeamId || m.homeTeamId;
                       const aId = m.officialAwayTeamId || m.awayTeamId;
@@ -7122,63 +6760,135 @@ export default function App() {
                         <div key={m.id} className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex flex-col gap-2">
                           <div className="flex justify-between text-[9px] text-slate-500 border-b border-slate-900 pb-1.5">
                             <span className="font-bold text-amber-500">M-ID: {m.id} ({m.stage})</span>
-                            <span>{m.date} | {m.time}</span>
+                            <div className="flex items-center gap-2">
+                              <span>{m.date} | {m.time}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (editingTeamsMatchId === m.id) {
+                                    setEditingTeamsMatchId(null);
+                                  } else {
+                                    setEditingTeamsMatchId(m.id);
+                                    setEditHomeId(m.officialHomeTeamId || 'default');
+                                    setEditAwayId(m.officialAwayTeamId || 'default');
+                                  }
+                                }}
+                                className="text-[9px] text-amber-400 hover:text-amber-350 font-bold flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.5 rounded transition cursor-pointer"
+                              >
+                                <Edit className="h-2.5 w-2.5" />
+                                {editingTeamsMatchId === m.id ? 'Cerrar' : 'Cambiar equipos'}
+                              </button>
+                            </div>
                           </div>
 
-                          <div className="flex items-center justify-between gap-2">
-                            {/* Home */}
-                            <div className="flex-1 truncate text-right font-semibold text-xs flex items-center justify-end gap-1.5">
-                              <span className="truncate">{'name' in homeRes ? homeRes.name : homeRes.text}</span>
-                              {'flag' in homeRes ? (
-                                <img src={getTeamFlagUrl((homeRes as any).id)} className="w-4 h-3 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
-                              ) : (
-                                <span className="text-xs shrink-0">🏳️</span>
-                              )}
+                          {editingTeamsMatchId === m.id ? (
+                            <div className="p-2 bg-slate-900/60 rounded-lg border border-amber-500/20 space-y-2 mt-1">
+                              <div className="grid grid-cols-2 gap-2">
+                                {/* Home select */}
+                                <div className="space-y-0.5">
+                                  <label className="text-[8px] text-slate-400 font-bold uppercase">Local:</label>
+                                  <select
+                                    value={editHomeId}
+                                    onChange={(e) => setEditHomeId(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded p-1 text-[10px] font-bold focus:outline-none focus:border-amber-500"
+                                  >
+                                    <option value="default">Original ({m.homeTeamId})</option>
+                                    {[...TEAMS].sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                                      <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                {/* Away select */}
+                                <div className="space-y-0.5">
+                                  <label className="text-[8px] text-slate-400 font-bold uppercase">Visitante:</label>
+                                  <select
+                                    value={editAwayId}
+                                    onChange={(e) => setEditAwayId(e.target.value)}
+                                    className="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded p-1 text-[10px] font-bold focus:outline-none focus:border-amber-500"
+                                  >
+                                    <option value="default">Original ({m.awayTeamId})</option>
+                                    {[...TEAMS].sort((a, b) => a.name.localeCompare(b.name)).map(t => (
+                                      <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="flex justify-end gap-1.5 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTeamsMatchId(null)}
+                                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[9px] font-bold px-2 py-1 rounded transition cursor-pointer"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await handleSaveMatchTeams(m.id, editHomeId, editAwayId);
+                                    setEditingTeamsMatchId(null);
+                                  }}
+                                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-[9px] font-black px-2 py-1 rounded transition cursor-pointer"
+                                >
+                                  Guardar Equipos
+                                </button>
+                              </div>
                             </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2">
+                              {/* Home */}
+                              <div className="flex-1 truncate text-right font-semibold text-xs flex items-center justify-end gap-1.5">
+                                <span className="truncate">{'name' in homeRes ? homeRes.name : homeRes.text}</span>
+                                {'flag' in homeRes ? (
+                                  <img src={getTeamFlagUrl((homeRes as any).id)} className="w-4 h-3 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <span className="text-xs shrink-0">🏳️</span>
+                                )}
+                              </div>
 
-                            {/* Inputs */}
-                            <div className="flex items-center gap-1 shrink-0">
-                              <input
-                                type="text"
-                                placeholder="-"
-                                value={inputHome}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val !== '' && !/^\d+$/.test(val)) return;
-                                  setAdminScores(prev => ({
-                                    ...prev,
-                                    [m.id]: { ...(prev[m.id] || { home: '', away: '' }), home: val }
-                                  }));
-                                }}
-                                className="w-8 py-0.5 text-center bg-slate-900 text-xs font-bold text-white border border-slate-805 rounded"
-                              />
-                              <span className="text-[10px] font-mono text-slate-600">:</span>
-                              <input
-                                type="text"
-                                placeholder="-"
-                                value={inputAway}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val !== '' && !/^\d+$/.test(val)) return;
-                                  setAdminScores(prev => ({
-                                    ...prev,
-                                    [m.id]: { ...(prev[m.id] || { home: '', away: '' }), away: val }
-                                  }));
-                                }}
-                                className="w-8 py-0.5 text-center bg-slate-900 text-xs font-bold text-white border border-slate-810 rounded"
-                              />
-                            </div>
+                              {/* Inputs */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <input
+                                  type="text"
+                                  placeholder="-"
+                                  value={inputHome}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val !== '' && !/^\d+$/.test(val)) return;
+                                    setAdminScores(prev => ({
+                                      ...prev,
+                                      [m.id]: { ...(prev[m.id] || { home: '', away: '' }), home: val }
+                                    }));
+                                  }}
+                                  className="w-8 py-0.5 text-center bg-slate-900 text-xs font-bold text-white border border-slate-805 rounded"
+                                />
+                                <span className="text-[10px] font-mono text-slate-600">:</span>
+                                <input
+                                  type="text"
+                                  placeholder="-"
+                                  value={inputAway}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val !== '' && !/^\d+$/.test(val)) return;
+                                    setAdminScores(prev => ({
+                                      ...prev,
+                                      [m.id]: { ...(prev[m.id] || { home: '', away: '' }), away: val }
+                                    }));
+                                  }}
+                                  className="w-8 py-0.5 text-center bg-slate-900 text-xs font-bold text-white border border-slate-810 rounded"
+                                />
+                              </div>
 
-                            {/* Away */}
-                            <div className="flex-1 truncate font-semibold text-xs flex items-center gap-1.5">
-                              {'flag' in awayRes ? (
-                                <img src={getTeamFlagUrl((awayRes as any).id)} className="w-4 h-3 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
-                              ) : (
-                                <span className="text-xs shrink-0">🏳️</span>
-                              )}
-                              <span className="truncate">{'name' in awayRes ? awayRes.name : awayRes.text}</span>
+                              {/* Away */}
+                              <div className="flex-1 truncate font-semibold text-xs flex items-center gap-1.5">
+                                {'flag' in awayRes ? (
+                                  <img src={getTeamFlagUrl((awayRes as any).id)} className="w-4 h-3 object-cover rounded shadow-sm border border-slate-800 shrink-0" alt="" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <span className="text-xs shrink-0">🏳️</span>
+                                )}
+                                <span className="truncate">{'name' in awayRes ? awayRes.name : awayRes.text}</span>
+                              </div>
                             </div>
-                          </div>
+                          )}
 
                           {/* Winner dropdown for ties & Delete action */}
                           <div className={`flex items-center mt-1.5 ${isTie ? 'justify-between' : 'justify-start'}`}>

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 -14 300 590" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
     <!-- Realistic high-fidelity metallic gold gradient set -->
     <linearGradient id="gold-primary" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -37,60 +37,95 @@
     </linearGradient>
   </defs>
 
-  <!-- The centered World Cup Trophy extending seamlessly from bottom to top -->
-  <g id="world-cup-trophy-overlay">
-    <!-- Base of the Cup (Stretching on top of the 'FIFA' text block up to the globe) -->
-    <!-- Golden Bottom Lip/Pedestal -->
-    <path d="M 120 540 L 380 540 C 390 540, 400 546, 400 554 L 400 562 C 400 570, 390 576, 380 576 L 120 576 C 110 576, 100 570, 100 562 L 100 554 C 100 546, 110 540, 120 540 Z" fill="url(#gold-shadow)" stroke="#000000" stroke-width="2" />
-    
-    <!-- Green Malachite Band 1 -->
-    <path d="M 112 498 L 388 498 C 394 498, 398 504, 396 512 L 392 530 C 391 536, 386 540, 380 540 L 120 540 C 114 540, 109 536, 108 530 L 104 512 C 102 504, 106 498, 112 498 Z" fill="url(#malachite-band)" stroke="#000000" stroke-width="2" />
-    
-    <!-- Gold Spacer Ring -->
-    <path d="M 116 486 L 384 486 C 388 486, 392 489, 392 492 L 390 498 H 122 L 120 492 C 120 489, 124 486, 116 486 Z" fill="url(#gold-primary)" />
-    
-    <!-- Green Malachite Band 2 -->
-    <path d="M 124 440 C 124 440, 250 456, 376 440 C 384 438, 390 445, 388 452 L 384 476 C 383 482, 378 486, 372 486 L 140 486 C 134 486, 129 482, 128 476 L 124 452 C 122 445, 126 440, 124 440 Z" fill="url(#malachite-band)" stroke="#000000" stroke-width="2" />
-    
-    <!-- Upper Gold Base Column -->
-    <path d="M 136 390 C 136 390, 250 416, 364 390 C 372 388, 380 394, 378 402 L 374 430 C 373 436, 368 440, 362 440 C 290 448, 222 448, 150 440 C 144 440, 139 436, 138 430 L 134 402 C 132 394, 140 390, 136 390 Z" fill="url(#gold-primary)" />
+  <!-- Deep black background to provide high contrast in both dark and light browser tabs -->
+  <rect width="512" height="512" fill="#000000" />
 
-    <!-- Double Spiral Humanesque Figure stems supporting the Sphere -->
-    <!-- Core background of golden figure shapes -->
-    <path d="M 148 390 C 154 374, 166 334, 148 286 C 130 238, 156 190, 174 166 C 190 142, 208 150, 212 174 C 216 198, 204 246, 218 286 C 226 310, 252 310, 260 286 C 274 246, 262 198, 266 174 C 270 150, 288 142, 304 166 C 322 190, 348 238, 330 286 C 312 334, 324 374, 330 390 Z" fill="url(#gold-bright)" stroke="#532E04" stroke-width="2" />
+  <!-- Main logo group scaled up for maximum tab/favicon visibility -->
+  <g id="official-wc-26-logo" transform="translate(256, 251) scale(1.15) translate(-256, -251)">
+    <!-- The vertical "2" (top) and "6" (bottom) Capsule shaped base in Solid Black -->
+    <g id="black-capsule-base">
+      <!-- Standardized geometric blocks matching the official 2026 emblem layout exactly -->
+      <!-- Top "2" Loop Head -->
+      <path d="M 148 142 C 148 85, 194 38, 256 38 C 318 38, 364 85, 364 142 L 364 240 L 148 240 Z" fill="#000000" />
+      
+      <!-- Bottom "6" Loop Base -->
+      <path d="M 148 241 L 364 241 L 364 360 C 364 418, 318 464, 256 464 C 194 464, 148 418, 148 360 Z" fill="#000000" />
 
-    <!-- Dynamic sweep details mimicking the intricate classic sculpture of the World Cup -->
-    <!-- Left side spiral arm sweep -->
-    <path d="M 132 390 C 126 286, 172 190, 202 126 C 184 126, 166 142, 148 166 C 130 190, 102 246, 116 310 C 124 342, 134 370, 140 390 Z" fill="url(#gold-shadow)" stroke="#451A03" stroke-width="1.5" />
-    
-    <!-- Right side spiral arm sweep -->
-    <path d="M 346 390 C 352 286, 306 190, 276 126 C 294 126, 312 142, 330 166 C 348 190, 376 246, 362 310 C 354 342, 344 370, 338 390 Z" fill="url(#gold-primary)" stroke="#451A03" stroke-width="1.5" />
+      <!-- High-precision white geometric cutout shapes to form the "2" and "6" outlines strictly identical to the image -->
+      <!-- Cutout 1: Top-left middle carve-out defining the neck bend of "2" -->
+      <rect x="148" y="142" width="108" height="44" fill="#FFFFFF" />
 
-    <!-- Center athletic support flame/detail lines -->
-    <path d="M 210 286 C 218 262, 230 206, 210 174 C 218 166, 230 158, 238 174 C 246 158, 258 166, 266 174 C 246 206, 258 262, 266 286 C 256 302, 220 302, 210 286 Z" fill="url(#gold-shadow)" />
+      <!-- Cutout 2: Bottom-right middle carve-out defining the base of "2" -->
+      <rect x="256" y="196" width="108" height="45" fill="#FFFFFF" />
 
-    <!-- Upper dynamic wraps that cuddle the globe -->
-    <path d="M 152 166 C 134 126, 152 94, 188 78 C 204 98, 212 118, 208 174 C 200 150, 168 158, 152 166 Z" fill="url(#gold-primary)" />
-    <path d="M 324 166 C 342 126, 324 94, 288 78 C 272 98, 264 118, 268 174 C 276 150, 308 158, 324 166 Z" fill="url(#gold-bright)" />
+      <!-- Cutout 3: Middle-right carve-out defining the neck bend/start of "6" -->
+      <rect x="256" y="291" width="108" height="44" fill="#FFFFFF" />
 
-    <!-- The Globe (Sphere sits gloriously on top of the figures) -->
-    <!-- Globe sphere outline -->
-    <circle cx="238" cy="74" r="88" fill="url(#globe-glow)" stroke="#451A03" stroke-width="2" />
+      <!-- Cutout 4: Loop center cutout in bottom area defining the interior hole of the "6" -->
+      <rect x="204" y="358" width="104" height="48" rx="24" ry="24" fill="#FFFFFF" />
+      
+      <!-- Tiny outer aesthetic white spacing lines or trademark alignment to guarantee visual balance -->
+      <text x="358" y="472" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="bold" font-size="9" fill="#000000">™</text>
+    </g>
 
-    <!-- Textured/detailed visual representations of continental landmasses mimicking the trophy design -->
-    <!-- Left side landmass representation -->
-    <path d="M 157 50 C 161 34, 177 26, 189 26 C 197 26, 201 42, 197 58 C 193 74, 177 98, 201 122 C 193 130, 181 130, 173 114 C 165 98, 153 66, 157 50 Z" fill="#FFFBEB" opacity="0.85" />
-    
-    <!-- Right side landmass/Eurasia/Africa graphic lines -->
-    <path d="M 250 26 C 266 14, 306 14, 318 34 C 326 46, 310 74, 298 74 C 286 74, 282 90, 290 102 C 282 118, 266 130, 258 114 C 250 98, 262 82, 250 66 C 242 54, 242 34, 250 26 Z" fill="#FFFBEB" opacity="0.9" />
+    <!-- "FIFA" Brand Text precisely positioned in SOLID WHITE inside the bottom solid black curvature of the "6" -->
+    <text x="256" y="440" font-family="'Arial Black', 'Impact', 'Inter', sans-serif" font-weight="950" font-size="34" letter-spacing="1" fill="#FFFFFF" text-anchor="middle">FIFA</text>
 
-    <!-- Iconic diagonal latitude lines wrapping around the golden sphere -->
-    <path d="M 151 82 C 177 50, 297 50, 325 82 C 290 58, 185 58, 151 82 Z" fill="url(#gold-bright)" />
-    <path d="M 169 122 C 197 90, 277 90, 307 122 C 273 102, 201 102, 169 122 Z" fill="url(#gold-bright)" />
-    <path d="M 154 42 C 180 10, 293 10, 320 42 C 290 22, 185 22, 154 42 Z" fill="url(#gold-bright)" />
+    <!-- The centered World Cup Trophy extending seamlessly from bottom to top -->
+    <g id="world-cup-trophy-overlay" transform="translate(136, 114) scale(0.47)">
+      <!-- Base of the Cup (Stretching on top of the 'FIFA' text block up to the globe) -->
+      <!-- Golden Bottom Lip/Pedestal -->
+      <path d="M 120 540 L 380 540 C 390 540, 400 546, 400 554 L 400 562 C 400 570, 390 576, 380 576 L 120 576 C 110 576, 100 570, 100 562 L 100 554 C 100 546, 110 540, 120 540 Z" fill="url(#gold-shadow)" stroke="#000000" stroke-width="2" />
+      
+      <!-- Green Malachite Band 1 -->
+      <path d="M 112 498 L 388 498 C 394 498, 398 504, 396 512 L 392 530 C 391 536, 386 540, 380 540 L 120 540 C 114 540, 109 536, 108 530 L 104 512 C 102 504, 106 498, 112 498 Z" fill="url(#malachite-band)" stroke="#000000" stroke-width="2" />
+      
+      <!-- Gold Spacer Ring -->
+      <path d="M 116 486 L 384 486 C 388 486, 392 489, 392 492 L 390 498 H 122 L 120 492 C 120 489, 124 486, 116 486 Z" fill="url(#gold-primary)" />
+      
+      <!-- Green Malachite Band 2 -->
+      <path d="M 124 440 C 124 440, 250 456, 376 440 C 384 438, 390 445, 388 452 L 384 476 C 383 482, 378 486, 372 486 L 140 486 C 134 486, 129 482, 128 476 L 124 452 C 122 445, 126 440, 124 440 Z" fill="url(#malachite-band)" stroke="#000000" stroke-width="2" />
+      
+      <!-- Upper Gold Base Column -->
+      <path d="M 136 390 C 136 390, 250 416, 364 390 C 372 388, 380 394, 378 402 L 374 430 C 373 436, 368 440, 362 440 C 290 448, 222 448, 150 440 C 144 440, 139 436, 138 430 L 134 402 C 132 394, 140 390, 136 390 Z" fill="url(#gold-primary)" />
 
-    <!-- Premium gloss/reflection effects on the globe -->
-    <ellipse cx="201" cy="18" rx="28" ry="12" transform="rotate(-30, 201, 18)" fill="#FFFFFF" opacity="0.4" />
-    <circle cx="161" cy="66" r="19" fill="#FFFFFF" opacity="0.25" filter="blur(4px)" />
+      <!-- Double Spiral Humanesque Figure stems supporting the Sphere -->
+      <!-- Core background of golden figure shapes -->
+      <path d="M 148 390 C 154 374, 166 334, 148 286 C 130 238, 156 190, 174 166 C 190 142, 208 150, 212 174 C 216 198, 204 246, 218 286 C 226 310, 252 310, 260 286 C 274 246, 262 198, 266 174 C 270 150, 288 142, 304 166 C 322 190, 348 238, 330 286 C 312 334, 324 374, 330 390 Z" fill="url(#gold-bright)" stroke="#532E04" stroke-width="2" />
+
+      <!-- Dynamic sweep details mimicking the intricate classic sculpture of the World Cup -->
+      <!-- Left side spiral arm sweep -->
+      <path d="M 132 390 C 126 286, 172 190, 202 126 C 184 126, 166 142, 148 166 C 130 190, 102 246, 116 310 C 124 342, 134 370, 140 390 Z" fill="url(#gold-shadow)" stroke="#451A03" stroke-width="1.5" />
+      
+      <!-- Right side spiral arm sweep -->
+      <path d="M 346 390 C 352 286, 306 190, 276 126 C 294 126, 312 142, 330 166 C 348 190, 376 246, 362 310 C 354 342, 344 370, 338 390 Z" fill="url(#gold-primary)" stroke="#451A03" stroke-width="1.5" />
+
+      <!-- Center athletic support flame/detail lines -->
+      <path d="M 210 286 C 218 262, 230 206, 210 174 C 218 166, 230 158, 238 174 C 246 158, 258 166, 266 174 C 246 206, 258 262, 266 286 C 256 302, 220 302, 210 286 Z" fill="url(#gold-shadow)" />
+
+      <!-- Upper dynamic wraps that cuddle the globe -->
+      <path d="M 152 166 C 134 126, 152 94, 188 78 C 204 98, 212 118, 208 174 C 200 150, 168 158, 152 166 Z" fill="url(#gold-primary)" />
+      <path d="M 324 166 C 342 126, 324 94, 288 78 C 272 98, 264 118, 268 174 C 276 150, 308 158, 324 166 Z" fill="url(#gold-bright)" />
+
+      <!-- The Globe (Sphere sits gloriously on top of the figures) -->
+      <!-- Globe sphere outline -->
+      <circle cx="238" cy="74" r="88" fill="url(#globe-glow)" stroke="#451A03" stroke-width="2" />
+
+      <!-- Textured/detailed visual representations of continental landmasses mimicking the trophy design -->
+      <!-- Left side landmass representation -->
+      <path d="M 157 50 C 161 34, 177 26, 189 26 C 197 26, 201 42, 197 58 C 193 74, 177 98, 201 122 C 193 130, 181 130, 173 114 C 165 98, 153 66, 157 50 Z" fill="#FFFBEB" opacity="0.85" />
+      
+      <!-- Right side landmass/Eurasia/Africa graphic lines -->
+      <path d="M 250 26 C 266 14, 306 14, 318 34 C 326 46, 310 74, 298 74 C 286 74, 282 90, 290 102 C 282 118, 266 130, 258 114 C 250 98, 262 82, 250 66 C 242 54, 242 34, 250 26 Z" fill="#FFFBEB" opacity="0.9" />
+
+      <!-- Iconic diagonal latitude lines wrapping around the golden sphere -->
+      <path d="M 151 82 C 177 50, 297 50, 325 82 C 290 58, 185 58, 151 82 Z" fill="url(#gold-bright)" />
+      <path d="M 169 122 C 197 90, 277 90, 307 122 C 273 102, 201 102, 169 122 Z" fill="url(#gold-bright)" />
+      <path d="M 154 42 C 180 10, 293 10, 320 42 C 290 22, 185 22, 154 42 Z" fill="url(#gold-bright)" />
+
+      <!-- Premium gloss/reflection effects on the globe -->
+      <ellipse cx="201" cy="18" rx="28" ry="12" transform="rotate(-30, 201, 18)" fill="#FFFFFF" opacity="0.4" />
+      <circle cx="161" cy="66" r="19" fill="#FFFFFF" opacity="0.25" filter="blur(4px)" />
+    </g>
   </g>
 </svg>
