@@ -23,7 +23,7 @@ const pool = new Pool({
   },
   max: 15, // Optimizamos para Vercel Serverless
   idleTimeoutMillis: 10000, // Cerrar conexiones ociosas rápido para evitar leaks
-  connectionTimeoutMillis: 5000 // Timeout si la DB se demora
+  connectionTimeoutMillis: 30000 // Timeout de 30 segundos para soportar cold starts de Neon de forma robusta
 });
 
 pool.on('error', (err) => {

@@ -1369,7 +1369,8 @@ export default function App() {
     if (id.startsWith('3_')) {
       if (isOfficial) {
         if (hasOfficialBracketConfigured) {
-          const thirdsToUse = adminOfficialThirds.map(tid => TEAMS.find(t => t.id === tid)).filter(Boolean) as Team[];
+          // Resolve thirds using automatically calculated official standings instead of adminOfficialThirds selection
+          const thirdsToUse = getRankedThirdPlacedTeams(officialStandings).slice(0, 8);
           const thirdsMap = resolveAllThirds(thirdsToUse);
           if (thirdsMap[id]) {
             return thirdsMap[id];
@@ -1621,7 +1622,6 @@ export default function App() {
         <div className="flex items-center justify-between pb-1 border-b border-slate-950">
           <div className="flex items-center gap-1.5">
             <span className="text-[8px] text-slate-500 font-bold uppercase tracking-wider">M- {m.id}</span>
-            {isOfficial && m.completed && <span className="text-[8px] px-1 bg-emerald-500/10 text-emerald-400 font-extrabold uppercase rounded border border-emerald-500/10">Jugado</span>}
           </div>
           
           <div className="flex items-center gap-2">
@@ -6037,7 +6037,18 @@ export default function App() {
                         {/* Week filter */}
                         <select
                           value={profileSearchWeek}
-                          onChange={(e) => setProfileSearchWeek(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setProfileSearchWeek(val);
+                            if (val !== 'all') {
+                              const weekNum = parseInt(val, 10);
+                              if (weekNum >= 4) {
+                                setProfileSearchGroup('all');
+                              } else {
+                                setProfileSearchKnockout('all');
+                              }
+                            }
+                          }}
                           className="bg-slate-950 text-slate-300 rounded-xl px-3 py-1.5 text-xs border border-slate-900 focus:outline-none focus:border-amber-500/50"
                         >
                           <option value="all">Todas las semanas</option>
@@ -6059,6 +6070,7 @@ export default function App() {
                             setProfileSearchGroup(e.target.value);
                             if (e.target.value !== 'all') {
                               setProfileSearchKnockout('all'); // mutually exclusive for usability
+                              setProfileSearchWeek('all'); // auto-reset week filter to see all group stage matches!
                             }
                           }}
                           className="bg-slate-950 text-slate-300 rounded-xl px-3 py-1.5 text-xs border border-slate-900 focus:outline-none focus:border-amber-500/50"
@@ -6076,6 +6088,7 @@ export default function App() {
                             setProfileSearchKnockout(e.target.value);
                             if (e.target.value !== 'all') {
                               setProfileSearchGroup('all'); // mutually exclusive for usability
+                              setProfileSearchWeek('all'); // auto-reset week filter to see all knockout matches!
                             }
                           }}
                           className="bg-slate-950 text-slate-300 rounded-xl px-3 py-1.5 text-xs border border-slate-900 focus:outline-none focus:border-amber-500/50"

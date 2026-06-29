@@ -179,12 +179,18 @@ async function loadDatabaseRaw(): Promise<DatabaseSchema> {
         };
       }),
       predictions: {},
-      matches: matches.map(m => ({
-        matchId: m.matchId,
-        homeScore: m.homeScore !== null ? m.homeScore : undefined,
-        awayScore: m.awayScore !== null ? m.awayScore : undefined,
-        winnerId: m.winnerId !== null ? m.winnerId : undefined,
-      })),
+      matches: matches.map(m => {
+        const matchId = getValueCaseInsensitive(m, 'matchId');
+        const homeScore = getValueCaseInsensitive(m, 'homeScore');
+        const awayScore = getValueCaseInsensitive(m, 'awayScore');
+        const winnerId = getValueCaseInsensitive(m, 'winnerId');
+        return {
+          matchId,
+          homeScore: homeScore !== null && homeScore !== undefined ? Number(homeScore) : undefined,
+          awayScore: awayScore !== null && awayScore !== undefined ? Number(awayScore) : undefined,
+          winnerId: winnerId !== null && winnerId !== undefined ? String(winnerId) : undefined,
+        };
+      }),
       config: conf[0] ? {
         unlockedWeek: conf[0].unlockedWeek || 1,
         official_balon_oro: conf[0].official_balon_oro || '',
@@ -217,50 +223,74 @@ async function loadDatabaseRaw(): Promise<DatabaseSchema> {
     // Reconstruct predictions structure for the frontend
     // 1. Regular Matches
     for (const p of pMatches) {
-      if (!db.predictions[p.userId]) db.predictions[p.userId] = {};
-      db.predictions[p.userId][p.matchId] = {
-        matchId: p.matchId,
-        predictedHome: p.predictedHome,
-        predictedAway: p.predictedAway,
-        completed: !!p.completed
+      const uId = getValueCaseInsensitive(p, 'userId');
+      const mId = getValueCaseInsensitive(p, 'matchId');
+      if (!uId || !mId) continue;
+      if (!db.predictions[uId]) db.predictions[uId] = {};
+      const predHome = getValueCaseInsensitive(p, 'predictedHome');
+      const predAway = getValueCaseInsensitive(p, 'predictedAway');
+      const comp = getValueCaseInsensitive(p, 'completed');
+      db.predictions[uId][mId] = {
+        matchId: mId,
+        predictedHome: predHome !== null && predHome !== undefined ? String(predHome) : '',
+        predictedAway: predAway !== null && predAway !== undefined ? String(predAway) : '',
+        completed: typeof comp === 'boolean' ? comp : (comp === 'true' || comp === 1 || comp === true)
       };
     }
 
     // 2. Knockout Matches
     for (const p of pKnockouts) {
-      if (!db.predictions[p.userId]) db.predictions[p.userId] = {};
-      db.predictions[p.userId][p.matchId] = {
-        matchId: p.matchId,
-        predictedHome: p.predictedHome,
-        predictedAway: p.predictedAway,
-        predictedWinnerId: p.predictedWinnerId !== null ? p.predictedWinnerId : undefined,
-        completed: !!p.completed
+      const uId = getValueCaseInsensitive(p, 'userId');
+      const mId = getValueCaseInsensitive(p, 'matchId');
+      if (!uId || !mId) continue;
+      if (!db.predictions[uId]) db.predictions[uId] = {};
+      const predHome = getValueCaseInsensitive(p, 'predictedHome');
+      const predAway = getValueCaseInsensitive(p, 'predictedAway');
+      const predWinnerId = getValueCaseInsensitive(p, 'predictedWinnerId');
+      const comp = getValueCaseInsensitive(p, 'completed');
+      db.predictions[uId][mId] = {
+        matchId: mId,
+        predictedHome: predHome !== null && predHome !== undefined ? String(predHome) : '',
+        predictedAway: predAway !== null && predAway !== undefined ? String(predAway) : '',
+        predictedWinnerId: predWinnerId !== null && predWinnerId !== undefined ? String(predWinnerId) : undefined,
+        completed: typeof comp === 'boolean' ? comp : (comp === 'true' || comp === 1 || comp === true)
       };
     }
 
     // 3. Group Standings
     for (const p of pGroups) {
-      if (!db.predictions[p.userId]) db.predictions[p.userId] = {};
-      const grp = p.groupId;
-      if (p.firstPlaceId) {
-        db.predictions[p.userId][`group_override_first_${grp}`] = { matchId: `group_override_first_${grp}`, predictedHome: '0', predictedAway: '0', predictedWinnerId: p.firstPlaceId, completed: true };
+      const uId = getValueCaseInsensitive(p, 'userId');
+      const grp = getValueCaseInsensitive(p, 'groupId');
+      if (!uId || !grp) continue;
+      if (!db.predictions[uId]) db.predictions[uId] = {};
+      
+      const firstPlaceId = getValueCaseInsensitive(p, 'firstPlaceId');
+      const secondPlaceId = getValueCaseInsensitive(p, 'secondPlaceId');
+      const thirdPlaceId = getValueCaseInsensitive(p, 'thirdPlaceId');
+
+      if (firstPlaceId) {
+        db.predictions[uId][`group_override_first_${grp}`] = { matchId: `group_override_first_${grp}`, predictedHome: '0', predictedAway: '0', predictedWinnerId: String(firstPlaceId), completed: true };
       }
-      if (p.secondPlaceId) {
-        db.predictions[p.userId][`group_override_second_${grp}`] = { matchId: `group_override_second_${grp}`, predictedHome: '0', predictedAway: '0', predictedWinnerId: p.secondPlaceId, completed: true };
+      if (secondPlaceId) {
+        db.predictions[uId][`group_override_second_${grp}`] = { matchId: `group_override_second_${grp}`, predictedHome: '0', predictedAway: '0', predictedWinnerId: String(secondPlaceId), completed: true };
       }
-      if (p.thirdPlaceId) {
-         db.predictions[p.userId][`group_override_third_${grp}`] = { matchId: `group_override_third_${grp}`, predictedHome: '0', predictedAway: '0', predictedWinnerId: p.thirdPlaceId, completed: true };
+      if (thirdPlaceId) {
+         db.predictions[uId][`group_override_third_${grp}`] = { matchId: `group_override_third_${grp}`, predictedHome: '0', predictedAway: '0', predictedWinnerId: String(thirdPlaceId), completed: true };
       }
     }
 
     // 4. Awards
     for (const p of pAwards) {
-      if (!db.predictions[p.userId]) db.predictions[p.userId] = {};
-      db.predictions[p.userId][p.awardId] = {
-        matchId: p.awardId,
+      const uId = getValueCaseInsensitive(p, 'userId');
+      const awardId = getValueCaseInsensitive(p, 'awardId');
+      if (!uId || !awardId) continue;
+      if (!db.predictions[uId]) db.predictions[uId] = {};
+      const predWinnerId = getValueCaseInsensitive(p, 'predictedWinnerId');
+      db.predictions[uId][awardId] = {
+        matchId: awardId,
         predictedHome: '0',
         predictedAway: '0',
-        predictedWinnerId: p.predictedWinnerId !== null ? p.predictedWinnerId : undefined,
+        predictedWinnerId: predWinnerId !== null && predWinnerId !== undefined ? String(predWinnerId) : undefined,
         completed: true
       };
     }
@@ -543,11 +573,7 @@ async function saveDatabase(db: DatabaseSchema, options?: {
 
     // Compute official group standings
     const officialAllStandings = computeAllStandings(officialGroupMatches);
-    let officialRankedThirds = getRankedThirdPlacedTeams(officialAllStandings);
-
-    if (db.config && db.config.official_thirds && db.config.official_thirds.length === 8) {
-      officialRankedThirds = db.config.official_thirds.map(tid => TEAMS.find(t => t.id === tid)).filter(Boolean) as Team[];
-    }
+    const officialRankedThirds = getRankedThirdPlacedTeams(officialAllStandings);
     
     // Also inject overrides into the officialAllStandings directly to spoof them for getKnockoutWinnerId
     if (db.config?.official_firsts && Object.keys(db.config.official_firsts).length > 0) {
@@ -579,7 +605,10 @@ async function saveDatabase(db: DatabaseSchema, options?: {
       });
     }
 
-    const officialTop8Thirds = officialRankedThirds.slice(0, 8).map(t => t.id);
+    let officialTop8Thirds = officialRankedThirds.slice(0, 8).map(t => t.id);
+    if (db.config && db.config.official_thirds && db.config.official_thirds.length === 8) {
+      officialTop8Thirds = db.config.official_thirds;
+    }
 
     // Check which groups are fully finalized (all 6 matches have official scores)
     const groupStatusFinalized: Record<string, boolean> = {};
