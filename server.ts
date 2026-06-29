@@ -631,6 +631,151 @@ async function saveDatabase(db: DatabaseSchema, options?: {
 
       const userPreds = db.predictions[user.id] || {};
 
+      // Resolve user's predicted bracket, standings, and champion at the start of the user's calculation
+      const userGroupMatches = baseGroupMatches.map((m) => {
+        const pred: any = userPreds[m.id] || {};
+        return {
+          ...m,
+          homeScore: undefined,
+          awayScore: undefined,
+          predictedHome: pred.predictedHome !== undefined ? String(pred.predictedHome) : '',
+          predictedAway: pred.predictedAway !== undefined ? String(pred.predictedAway) : '',
+          completed: pred.completed
+        };
+      });
+
+      const userAllStandings = computeAllStandings(userGroupMatches);
+      const userRankedThirds = getRankedThirdPlacedTeams(userAllStandings);
+
+      const userKnockoutMatches = baseKnockoutMatches.map((m) => {
+        const pred: any = userPreds[m.id] || {};
+        return {
+          ...m,
+          predictedHome: pred.predictedHome !== undefined ? String(pred.predictedHome) : '',
+          predictedAway: pred.predictedAway !== undefined ? String(pred.predictedAway) : '',
+          predictedWinnerId: pred.predictedWinnerId || '',
+          completed: pred.completed
+        };
+      });
+
+      // Helper to resolve user's predicted team at a specific slot/placeholder
+      function resolveUserTeam(id: string): any {
+        const directTeam = TEAMS.find((t) => t.id === id);
+        if (directTeam) return directTeam;
+
+        const wMatch = id.match(/^1([A-L])$/);
+        if (wMatch) {
+          const gr = wMatch[1];
+          const overrideFirst = userPreds[`group_override_first_${gr}`]?.predictedWinnerId;
+          if (overrideFirst) {
+            const t = TEAMS.find(x => x.id === overrideFirst);
+            if (t) return t;
+          }
+          const groupStandings = userAllStandings[gr];
+          if (groupStandings && groupStandings.length > 0) {
+            const t = TEAMS.find((x) => x.id === groupStandings[0].teamId);
+            if (t) return t;
+          }
+          return { placeholder: id, text: `1ro Gr. ${gr}` };
+        }
+
+        const sMatch = id.match(/^2([A-L])$/);
+        if (sMatch) {
+          const gr = sMatch[1];
+          const overrideSecond = userPreds[`group_override_second_${gr}`]?.predictedWinnerId;
+          if (overrideSecond) {
+            const t = TEAMS.find(x => x.id === overrideSecond);
+            if (t) return t;
+          }
+          const groupStandings = userAllStandings[gr];
+          if (groupStandings && groupStandings.length > 1) {
+            const t = TEAMS.find((x) => x.id === groupStandings[1].teamId);
+            if (t) return t;
+          }
+          return { placeholder: id, text: `2do Gr. ${gr}` };
+        }
+
+        if (id.startsWith('3_')) {
+          const manualThirds: string[] = [];
+          GROUPS.forEach((gr) => {
+            const tid = userPreds[`group_override_third_${gr}`]?.predictedWinnerId;
+            if (tid && tid !== 'no_aplica' && !manualThirds.includes(tid)) {
+              manualThirds.push(tid);
+            }
+          });
+
+          const thirdsToUse = manualThirds.length === 8
+            ? (manualThirds.map(tid => TEAMS.find(t => t.id === tid)).filter(Boolean) as any)
+            : userRankedThirds;
+
+          const thirdsMap = resolveAllThirds(thirdsToUse);
+          if (thirdsMap[id]) return thirdsMap[id];
+          return { placeholder: id, text: `3ro (Gr. ${id.substring(2)})` };
+        }
+
+        const wkMatch = id.match(/^WK(\d+)$/);
+        if (wkMatch) {
+          const mId = `K${wkMatch[1]}`;
+          const mObj = userKnockoutMatches.find((x: any) => x.id === mId);
+          if (mObj) {
+            const wId = getUserKnockoutWinnerId(mObj);
+            if (wId) {
+              const t = TEAMS.find((x) => x.id === wId);
+              if (t) return t;
+            }
+          }
+          return { placeholder: id, text: `Ganador P.${wkMatch[1]}` };
+        }
+
+        const lkMatch = id.match(/^LK(\d+)$/);
+        if (lkMatch) {
+          const mId = `K${lkMatch[1]}`;
+          const mObj = userKnockoutMatches.find((x: any) => x.id === mId);
+          if (mObj) {
+            const wId = getUserKnockoutWinnerId(mObj);
+            if (wId) {
+              const home = resolveUserTeam(mObj.homeTeamId);
+              const away = resolveUserTeam(mObj.awayTeamId);
+              if (!('placeholder' in home) && !('placeholder' in away)) {
+                return wId === home.id ? away : home;
+              }
+            }
+          }
+          return { placeholder: id, text: `Perdedor P.${lkMatch[1]}` };
+        }
+
+        return { placeholder: id, text: id };
+      }
+
+      function getUserKnockoutWinnerId(mObj: any): string | undefined {
+        const home = resolveUserTeam(mObj.homeTeamId);
+        const away = resolveUserTeam(mObj.awayTeamId);
+
+        if ('placeholder' in home || 'placeholder' in away) return undefined;
+
+        const hScoreStr = mObj.predictedHome;
+        const aScoreStr = mObj.predictedAway;
+
+        if (hScoreStr === undefined || hScoreStr === null || hScoreStr.trim() === '' || 
+            aScoreStr === undefined || aScoreStr === null || aScoreStr.trim() === '') {
+          return undefined;
+        }
+
+        const hScore = parseInt(hScoreStr, 10);
+        const aScore = parseInt(aScoreStr, 10);
+
+        if (isNaN(hScore) || isNaN(aScore)) return undefined;
+
+        if (hScore > aScore) return home.id;
+        if (hScore < aScore) return away.id;
+
+        if (mObj.predictedWinnerId && (mObj.predictedWinnerId === home.id || mObj.predictedWinnerId === away.id)) {
+          return mObj.predictedWinnerId;
+        }
+
+        return home.id;
+      }
+
       // Match-by-match predictions points
       db.matches.forEach((official) => {
         const pred = userPreds[official.matchId];
@@ -646,23 +791,58 @@ async function saveDatabase(db: DatabaseSchema, options?: {
 
         if (isNaN(pHome) || isNaN(pAway)) return;
 
-        // Check accurate score hit (Acierto Exacto)
-        const isExact = pHome === oHome && pAway === oAway;
+        // Check accurate score hit (Acierto Exacto) and winner prediction success (Acierto Ganador)
+        let isExact = false;
+        let isWinnerCorrect = false;
 
-        // Check winner/draw prediction success (Acierto Ganador)
-        const predWinner = pHome > pAway ? 'home' : (pHome < pAway ? 'away' : 'draw');
-        const officialWinner = oHome > oAway ? 'home' : (oHome < oAway ? 'away' : 'draw');
-        let isWinnerCorrect = predWinner === officialWinner;
+        if (official.matchId.startsWith('K')) {
+          // Special evaluation for knockout stage matches where team matchups are dynamic
+          const officialMatchObj = officialKnockoutMatches.find(m => m.id === official.matchId);
+          if (officialMatchObj) {
+            let officialWinnerTeamId: string | undefined = undefined;
+            if (official.homeScore > official.awayScore) {
+              officialWinnerTeamId = officialMatchObj.homeTeamId;
+            } else if (official.homeScore < official.awayScore) {
+              officialWinnerTeamId = officialMatchObj.awayTeamId;
+            } else {
+              officialWinnerTeamId = official.winnerId;
+            }
 
-        // If knockout match and game ended in a draw (regulation/extra time), the winner is decided by penalty shootout
-        if (official.matchId.startsWith('K') && oHome === oAway) {
-          if (pred.predictedWinnerId && official.winnerId) {
-            isWinnerCorrect = pred.predictedWinnerId === official.winnerId;
+            const userMatchObj = userKnockoutMatches.find(m => m.id === official.matchId);
+            if (userMatchObj) {
+              const userHomeTeam = resolveUserTeam(userMatchObj.homeTeamId);
+              const userAwayTeam = resolveUserTeam(userMatchObj.awayTeamId);
+              const userWinnerTeamId = getUserKnockoutWinnerId(userMatchObj);
+
+              isWinnerCorrect = !!(userWinnerTeamId && officialWinnerTeamId && userWinnerTeamId === officialWinnerTeamId);
+
+              if (isWinnerCorrect) {
+                const userHomeId = userHomeTeam?.id;
+                const userAwayId = userAwayTeam?.id;
+                const officialHomeId = officialMatchObj.homeTeamId;
+                const officialAwayId = officialMatchObj.awayTeamId;
+
+                const sameTeams = userHomeId === officialHomeId && userAwayId === officialAwayId;
+                const reversedTeams = userHomeId === officialAwayId && userAwayId === officialHomeId;
+
+                if (sameTeams) {
+                  isExact = pHome === oHome && pAway === oAway;
+                } else if (reversedTeams) {
+                  isExact = pHome === oAway && pAway === oHome;
+                }
+              }
+            }
           }
+        } else {
+          // Standard group stage match evaluation
+          isExact = pHome === oHome && pAway === oAway;
+
+          const predWinner = pHome > pAway ? 'home' : (pHome < pAway ? 'away' : 'draw');
+          const officialWinner = oHome > oAway ? 'home' : (oHome < oAway ? 'away' : 'draw');
+          isWinnerCorrect = predWinner === officialWinner;
         }
 
         // Scoring rules:
-        // Line-by-line official rules update:
         // 1. Selección del ganador: 3 points
         if (isWinnerCorrect) {
           puntos += 3;
@@ -721,151 +901,6 @@ async function saveDatabase(db: DatabaseSchema, options?: {
 
       // --- CAMPEÓN DEL MUNDO ---
       if (isFinalPlayed && officialChampionId) {
-        // Resolve user's predicted champion
-        const userGroupMatches = baseGroupMatches.map((m) => {
-          const pred: any = userPreds[m.id] || {};
-          return {
-            ...m,
-            homeScore: undefined,
-            awayScore: undefined,
-            predictedHome: pred.predictedHome !== undefined ? String(pred.predictedHome) : '',
-            predictedAway: pred.predictedAway !== undefined ? String(pred.predictedAway) : '',
-            completed: pred.completed
-          };
-        });
-
-        const userAllStandings = computeAllStandings(userGroupMatches);
-        const userRankedThirds = getRankedThirdPlacedTeams(userAllStandings);
-
-        const userKnockoutMatches = baseKnockoutMatches.map((m) => {
-          const pred: any = userPreds[m.id] || {};
-          return {
-            ...m,
-            predictedHome: pred.predictedHome !== undefined ? String(pred.predictedHome) : '',
-            predictedAway: pred.predictedAway !== undefined ? String(pred.predictedAway) : '',
-            predictedWinnerId: pred.predictedWinnerId || '',
-            completed: pred.completed
-          };
-        });
-
-        // Replicating helper inline to avoid circular reference / lexical scope issues
-        function resolveUserTeam(id: string): any {
-          const directTeam = TEAMS.find((t) => t.id === id);
-          if (directTeam) return directTeam;
-
-          const wMatch = id.match(/^1([A-L])$/);
-          if (wMatch) {
-            const gr = wMatch[1];
-            const overrideFirst = userPreds[`group_override_first_${gr}`]?.predictedWinnerId;
-            if (overrideFirst) {
-              const t = TEAMS.find(x => x.id === overrideFirst);
-              if (t) return t;
-            }
-            const groupStandings = userAllStandings[gr];
-            if (groupStandings && groupStandings.length > 0) {
-              const t = TEAMS.find((x) => x.id === groupStandings[0].teamId);
-              if (t) return t;
-            }
-            return { placeholder: id, text: `Ganador Grupo ${gr}` };
-          }
-
-          const rMatch = id.match(/^2([A-L])$/);
-          if (rMatch) {
-            const gr = rMatch[1];
-            const overrideSecond = userPreds[`group_override_second_${gr}`]?.predictedWinnerId;
-            if (overrideSecond) {
-              const t = TEAMS.find(x => x.id === overrideSecond);
-              if (t) return t;
-            }
-            const groupStandings = userAllStandings[gr];
-            if (groupStandings && groupStandings.length > 1) {
-              const t = TEAMS.find((x) => x.id === groupStandings[1].teamId);
-              if (t) return t;
-            }
-            return { placeholder: id, text: `2do Grupo ${gr}` };
-          }
-
-          if (id.startsWith('3_')) {
-            const manualThirds: string[] = [];
-            GROUPS.forEach((gr) => {
-              const tid = userPreds[`group_override_third_${gr}`]?.predictedWinnerId;
-              if (tid && tid !== 'no_aplica' && !manualThirds.includes(tid)) {
-                manualThirds.push(tid);
-              }
-            });
-
-            const thirdsToUse = manualThirds.length === 8
-              ? (manualThirds.map(tid => TEAMS.find(t => t.id === tid)).filter(Boolean) as any)
-              : userRankedThirds;
-
-            const thirdsMap = resolveAllThirds(thirdsToUse);
-            if (thirdsMap[id]) return thirdsMap[id];
-            return { placeholder: id, text: `3ro (Gr. ${id.substring(2)})` };
-          }
-
-          const wkMatch = id.match(/^WK(\d+)$/);
-          if (wkMatch) {
-            const mId = `K${wkMatch[1]}`;
-            const mObj = userKnockoutMatches.find((x: any) => x.id === mId);
-            if (mObj) {
-              const wId = getUserKnockoutWinnerId(mObj);
-              if (wId) {
-                const t = TEAMS.find((x) => x.id === wId);
-                if (t) return t;
-              }
-            }
-            return { placeholder: id, text: `Ganador P.${wkMatch[1]}` };
-          }
-
-          const lkMatch = id.match(/^LK(\d+)$/);
-          if (lkMatch) {
-            const mId = `K${lkMatch[1]}`;
-            const mObj = userKnockoutMatches.find((x: any) => x.id === mId);
-            if (mObj) {
-              const wId = getUserKnockoutWinnerId(mObj);
-              if (wId) {
-                const home = resolveUserTeam(mObj.homeTeamId);
-                const away = resolveUserTeam(mObj.awayTeamId);
-                if (!('placeholder' in home) && !('placeholder' in away)) {
-                  return wId === home.id ? away : home;
-                }
-              }
-            }
-            return { placeholder: id, text: `Perdedor P.${lkMatch[1]}` };
-          }
-
-          return { placeholder: id, text: id };
-        }
-
-        function getUserKnockoutWinnerId(mObj: any): string | undefined {
-          const home = resolveUserTeam(mObj.homeTeamId);
-          const away = resolveUserTeam(mObj.awayTeamId);
-
-          if ('placeholder' in home || 'placeholder' in away) return undefined;
-
-          const hScoreStr = mObj.predictedHome;
-          const aScoreStr = mObj.predictedAway;
-
-          if (hScoreStr === undefined || hScoreStr === null || hScoreStr.trim() === '' || 
-              aScoreStr === undefined || aScoreStr === null || aScoreStr.trim() === '') {
-            return undefined;
-          }
-
-          const hScore = parseInt(hScoreStr, 10);
-          const aScore = parseInt(aScoreStr, 10);
-
-          if (isNaN(hScore) || isNaN(aScore)) return undefined;
-
-          if (hScore > aScore) return home.id;
-          if (hScore < aScore) return away.id;
-
-          if (mObj.predictedWinnerId && (mObj.predictedWinnerId === home.id || mObj.predictedWinnerId === away.id)) {
-            return mObj.predictedWinnerId;
-          }
-
-          return home.id;
-        }
-
         const userK104Match = userKnockoutMatches.find((m: any) => m.id === 'K104');
         let userChampionId: string | undefined = undefined;
         if (userK104Match) {
@@ -1080,91 +1115,52 @@ async function startServer() {
     console.error("Error running database group stage results seeding:", err);
   }
 
-  // Always run Francia/Suecia bracket swap on startup to ensure Francia vs Suecia is in 2A vs 2B
+  // Always ensure official group stage standings are natural and correct, and match overrides assign K73 to Sudafrica vs Canada and K78 to Francia vs Suecia
   try {
     const { rows: confRows } = await pool.query("SELECT * FROM config WHERE id = 'system_config'");
     if (confRows.length > 0) {
       const configObj = confRows[0];
-      let firsts: Record<string, string> = {};
-      let seconds: Record<string, string> = {};
-      let thirds: string[] = [];
-
-      try {
-        firsts = typeof configObj.official_firsts === 'string' ? JSON.parse(configObj.official_firsts) : (configObj.official_firsts || {});
-      } catch (e) { firsts = configObj.official_firsts || {}; }
-
-      try {
-        seconds = typeof configObj.official_seconds === 'string' ? JSON.parse(configObj.official_seconds) : (configObj.official_seconds || {});
-      } catch (e) { seconds = configObj.official_seconds || {}; }
-
-      try {
-        thirds = typeof configObj.official_thirds === 'string' ? JSON.parse(configObj.official_thirds) : (configObj.official_thirds || []);
-      } catch (e) { thirds = configObj.official_thirds || []; }
-
-      // We want Francia (FRA) to be 2A (previously Sudáfrica / RSA)
-      // And we want Suecia (SWE) to be 2B (previously Canadá / CAN)
       
-      // 1. Find FRA and RSA current positions
-      let fraGroup = '';
-      let fraKey: 'firsts' | 'seconds' | 'thirds' | null = null;
-      Object.keys(firsts).forEach(g => { if (firsts[g] === 'FRA') { fraGroup = g; fraKey = 'firsts'; } });
-      Object.keys(seconds).forEach(g => { if (seconds[g] === 'FRA') { fraGroup = g; fraKey = 'seconds'; } });
-      const fraInThirdsIndex = thirds.indexOf('FRA');
+      // Calculate clean, natural official standings based on deterministic simulated group stage results
+      const groupMatches = generateGroupStageMatches();
+      const offMatches = groupMatches.map(m => {
+        const strToHash = m.id + "-" + m.homeTeamId + "-" + m.awayTeamId;
+        let hash = 0;
+        for (let i = 0; i < strToHash.length; i++) {
+          hash = strToHash.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const pseudoRandom = Math.abs(hash % 100) / 100;
+        const totalRank = (TEAMS.find(t => t.id === m.homeTeamId)?.rank || 50) + (TEAMS.find(t => t.id === m.awayTeamId)?.rank || 50);
+        const homeWeight = (TEAMS.find(t => t.id === m.awayTeamId)?.rank || 50) / totalRank;
+        let homeScore = Math.floor(pseudoRandom * homeWeight * 4);
+        let awayScore = Math.floor((1 - pseudoRandom) * (1 - homeWeight) * 4);
+        if (pseudoRandom < 0.15) homeScore += 1;
+        if (pseudoRandom > 0.85) awayScore += 1;
+        if (homeScore > 5) homeScore = 2;
+        if (awayScore > 5) awayScore = 1;
+        
+        return { 
+          ...m, 
+          predictedHome: String(homeScore), 
+          predictedAway: String(awayScore) 
+        };
+      });
 
-      let rsaGroup = '';
-      let rsaKey: 'firsts' | 'seconds' | 'thirds' | null = null;
-      Object.keys(firsts).forEach(g => { if (firsts[g] === 'RSA') { rsaGroup = g; rsaKey = 'firsts'; } });
-      Object.keys(seconds).forEach(g => { if (seconds[g] === 'RSA') { rsaGroup = g; rsaKey = 'seconds'; } });
-      const rsaInThirdsIndex = thirds.indexOf('RSA');
+      const standings = computeAllStandings(offMatches);
+      const firsts: Record<string, string> = {};
+      const seconds: Record<string, string> = {};
+      GROUPS.forEach(g => {
+         if (standings[g] && standings[g].length >= 2) {
+           firsts[g] = standings[g][0].teamId;
+           seconds[g] = standings[g][1].teamId;
+         }
+      });
+      const thirds = getRankedThirdPlacedTeams(standings).slice(0, 8).map(t => t.id);
 
-      // Swap FRA and RSA positions if both found
-      if (fraKey || fraInThirdsIndex !== -1 || rsaKey || rsaInThirdsIndex !== -1) {
-        const tempRsaVal = { group: rsaGroup, key: rsaKey, thirdsIndex: rsaInThirdsIndex };
-        const tempFraVal = { group: fraGroup, key: fraKey, thirdsIndex: fraInThirdsIndex };
-
-        // Assign RSA to FRA's former place
-        if (tempFraVal.key === 'firsts') firsts[tempFraVal.group] = 'RSA';
-        else if (tempFraVal.key === 'seconds') seconds[tempFraVal.group] = 'RSA';
-        else if (tempFraVal.thirdsIndex !== -1) thirds[tempFraVal.thirdsIndex] = 'RSA';
-
-        // Assign FRA to RSA's former place (which is 2A)
-        if (tempRsaVal.key === 'firsts') firsts[tempRsaVal.group] = 'FRA';
-        else if (tempRsaVal.key === 'seconds') seconds[tempRsaVal.group] = 'FRA';
-        else if (tempRsaVal.thirdsIndex !== -1) thirds[tempRsaVal.thirdsIndex] = 'FRA';
-      }
-
-      // 2. Find SWE and CAN current positions
-      let sweGroup = '';
-      let sweKey: 'firsts' | 'seconds' | 'thirds' | null = null;
-      Object.keys(firsts).forEach(g => { if (firsts[g] === 'SWE') { sweGroup = g; sweKey = 'firsts'; } });
-      Object.keys(seconds).forEach(g => { if (seconds[g] === 'SWE') { sweGroup = g; sweKey = 'seconds'; } });
-      const sweInThirdsIndex = thirds.indexOf('SWE');
-
-      let canGroup = '';
-      let canKey: 'firsts' | 'seconds' | 'thirds' | null = null;
-      Object.keys(firsts).forEach(g => { if (firsts[g] === 'CAN') { canGroup = g; canKey = 'firsts'; } });
-      Object.keys(seconds).forEach(g => { if (seconds[g] === 'CAN') { canGroup = g; canKey = 'seconds'; } });
-      const canInThirdsIndex = thirds.indexOf('CAN');
-
-      // Swap SWE and CAN positions
-      if (sweKey || sweInThirdsIndex !== -1 || canKey || canInThirdsIndex !== -1) {
-        const tempCanVal = { group: canGroup, key: canKey, thirdsIndex: canInThirdsIndex };
-        const tempSweVal = { group: sweGroup, key: sweKey, thirdsIndex: sweInThirdsIndex };
-
-        // Assign CAN to SWE's former place
-        if (tempSweVal.key === 'firsts') firsts[tempSweVal.group] = 'CAN';
-        else if (tempSweVal.key === 'seconds') seconds[tempSweVal.group] = 'CAN';
-        else if (tempSweVal.thirdsIndex !== -1) thirds[tempSweVal.thirdsIndex] = 'CAN';
-
-        // Assign SWE to CAN's former place (which is 2B)
-        if (tempCanVal.key === 'firsts') firsts[tempCanVal.group] = 'SWE';
-        else if (tempCanVal.key === 'seconds') seconds[tempCanVal.group] = 'SWE';
-        else if (tempCanVal.thirdsIndex !== -1) thirds[tempCanVal.thirdsIndex] = 'SWE';
-      }
-
-      // Force absolute assignment to guarantee 2A vs 2B is Francia vs Suecia
-      seconds['A'] = 'FRA';
-      seconds['B'] = 'SWE';
+      // Restore clean, natural official placements
+      seconds['A'] = 'RSA';
+      seconds['B'] = 'CAN';
+      firsts['I'] = 'FRA';
 
       // Parse and update match_overrides to force specific match dates and teams
       let matchOverrides: Record<string, any> = {};
@@ -1172,23 +1168,23 @@ async function startServer() {
         matchOverrides = typeof configObj.match_overrides === 'string' ? JSON.parse(configObj.match_overrides) : (configObj.match_overrides || {});
       } catch (e) { matchOverrides = configObj.match_overrides || {}; }
 
-      // K73: Francia vs Suecia plays on 2026-06-30 16:00 (Martes 30 de Junio 2026 - 4:00 PM)
+      // K73: Sudafrica vs Canada plays on 2026-06-28 14:00 (Domingo 28 de Junio 2026 - 2:00 PM)
       matchOverrides['K73'] = {
-        date: '2026-06-30',
-        time: '16:00',
-        officialHomeTeamId: 'FRA',
-        officialAwayTeamId: 'SWE'
-      };
-
-      // K78: Sudafrica vs Canada plays on 2026-06-28 14:00
-      matchOverrides['K78'] = {
         date: '2026-06-28',
         time: '14:00',
         officialHomeTeamId: 'RSA',
         officialAwayTeamId: 'CAN'
       };
 
-      // Update the database config with the swapped values and match_overrides
+      // K78: Francia vs Suecia plays on 2026-06-30 16:00 (Martes 30 de Junio 2026 - 4:00 PM)
+      matchOverrides['K78'] = {
+        date: '2026-06-30',
+        time: '16:00',
+        officialHomeTeamId: 'FRA',
+        officialAwayTeamId: 'SWE'
+      };
+
+      // Update the database config with the natural standings and match_overrides
       await pool.query(`
         UPDATE config SET
           official_firsts = $1,
@@ -1197,10 +1193,10 @@ async function startServer() {
           match_overrides = $4
         WHERE id = 'system_config'
       `, [JSON.stringify(firsts), JSON.stringify(seconds), JSON.stringify(thirds), JSON.stringify(matchOverrides)]);
-      console.log("Forced bracket swap of Francia vs Suecia and set K78 to Sudafrica vs Canada in config successful.");
+      console.log("Restored natural official standings and set K73: Sudafrica vs Canada and K78: Francia vs Suecia successfully.");
     }
   } catch (err) {
-    console.error("Error executing bracket swap of Francia vs Suecia:", err);
+    console.error("Error executing natural standings and overrides alignment:", err);
   }
 
   app.use(express.json());
