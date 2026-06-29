@@ -86,6 +86,8 @@ let cachedDbSnapshot: DatabaseSchema | null = null;
 let cachedDbPromise: Promise<DatabaseSchema> | null = null;
 let cachedRankingJson: string | null = null;
 let cachedRankingArray: any[] | null = null;
+let lastCacheTime = 0;
+const CACHE_TTL = 3000; // 3 seconds Time-To-Live for fast manual DB update replication
 
 const cacheVersions = {
   db: Date.now(),
@@ -112,17 +114,22 @@ function invalidateUserPredictionsCache(userId: string) {
 }
 
 async function getFullDatabase(): Promise<DatabaseSchema> {
-  if (cachedDbSnapshot) {
+  const now = Date.now();
+  if (cachedDbSnapshot && (now - lastCacheTime < CACHE_TTL)) {
     return cachedDbSnapshot;
   }
   if (cachedDbPromise) {
     return cachedDbPromise;
   }
 
+  // Clear cache since it is expired or empty
+  invalidateDbCache();
+
   cachedDbPromise = (async () => {
     try {
       const db = await loadDatabaseRaw();
       cachedDbSnapshot = db;
+      lastCacheTime = Date.now();
       return db;
     } finally {
       cachedDbPromise = null;
