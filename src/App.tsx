@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Trophy, 
@@ -253,6 +253,24 @@ export default function App() {
   // Navigation tab
   const [activeTab, setActiveTab] = useState<'info' | 'groups' | 'calendar' | 'bracket' | 'ranking' | 'admin' | 'profile' | 'awards' | 'bracket_official' | 'bracket_mundial'>('info');
   const [bracketMundialMode, setBracketMundialMode] = useState<'official' | 'prediction'>('official');
+
+  // Refs for synchronized horizontal scrolling of bracket mundial
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const bottomScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleTopScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (bottomScrollRef.current && Math.abs(bottomScrollRef.current.scrollLeft - target.scrollLeft) > 1) {
+      bottomScrollRef.current.scrollLeft = target.scrollLeft;
+    }
+  };
+
+  const handleBottomScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (topScrollRef.current && Math.abs(topScrollRef.current.scrollLeft - target.scrollLeft) > 1) {
+      topScrollRef.current.scrollLeft = target.scrollLeft;
+    }
+  };
 
   // Filters
   const [calendarSubTab, setCalendarSubTab] = useState<'pending' | 'completed'>('pending');
@@ -4644,8 +4662,29 @@ export default function App() {
               )}
 
               {(bracketMundialMode === 'prediction' || (hasOfficialBracketConfigured && isOfficialGroupStageCompleted)) && (
-                <div className="w-full overflow-x-auto pb-8 pt-4 rounded-2xl bg-slate-955/50 border border-slate-900/65 shadow-inner scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
-                  <div className="relative min-w-[2500px] h-[1080px] mx-auto select-none">
+                <div className="space-y-4">
+                  {/* Barra de desplazamiento horizontal superior sincronizada */}
+                  <div className="bg-slate-950/40 border border-slate-900/60 rounded-xl p-2 flex items-center gap-3">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest select-none shrink-0 flex items-center gap-1.5 ml-2">
+                      <SlidersHorizontal className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                      Desplazar Bracket:
+                    </span>
+                    <div 
+                      ref={topScrollRef}
+                      onScroll={handleTopScroll}
+                      className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-700 hover:scrollbar-thumb-slate-600 scrollbar-track-transparent rounded-lg py-1"
+                    >
+                      <div className="w-[2500px] h-[4px]" />
+                    </div>
+                  </div>
+
+                  {/* El contenedor principal del bracket */}
+                  <div 
+                    ref={bottomScrollRef}
+                    onScroll={handleBottomScroll}
+                    className="w-full overflow-x-auto pb-8 pt-4 rounded-2xl bg-slate-955/50 border border-slate-900/65 shadow-inner scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent"
+                  >
+                    <div className="relative min-w-[2500px] h-[1080px] mx-auto select-none">
                     
                     {/* CONNECTOR LINES */}
                     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '2500px' }}>
@@ -4893,7 +4932,8 @@ export default function App() {
 
                   </div>
                 </div>
-              )}
+              </div>
+            )}
             </div>
           );
         })()}
