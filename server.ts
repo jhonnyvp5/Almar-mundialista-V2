@@ -87,7 +87,7 @@ let cachedDbPromise: Promise<DatabaseSchema> | null = null;
 let cachedRankingJson: string | null = null;
 let cachedRankingArray: any[] | null = null;
 let lastCacheTime = 0;
-const CACHE_TTL = 3000; // 3 seconds Time-To-Live for fast manual DB update replication
+const CACHE_TTL = 1000; // 1 second Time-To-Live for fast manual DB update replication
 
 const cacheVersions = {
   db: Date.now(),
@@ -1514,15 +1514,7 @@ async function startServer() {
   app.get('/api/predictions/:userId', async (req, res) => {
     const { userId } = req.params;
 
-    if (!userPredictionCacheVersions[userId]) {
-      userPredictionCacheVersions[userId] = Date.now();
-    }
-    const version = userPredictionCacheVersions[userId];
-    res.setHeader('ETag', `W/"pred-${userId}-${version}"`);
-    res.setHeader('Cache-Control', 'public, no-cache');
-    if (req.headers['if-none-match'] === `W/"pred-${userId}-${version}"`) {
-      return res.status(304).end();
-    }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     try {
       const db = await loadDatabase(userId);
@@ -1686,11 +1678,7 @@ async function startServer() {
 
   // API - Get current Configuration
   app.get('/api/config', async (req, res) => {
-    res.setHeader('ETag', `W/"config-${cacheVersions.config}-${APP_VERSION}"`);
-    res.setHeader('Cache-Control', 'public, no-cache');
-    if (req.headers['if-none-match'] === `W/"config-${cacheVersions.config}-${APP_VERSION}"`) {
-      return res.status(304).end();
-    }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     try {
       const db = await loadDatabase();
@@ -1886,11 +1874,7 @@ async function startServer() {
 
   // API - Get official results
   app.get('/api/admin/results', async (req, res) => {
-    res.setHeader('ETag', `W/"results-${cacheVersions.results}"`);
-    res.setHeader('Cache-Control', 'public, no-cache');
-    if (req.headers['if-none-match'] === `W/"results-${cacheVersions.results}"`) {
-      return res.status(304).end();
-    }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     const db = await loadDatabase();
     res.json(db.matches);
   });
@@ -1898,11 +1882,7 @@ async function startServer() {
 
   // API - Get Ranking
   app.get('/api/ranking', async (req, res) => {
-    res.setHeader('ETag', `W/"ranking-${cacheVersions.ranking}"`);
-    res.setHeader('Cache-Control', 'public, no-cache');
-    if (req.headers['if-none-match'] === `W/"ranking-${cacheVersions.ranking}"`) {
-      return res.status(304).end();
-    }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 
     try {
       if (cachedRankingJson) {

@@ -33,6 +33,7 @@ import {
   Lock,
   Unlock,
   ShieldAlert,
+  ShieldCheck,
   Sliders,
   FileSpreadsheet,
   LogOut,
@@ -250,7 +251,8 @@ export default function App() {
   const [editingWeeks, setEditingWeeks] = useState<Record<number, boolean>>({});
 
   // Navigation tab
-  const [activeTab, setActiveTab] = useState<'info' | 'groups' | 'calendar' | 'bracket' | 'ranking' | 'admin' | 'profile' | 'awards'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'groups' | 'calendar' | 'bracket' | 'ranking' | 'admin' | 'profile' | 'awards' | 'bracket_official' | 'bracket_mundial'>('info');
+  const [bracketMundialMode, setBracketMundialMode] = useState<'official' | 'prediction'>('official');
 
   // Filters
   const [calendarSubTab, setCalendarSubTab] = useState<'pending' | 'completed'>('pending');
@@ -1738,6 +1740,197 @@ export default function App() {
     );
   };
 
+  const renderButterflyMatchCard = (matchId: string, isOfficialMode: boolean, style: React.CSSProperties) => {
+    const m = combinedMatches.find(x => x.id === matchId);
+    if (!m) return null;
+
+    const effHomeId = (isOfficialMode && m.officialHomeTeamId) ? m.officialHomeTeamId : m.homeTeamId;
+    const effAwayId = (isOfficialMode && m.officialAwayTeamId) ? m.officialAwayTeamId : m.awayTeamId;
+    const homeRes = resolveTeamWithManualOverrides(effHomeId, isOfficialMode);
+    const awayRes = resolveTeamWithManualOverrides(effAwayId, isOfficialMode);
+    const winnerId = getKnockoutWinnerIdWithOverrides(m, isOfficialMode);
+
+    const isHomePlaceholder = 'placeholder' in homeRes;
+    const isAwayPlaceholder = 'placeholder' in awayRes;
+
+    let hScore = '', aScore = '', pWinnerId = m.winnerId;
+    if (isOfficialMode) {
+      hScore = m.homeScore !== undefined ? m.homeScore.toString() : '';
+      aScore = m.awayScore !== undefined ? m.awayScore.toString() : '';
+    } else {
+      hScore = userPredictions[m.id]?.predictedHome || '';
+      aScore = userPredictions[m.id]?.predictedAway || '';
+      pWinnerId = userPredictions[m.id]?.predictedWinnerId;
+    }
+
+    const isTimeLocked = isMatchLockedForTime(m);
+    const isWeeklyLocked = isMatchWeeklyLocked(m.date, m.stage);
+    const hasOfficialResult = m.homeScore !== undefined;
+    const isKnockoutEditable = currentUser?.role === 'user';
+    const isLocked = isOfficialMode ? true : (m.completed && !isKnockoutEditable) || isTimeLocked || isWeeklyLocked || hasOfficialResult;
+
+    const isDisabled = isOfficialMode || isLocked || isHomePlaceholder || isAwayPlaceholder;
+    const isTie = hScore !== '' && aScore !== '' && parseInt(hScore, 10) === parseInt(aScore, 10);
+
+    const handleScoreBlur = async (homeVal: string, awayVal: string) => {
+      if (isLocked) return;
+      if (homeVal === '' || awayVal === '') return;
+      
+      const tie = parseInt(homeVal, 10) === parseInt(awayVal, 10);
+      if (tie && !pWinnerId) return;
+
+      const payload = {
+        [m.id]: {
+          predictedHome: homeVal,
+          predictedAway: awayVal,
+          predictedWinnerId: tie ? pWinnerId : (parseInt(homeVal, 10) > parseInt(awayVal, 10) ? (homeRes as any).id : (awayRes as any).id),
+          meta: { date: m.date, time: m.time }
+        }
+      };
+
+      try {
+        setUserPredictions(prev => ({ ...prev, ...payload }));
+        await fetch(`/api/predictions/${currentUser?.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ predictions: payload })
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    const handleSelectPenaltyWinner = async (selectedId: string) => {
+      if (isLocked) return;
+      
+      const payload = {
+        [m.id]: {
+          predictedHome: hScore,
+          predictedAway: aScore,
+          predictedWinnerId: selectedId,
+          meta: { date: m.date, time: m.time }
+        }
+      };
+
+      try {
+        setUserPredictions(prev => ({ ...prev, ...payload }));
+        await fetch(`/api/predictions/${currentUser?.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ predictions: payload })
+        });
+        showToast('⚽ ¡Ganador por penales guardado!');
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    return (
+      <div 
+        key={m.id}
+        className={`absolute w-[220px] h-[84px] bg-slate-900/90 hover:bg-slate-850/95 border rounded-xl p-2.5 flex flex-col justify-between text-xs transition-all shadow-md group ${
+          m.completed ? 'border-emerald-800/40 bg-emerald-950/10' : 'border-slate-800 hover:border-slate-700'
+        }`}
+        style={style}
+      >
+        <div className="flex items-center justify-between text-[8px] font-bold tracking-wider text-slate-500 uppercase pb-0.5 border-b border-slate-950/30">
+          <span>M-{m.id}</span>
+          <span className="text-amber-500/80">{m.stage === 'group' ? 'Grupo' : m.stage === '1/16' ? '1/16 Final' : m.stage === '1/8' ? 'Octavos' : m.stage === '1/4' ? 'Cuartos' : m.stage === '1/2' ? 'Semifinal' : m.stage === 'third_place' ? '3º Puesto' : 'Final'}</span>
+        </div>
+
+        <div 
+          onClick={() => isTie && !isDisabled && handleSelectPenaltyWinner((homeRes as any).id)}
+          className={`flex items-center justify-between gap-1 py-0.5 px-1 rounded transition-colors ${
+            isTie && !isDisabled ? 'cursor-pointer hover:bg-slate-800' : ''
+          } ${winnerId === (homeRes as any).id || pWinnerId === (homeRes as any).id ? 'text-amber-400 font-bold bg-amber-500/5' : 'text-slate-300'}`}
+        >
+          <div className="flex items-center gap-1.5 truncate flex-1 min-w-0">
+            {'flag' in homeRes ? (
+              <img src={getTeamFlagUrl((homeRes as any).id)} className="w-5 h-3.5 object-cover rounded shadow-sm border border-slate-850 shrink-0" alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="shrink-0 text-[10px] text-slate-500">🏳️</span>
+            )}
+            <span className="truncate text-[11px]">
+              {'name' in homeRes ? homeRes.name : homeRes.text}
+            </span>
+            {m.id === 'K104' && winnerId === (homeRes as any).id && (
+              <span className="text-[11px] ml-1 shrink-0" title="Campeón - Medalla de Oro">🥇</span>
+            )}
+            {m.id === 'K104' && winnerId && winnerId !== (homeRes as any).id && (homeRes as any).id && (homeRes as any).id !== 'WK101' && (homeRes as any).id !== 'WK102' && (
+              <span className="text-[11px] ml-1 shrink-0" title="Subcampeón - Medalla de Plata">🥈</span>
+            )}
+            {m.id === 'K103' && winnerId === (homeRes as any).id && (
+              <span className="text-[11px] ml-1 shrink-0" title="Tercer Lugar - Medalla de Bronce">🥉</span>
+            )}
+            {isTie && pWinnerId === (homeRes as any).id && (
+              <span className="text-[8px] bg-amber-500 text-slate-950 font-black px-1 rounded shrink-0">PEN</span>
+            )}
+          </div>
+          <input
+            type="text"
+            disabled={isDisabled}
+            value={hScore}
+            onChange={(e) => {
+              const val = e.target.value;
+              setUserPredictions(prev => ({
+                ...prev,
+                [m.id]: { ...(prev[m.id] || {}), predictedHome: val }
+              }));
+            }}
+            onBlur={(e) => handleScoreBlur(e.target.value, aScore)}
+            placeholder="-"
+            className="w-7 text-center bg-slate-950/80 border border-slate-800/80 rounded py-0.5 px-0.5 text-[11px] text-amber-400 font-bold font-mono focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-50"
+          />
+        </div>
+
+        <div 
+          onClick={() => isTie && !isDisabled && handleSelectPenaltyWinner((awayRes as any).id)}
+          className={`flex items-center justify-between gap-1 py-0.5 px-1 rounded transition-colors ${
+            isTie && !isDisabled ? 'cursor-pointer hover:bg-slate-800' : ''
+          } ${winnerId === (awayRes as any).id || pWinnerId === (awayRes as any).id ? 'text-amber-400 font-bold bg-amber-500/5' : 'text-slate-300'}`}
+        >
+          <div className="flex items-center gap-1.5 truncate flex-1 min-w-0">
+            {'flag' in awayRes ? (
+              <img src={getTeamFlagUrl((awayRes as any).id)} className="w-5 h-3.5 object-cover rounded shadow-sm border border-slate-850 shrink-0" alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="shrink-0 text-[10px] text-slate-500">🏳️</span>
+            )}
+            <span className="truncate text-[11px]">
+              {'name' in awayRes ? awayRes.name : awayRes.text}
+            </span>
+            {m.id === 'K104' && winnerId === (awayRes as any).id && (
+              <span className="text-[11px] ml-1 shrink-0" title="Campeón - Medalla de Oro">🥇</span>
+            )}
+            {m.id === 'K104' && winnerId && winnerId !== (awayRes as any).id && (awayRes as any).id && (awayRes as any).id !== 'WK101' && (awayRes as any).id !== 'WK102' && (
+              <span className="text-[11px] ml-1 shrink-0" title="Subcampeón - Medalla de Plata">🥈</span>
+            )}
+            {m.id === 'K103' && winnerId === (awayRes as any).id && (
+              <span className="text-[11px] ml-1 shrink-0" title="Tercer Lugar - Medalla de Bronce">🥉</span>
+            )}
+            {isTie && pWinnerId === (awayRes as any).id && (
+              <span className="text-[8px] bg-amber-500 text-slate-950 font-black px-1 rounded shrink-0">PEN</span>
+            )}
+          </div>
+          <input
+            type="text"
+            disabled={isDisabled}
+            value={aScore}
+            onChange={(e) => {
+              const val = e.target.value;
+              setUserPredictions(prev => ({
+                ...prev,
+                [m.id]: { ...(prev[m.id] || {}), predictedAway: val }
+              }));
+            }}
+            onBlur={(e) => handleScoreBlur(hScore, e.target.value)}
+            placeholder="-"
+            className="w-7 text-center bg-slate-950/80 border border-slate-800/80 rounded py-0.5 px-0.5 text-[11px] text-amber-400 font-bold font-mono focus:ring-1 focus:ring-amber-500 focus:outline-none disabled:opacity-50"
+          />
+        </div>
+      </div>
+    );
+  };
+
   // Handle logging in
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3161,14 +3354,27 @@ export default function App() {
               </button>
             )}
 
+            {/* Ocultado por solicitud del usuario */}
+            {false && (
+              <button
+                onClick={() => setActiveTab('bracket_official')}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'bracket_official' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Trophy className="h-4 w-4 text-emerald-400" />
+                <span>Llaves Eliminatorias Oficial FIFA</span>
+              </button>
+            )}
+
             <button
-              onClick={() => setActiveTab('bracket_official')}
+              onClick={() => setActiveTab('bracket_mundial')}
               className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'bracket_official' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                activeTab === 'bracket_mundial' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Trophy className="h-4 w-4 text-emerald-400" />
-              <span>Llaves Eliminatorias Oficial FIFA</span>
+              <Trophy className="h-4 w-4 text-amber-400" />
+              <span>Bracket Mundial 2026</span>
             </button>
 
             {currentUser?.role !== 'admin' && (
@@ -4367,6 +4573,330 @@ export default function App() {
 
           </div>
         )}
+
+        {/* ==================== TAB: BRACKET MUNDIAL 2026 (MARIPOSA) ==================== */}
+        {activeTab === 'bracket_mundial' && (() => {
+          const y_col1 = [90, 214, 338, 462, 586, 710, 834, 958];
+          const y_col2 = [152, 400, 648, 896];
+          const y_col3 = [276, 772];
+          const y_col4 = [524];
+
+          const y_col1_mid = [132, 256, 380, 504, 628, 752, 876, 1000];
+          const y_col2_mid = [194, 442, 690, 938];
+          const y_col3_mid = [318, 814];
+          const y_col4_mid = [566];
+
+          const leftCol1Ids = ['K75', 'K78', 'K73', 'K76', 'K84', 'K83', 'K82', 'K81'];
+          const leftCol2Ids = ['K89', 'K90', 'K93', 'K94'];
+          const leftCol3Ids = ['K97', 'K98'];
+          const leftCol4Ids = ['K101'];
+
+          const rightCol1Ids = ['K74', 'K77', 'K79', 'K80', 'K87', 'K86', 'K85', 'K88'];
+          const rightCol2Ids = ['K91', 'K92', 'K95', 'K96'];
+          const rightCol3Ids = ['K99', 'K100'];
+          const rightCol4Ids = ['K102'];
+
+          const headers = [
+            { x: '20px', text: '1/16 Final (Izq.)' },
+            { x: '300px', text: 'Octavos (Izq.)' },
+            { x: '580px', text: 'Cuartos (Izq.)' },
+            { x: '860px', text: 'Semifinal (Izq.)' },
+            { x: '1140px', text: 'Gran Final / Podio' },
+            { x: '1420px', text: 'Semifinal (Der.)' },
+            { x: '1700px', text: 'Cuartos (Der.)' },
+            { x: '1980px', text: 'Octavos (Der.)' },
+            { x: '2260px', text: '1/16 Final (Der.)' }
+          ];
+
+          return (
+            <div className="space-y-6">
+              <div className="bg-slate-900/40 p-6 rounded-2xl border border-slate-900 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <h2 className="text-xl font-extrabold text-white uppercase tracking-tight flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-amber-500" />
+                    Bracket Mundial 2026
+                  </h2>
+                  <p className="text-xs text-slate-400 max-w-2xl">
+                    Visualización interactiva y simétrica del cuadro eliminatorio oficial y pronósticos en formato de mariposa.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-3.5 py-1.5 rounded-xl">
+                  <ShieldCheck className="h-4 w-4 text-amber-500" />
+                  <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wide">Oficial FIFA</span>
+                </div>
+              </div>
+
+              {bracketMundialMode === 'official' && (!hasOfficialBracketConfigured || !isOfficialGroupStageCompleted) && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 p-5 rounded-2xl flex flex-col sm:flex-row items-center sm:items-start gap-4 shadow-lg shadow-emerald-500/5">
+                  <div className="bg-emerald-500/20 p-3 rounded-xl shrink-0">
+                    <ShieldAlert className="h-6 w-6 text-emerald-400" />
+                  </div>
+                  <div className="space-y-1.5 flex-1 text-center sm:text-left">
+                    <h3 className="font-bold text-base text-emerald-400 tracking-tight flex items-center justify-center sm:justify-start gap-2">
+                      Llaves Eliminatorias Oficiales Por Definir
+                    </h3>
+                    <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
+                      Las llaves eliminatorias definitivas oficiales estarán disponibles cuando se hayan jugado todos los partidos de las tres primeras semanas (Fase de Grupos) y el administrador configure los clasificados.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {(bracketMundialMode === 'prediction' || (hasOfficialBracketConfigured && isOfficialGroupStageCompleted)) && (
+                <div className="w-full overflow-x-auto pb-8 pt-4 rounded-2xl bg-slate-955/50 border border-slate-900/65 shadow-inner scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                  <div className="relative min-w-[2500px] h-[1080px] mx-auto select-none">
+                    
+                    {/* CONNECTOR LINES */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '2500px' }}>
+                      {/* Left Column 1 to Column 2 */}
+                      {Array.from({ length: 4 }).map((_, i) => {
+                        const y1 = y_col1_mid[2 * i];
+                        const y2 = y_col1_mid[2 * i + 1];
+                        const yMid = y_col2_mid[i];
+                        return (
+                          <g key={`l1-${i}`} stroke="#1e293b" strokeWidth="2" fill="none">
+                            <path d={`M 240,${y1} H 270`} />
+                            <path d={`M 240,${y2} H 270`} />
+                            <path d={`M 270,${y1} V ${y2}`} />
+                            <path d={`M 270,${yMid} H 300`} stroke="#0284c7" />
+                          </g>
+                        );
+                      })}
+
+                      {/* Left Column 2 to Column 3 */}
+                      {Array.from({ length: 2 }).map((_, i) => {
+                        const y1 = y_col2_mid[2 * i];
+                        const y2 = y_col2_mid[2 * i + 1];
+                        const yMid = y_col3_mid[i];
+                        return (
+                          <g key={`l2-${i}`} stroke="#1e293b" strokeWidth="2" fill="none">
+                            <path d={`M 520,${y1} H 550`} />
+                            <path d={`M 520,${y2} H 550`} />
+                            <path d={`M 550,${y1} V ${y2}`} />
+                            <path d={`M 550,${yMid} H 580`} stroke="#0284c7" />
+                          </g>
+                        );
+                      })}
+
+                      {/* Left Column 3 to Column 4 */}
+                      {Array.from({ length: 1 }).map((_, i) => {
+                        const y1 = y_col3_mid[0];
+                        const y2 = y_col3_mid[1];
+                        const yMid = y_col4_mid[0];
+                        return (
+                          <g key={`l3-${i}`} stroke="#1e293b" strokeWidth="2" fill="none">
+                            <path d={`M 800,${y1} H 830`} />
+                            <path d={`M 800,${y2} H 830`} />
+                            <path d={`M 830,${y1} V ${y2}`} />
+                            <path d={`M 830,${yMid} H 860`} stroke="#0284c7" />
+                          </g>
+                        );
+                      })}
+
+                      {/* Left Column 4 to Center */}
+                      <g stroke="#1e293b" strokeWidth="2" fill="none">
+                        <path d={`M 1080,${y_col4_mid[0]} H 1110`} stroke="#38bdf8" />
+                        <path d={`M 1110,${y_col4_mid[0]} V 212 H 1140`} stroke="#38bdf8" />
+                        <path d={`M 1110,${y_col4_mid[0]} V 952 H 1140`} stroke="#475569" />
+                      </g>
+
+                      {/* Right Column 4 to Center */}
+                      <g stroke="#1e293b" strokeWidth="2" fill="none">
+                        <path d={`M 1420,${y_col4_mid[0]} H 1390`} stroke="#38bdf8" />
+                        <path d={`M 1390,${y_col4_mid[0]} V 212 H 1360`} stroke="#38bdf8" />
+                        <path d={`M 1390,${y_col4_mid[0]} V 952 H 1360`} stroke="#475569" />
+                      </g>
+
+                      {/* Right Column 1 to Column 2 */}
+                      {Array.from({ length: 4 }).map((_, i) => {
+                        const y1 = y_col1_mid[2 * i];
+                        const y2 = y_col1_mid[2 * i + 1];
+                        const yMid = y_col2_mid[i];
+                        return (
+                          <g key={`r1-${i}`} stroke="#1e293b" strokeWidth="2" fill="none">
+                            <path d={`M 2260,${y1} H 2230`} />
+                            <path d={`M 2260,${y2} H 2230`} />
+                            <path d={`M 2230,${y1} V ${y2}`} />
+                            <path d={`M 2230,${yMid} H 2200`} stroke="#0284c7" />
+                          </g>
+                        );
+                      })}
+
+                      {/* Right Column 2 to Column 3 */}
+                      {Array.from({ length: 2 }).map((_, i) => {
+                        const y1 = y_col2_mid[2 * i];
+                        const y2 = y_col2_mid[2 * i + 1];
+                        const yMid = y_col3_mid[i];
+                        return (
+                          <g key={`r2-${i}`} stroke="#1e293b" strokeWidth="2" fill="none">
+                            <path d={`M 1980,${y1} H 1950`} />
+                            <path d={`M 1980,${y2} H 1950`} />
+                            <path d={`M 1950,${y1} V ${y2}`} />
+                            <path d={`M 1950,${yMid} H 1920`} stroke="#0284c7" />
+                          </g>
+                        );
+                      })}
+
+                      {/* Right Column 3 to Column 4 */}
+                      {Array.from({ length: 1 }).map((_, i) => {
+                        const y1 = y_col3_mid[0];
+                        const y2 = y_col3_mid[1];
+                        const yMid = y_col4_mid[0];
+                        return (
+                          <g key={`r3-${i}`} stroke="#1e293b" strokeWidth="2" fill="none">
+                            <path d={`M 1700,${y1} H 1670`} />
+                            <path d={`M 1700,${y2} H 1670`} />
+                            <path d={`M 1670,${y1} V ${y2}`} />
+                            <path d={`M 1670,${yMid} H 1640`} stroke="#0284c7" />
+                          </g>
+                        );
+                      })}
+                    </svg>
+
+                    {/* HEADERS */}
+                    {headers.map((h, index) => (
+                      <div 
+                        key={index} 
+                        className="absolute text-center text-[9px] font-black uppercase tracking-widest text-slate-500 bg-slate-950/60 border border-slate-900 px-3 py-1.5 rounded-lg w-[220px]"
+                        style={{ left: h.x, top: '0px' }}
+                      >
+                        {h.text}
+                      </div>
+                    ))}
+
+                    {/* CARDS RENDERING */}
+                    {/* Left Column 1 */}
+                    {leftCol1Ids.map((id, index) => renderButterflyMatchCard(id, bracketMundialMode === 'official', { left: '20px', top: `${y_col1[index]}px` }))}
+
+                    {/* Left Column 2 */}
+                    {leftCol2Ids.map((id, index) => renderButterflyMatchCard(id, bracketMundialMode === 'official', { left: '300px', top: `${y_col2[index]}px` }))}
+
+                    {/* Left Column 3 */}
+                    {leftCol3Ids.map((id, index) => renderButterflyMatchCard(id, bracketMundialMode === 'official', { left: '580px', top: `${y_col3[index]}px` }))}
+
+                    {/* Left Column 4 */}
+                    {leftCol4Ids.map((id, index) => renderButterflyMatchCard(id, bracketMundialMode === 'official', { left: '860px', top: `${y_col4[index]}px` }))}
+
+                    {/* Center Column */}
+                    {renderButterflyMatchCard('K104', bracketMundialMode === 'official', { left: '1140px', top: '170px' })}
+
+                    {/* Champion Showcase Card with World Cup Trophy SVG */}
+                    {(() => {
+                      const matchK104 = combinedMatches.find(x => x.id === 'K104');
+                      const winnerIdK104 = matchK104 ? getKnockoutWinnerIdWithOverrides(matchK104, true) : null;
+                      const champion = winnerIdK104 ? TEAMS.find(t => t.id === winnerIdK104) : null;
+                      
+                      return (
+                        <div 
+                          className="absolute w-[220px] bg-gradient-to-b from-slate-900/95 to-slate-950/95 border border-amber-500/30 rounded-2xl p-4 flex flex-col items-center justify-between shadow-[0_0_25px_rgba(245,158,11,0.15)] text-center text-xs transition-all"
+                          style={{ left: '1140px', top: '275px', height: '330px' }}
+                        >
+                          <div className="flex flex-col items-center space-y-1">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-500">Campeón del Mundo</span>
+                            <div className="w-16 h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent rounded-full" />
+                          </div>
+                          
+                          {/* Real FIFA World Cup Trophy Image */}
+                          <div className="relative flex items-center justify-center py-2 h-28">
+                            <div className="absolute inset-0 bg-amber-500/10 blur-xl rounded-full w-24 h-24 -translate-y-2 animate-pulse" />
+                            <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-amber-400/60 bg-gradient-to-tr from-amber-600 via-yellow-400 to-amber-500 flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.4)]">
+                              <img 
+                                src="https://i.pinimg.com/474x/3f/2c/16/3f2c1645bd037c8d2471bbd9be550989.jpg"
+                                alt="Copa del Mundo FIFA"
+                                className="h-[92%] w-[92%] object-contain mix-blend-multiply filter contrast-125 brightness-105 saturate-110"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          </div>
+
+                          {champion ? (
+                            <div className="flex flex-col items-center space-y-1.5 z-10">
+                              <img 
+                                src={getTeamFlagUrl(champion.id)} 
+                                className="w-12 h-8 object-cover rounded-md shadow-md border border-amber-500/40" 
+                                alt="" 
+                                referrerPolicy="no-referrer" 
+                              />
+                              <div className="space-y-0.5">
+                                <div className="text-[13px] font-black text-white tracking-tight uppercase leading-tight truncate max-w-[200px]">{champion.name}</div>
+                                <div className="text-[8px] text-amber-500 font-bold tracking-widest uppercase">CAMPEÓN 2026</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-slate-500 italic text-[11px] px-2 leading-tight">
+                              Por definir una vez concluida la Final (M-K104)
+                            </div>
+                          )}
+                          
+                          <div className="text-[8px] font-bold text-slate-600 tracking-widest uppercase">
+                            FIFA WORLD CUP
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Third Place Medal Card */}
+                    {(() => {
+                      const matchK103 = combinedMatches.find(x => x.id === 'K103');
+                      const winnerIdK103 = matchK103 ? getKnockoutWinnerIdWithOverrides(matchK103, true) : null;
+                      const thirdPlaceTeam = winnerIdK103 ? TEAMS.find(t => t.id === winnerIdK103) : null;
+                      
+                      return (
+                        <div 
+                          className="absolute w-[220px] bg-gradient-to-b from-slate-900/95 to-slate-950/95 border border-amber-800/30 rounded-2xl p-3 flex flex-col items-center justify-between shadow-[0_0_15px_rgba(217,119,6,0.05)] text-center text-xs transition-all"
+                          style={{ left: '1140px', top: '775px', height: '115px' }}
+                        >
+                          <div className="flex items-center gap-1.5 justify-center">
+                            <Award className="h-4 w-4 text-amber-600 fill-amber-700/10" />
+                            <span className="text-[9px] font-black uppercase tracking-wider text-amber-600">Tercer Lugar</span>
+                          </div>
+                          <div className="w-12 h-[1px] bg-amber-800/20 rounded-full" />
+                          
+                          {thirdPlaceTeam ? (
+                            <div className="flex items-center gap-2 mt-1">
+                              <img 
+                                src={getTeamFlagUrl(thirdPlaceTeam.id)} 
+                                className="w-9 h-6 object-cover rounded shadow border border-amber-800/20" 
+                                alt="" 
+                                referrerPolicy="no-referrer" 
+                              />
+                              <div className="text-left">
+                                <div className="text-[11px] font-extrabold text-white leading-tight uppercase truncate max-w-[130px]">{thirdPlaceTeam.name}</div>
+                                <div className="text-[8.5px] text-amber-600 font-extrabold flex items-center gap-0.5">
+                                  <span>🥉 Medalla de Bronce</span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-slate-500 italic text-[10px] leading-tight px-1 py-1">
+                              Por definir en partido M-K103
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {renderButterflyMatchCard('K103', bracketMundialMode === 'official', { left: '1140px', top: '910px' })}
+
+                    {/* Right Column 4 */}
+                    {rightCol4Ids.map((id, index) => renderButterflyMatchCard(id, bracketMundialMode === 'official', { left: '1420px', top: `${y_col4[index]}px` }))}
+
+                    {/* Right Column 3 */}
+                    {rightCol3Ids.map((id, index) => renderButterflyMatchCard(id, bracketMundialMode === 'official', { left: '1700px', top: `${y_col3[index]}px` }))}
+
+                    {/* Right Column 2 */}
+                    {rightCol2Ids.map((id, index) => renderButterflyMatchCard(id, bracketMundialMode === 'official', { left: '1980px', top: `${y_col2[index]}px` }))}
+
+                    {/* Right Column 1 */}
+                    {rightCol1Ids.map((id, index) => renderButterflyMatchCard(id, bracketMundialMode === 'official', { left: '2260px', top: `${y_col1[index]}px` }))}
+
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ==================== TAB: GENERAL RANKING (PUNTAJES) ==================== */}
         {activeTab === 'ranking' && (

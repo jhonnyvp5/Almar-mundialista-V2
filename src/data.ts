@@ -232,14 +232,14 @@ export function generateKnockoutMatches(): Match[] {
     { id: 'K88', type: 'knockout', stage: '1/16', date: '2026-07-03', time: '20:30', venue: VENUES[15], homeTeamId: 'COL', awayTeamId: 'GHA' },
 
     // 1/8 Final (Round of 16)
-    { id: 'K89', type: 'knockout', stage: '1/8', date: '2026-07-04', time: '12:00', venue: VENUES[0], homeTeamId: 'WK73', awayTeamId: 'WK75' },
-    { id: 'K90', type: 'knockout', stage: '1/8', date: '2026-07-04', time: '16:00', venue: VENUES[1], homeTeamId: 'WK74', awayTeamId: 'WK77' },
-    { id: 'K91', type: 'knockout', stage: '1/8', date: '2026-07-05', time: '15:00', venue: VENUES[2], homeTeamId: 'WK76', awayTeamId: 'WK78' },
+    { id: 'K89', type: 'knockout', stage: '1/8', date: '2026-07-04', time: '12:00', venue: VENUES[0], homeTeamId: 'WK75', awayTeamId: 'WK78' },
+    { id: 'K90', type: 'knockout', stage: '1/8', date: '2026-07-04', time: '16:00', venue: VENUES[1], homeTeamId: 'WK73', awayTeamId: 'WK76' },
+    { id: 'K91', type: 'knockout', stage: '1/8', date: '2026-07-05', time: '15:00', venue: VENUES[2], homeTeamId: 'WK74', awayTeamId: 'WK77' },
     { id: 'K92', type: 'knockout', stage: '1/8', date: '2026-07-05', time: '19:00', venue: VENUES[3], homeTeamId: 'WK79', awayTeamId: 'WK80' },
-    { id: 'K93', type: 'knockout', stage: '1/8', date: '2026-07-06', time: '14:00', venue: VENUES[4], homeTeamId: 'WK83', awayTeamId: 'WK84' },
-    { id: 'K94', type: 'knockout', stage: '1/8', date: '2026-07-06', time: '19:00', venue: VENUES[5], homeTeamId: 'WK81', awayTeamId: 'WK82' },
-    { id: 'K95', type: 'knockout', stage: '1/8', date: '2026-07-07', time: '11:00', venue: VENUES[6], homeTeamId: 'WK86', awayTeamId: 'WK88' },
-    { id: 'K96', type: 'knockout', stage: '1/8', date: '2026-07-07', time: '15:00', venue: VENUES[7], homeTeamId: 'WK85', awayTeamId: 'WK87' },
+    { id: 'K93', type: 'knockout', stage: '1/8', date: '2026-07-06', time: '14:00', venue: VENUES[4], homeTeamId: 'WK84', awayTeamId: 'WK83' },
+    { id: 'K94', type: 'knockout', stage: '1/8', date: '2026-07-06', time: '19:00', venue: VENUES[5], homeTeamId: 'WK82', awayTeamId: 'WK81' },
+    { id: 'K95', type: 'knockout', stage: '1/8', date: '2026-07-07', time: '11:00', venue: VENUES[6], homeTeamId: 'WK87', awayTeamId: 'WK86' },
+    { id: 'K96', type: 'knockout', stage: '1/8', date: '2026-07-07', time: '15:00', venue: VENUES[7], homeTeamId: 'WK85', awayTeamId: 'WK88' },
 
     // Quarter Finals
     { id: 'K97', type: 'knockout', stage: '1/4', date: '2026-07-09', time: '15:00', venue: VENUES[8], homeTeamId: 'WK89', awayTeamId: 'WK90' },
